@@ -1,20 +1,11 @@
 # aixa
 
-[![npm version][npm-version-src]][npm-version-href]
-[![License][license-src]][license-href]
+[![npm version](https://img.shields.io/npm/v/aixa?style=flat&colorA=130f40&colorB=474787)](https://npmjs.com/package/aixa)
+[![npm downloads](https://img.shields.io/npm/dm/aixa?style=flat&colorA=130f40&colorB=474787)](https://npm.chart.dev/aixa)
+[![license](https://img.shields.io/github/license/oritwoen/aixa?style=flat&colorA=130f40&colorB=474787)](https://github.com/oritwoen/aixa/blob/main/LICENSE)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/oritwoen/aixa)
 
-Agnostic metadata toolkit for AI tools: binaries, configs, sessions, and storage formats.
-
-## Purpose
-
-`aixa` is a tool-agnostic layer for AI CLIs and assistants (for example Codex, Gemini, Claude, OpenCode). It provides one normalized model for:
-
-- binary names and executable locations
-- config file locations and structure
-- session storage locations and formats
-- runtime metadata needed by higher-level libraries
-
-The goal is to let other packages query and invoke tool data without re-implementing every integration from scratch.
+Metadata toolkit for AI coding agents. One registry of paths, formats, and detection rules for every major CLI.
 
 ## Install
 
@@ -25,18 +16,66 @@ pnpm add aixa
 ## Usage
 
 ```ts
-import { version } from "aixa";
+import { getClient, detectClient, detectProjectClients } from "aixa";
 
-console.log(version);
+const claude = getClient("claude");
+console.log(claude.skills); // [{ path: ".claude/skills/", scope: "project", ... }, ...]
+console.log(claude.hooks); // [{ path: ".claude/hooks/", scope: "project", ... }, ...]
+
+// Resolve to absolute paths for current platform
+const paths = claude.resolve({ platform: "linux", homeDir: "/home/dev" });
+console.log(paths.config); // [{ path: "/home/dev/.claude/settings.json", ... }, ...]
+
+// Detect which agent is running (env vars first, then project markers)
+const active = detectClient();
+if (active) {
+  console.log(`Running inside ${active.name}`);
+}
+
+// Find all agents configured in a project directory
+const agents = detectProjectClients("/path/to/project");
 ```
+
+Session schemas are typed per agent, so you get structure when parsing JSONL/SQLite/JSON files:
+
+```ts
+import type { ClaudeSessionEntry, CodexThread, GeminiConversationRecord } from "aixa";
+```
+
+## Supported agents
+
+| Agent          | ID               | Detection     | Skills                | Hooks                    | Sessions       |
+| -------------- | ---------------- | ------------- | --------------------- | ------------------------ | -------------- |
+| Claude Code    | `claude`         | env + project | `.claude/skills/`     | `.claude/hooks/`         | JSONL          |
+| Codex CLI      | `codex`          | project       | `.agents/skills/`     | -                        | SQLite + JSONL |
+| Gemini CLI     | `gemini`         | env + project | `.gemini/skills/`     | -                        | JSON           |
+| OpenCode       | `opencode`       | project       | `.opencode/skills/`   | -                        | SQLite         |
+| Cursor         | `cursor`         | env + project | `.cursor/skills/`     | -                        | -              |
+| GitHub Copilot | `github-copilot` | env + project | `.github/skills/`     | -                        | -              |
+| Mastra Code    | `mastracode`     | project       | `.mastracode/skills/` | `.mastracode/hooks.json` | SQLite         |
+
+Each agent definition includes config paths, session locations, instruction files, skills dirs, hooks, commands, persistence formats, capabilities (MCP, vision, tools, streaming), and detection rules. All paths carry `scope` (user/project/system/data), `level` (official/community/inferred), and optional `platforms` tags.
+
+## CLI
+
+```bash
+aixa list                  # all known agents
+aixa detect                # which ones are installed + versions
+aixa info claude           # full metadata for an agent
+aixa paths claude          # resolved paths for current platform
+aixa info codex --json     # machine-readable output
+```
+
+## How aixa compares to unagent
+
+[unagent](https://github.com/onmax/unagent) covers similar ground but makes different tradeoffs.
+
+**aixa is deep and narrow.** Each agent gets verified, platform-specific paths with scope, evidence level, and platform tags. Session formats are typed per agent. Seven agents, each fully mapped.
+
+**unagent is wide and shallow.** 40+ agents detected by env vars, but each definition is just `configDir` + `rulesFile` + `skillsDir`. No platform-specific paths, no session schemas. In exchange, it ships runtime primitives aixa doesn't touch: skill install/uninstall, vector stores, browser automation, sandboxes, queues, workflows.
+
+aixa tells you _where things live and what format they're in_. unagent tells you _which agent is running_ and gives you tools to _do things_ with skills. They could use each other.
 
 ## License
 
 [MIT](./LICENSE)
-
-<!-- Badges -->
-
-[npm-version-src]: https://img.shields.io/npm/v/aixa?style=flat
-[npm-version-href]: https://npmjs.com/package/aixa
-[license-src]: https://img.shields.io/npm/l/aixa?style=flat
-[license-href]: https://github.com/oritwoen/aixa/blob/main/LICENSE

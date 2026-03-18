@@ -10,11 +10,14 @@
     "type": "git",
     "url": "git+https://github.com/oritwoen/aixa.git"
   },
+  "bin": {
+    "aixa": "./dist/cli.mjs"
+  },
   "files": [
     "dist"
   ],
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": true,
   "main": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
   "exports": {
@@ -26,15 +29,19 @@
   "scripts": {
     "build": "obuild",
     "dev": "obuild --stub",
-    "fmt": "oxlint src test *.ts --fix && oxfmt src test *.ts *.json *.md --write",
-    "lint": "oxlint src test *.ts && oxfmt src test *.ts *.json *.md --check",
+    "lint": "oxlint . && oxfmt --check .",
+    "lint:fix": "oxlint . --fix && oxfmt .",
     "typecheck": "tsgo --noEmit --skipLibCheck",
     "test": "vitest",
     "test:run": "vitest --run",
     "prepack": "pnpm run build",
     "release": "pnpm test:run && pnpm build && changelogen --release --push"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@toon-format/toon": "^2.1.0",
+    "citty": "^0.2.1",
+    "consola": "^3.4.2"
+  },
   "devDependencies": {
     "@types/node": "latest",
     "@typescript/native-preview": "latest",
@@ -48,5 +55,5 @@
   "engines": {
     "node": ">=22"
   },
-  "packageManager": "pnpm@10.12.1"
+  "packageManager": "pnpm@10.30.3"
 }

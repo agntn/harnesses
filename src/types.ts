@@ -1,0 +1,75 @@
+import { createRequire } from "node:module";
+
+const _require = createRequire(import.meta.url);
+const pkg = _require("../package.json") as { version: string };
+
+export const version: string = pkg.version;
+
+export type ClientId =
+  | "codex"
+  | "gemini"
+  | "claude"
+  | "opencode"
+  | "cursor"
+  | "github-copilot"
+  | "mastracode";
+export type EvidenceLevel = "official" | "community" | "inferred";
+export type Platform = "linux" | "darwin" | "win32";
+
+export interface PathCandidate {
+  path: string;
+  scope: "user" | "project" | "system" | "data";
+  level: EvidenceLevel;
+  platforms?: Platform[];
+  note?: string;
+}
+
+export interface StorageDescriptor {
+  format: string;
+  level: EvidenceLevel;
+  note?: string;
+}
+
+export interface ClientCapabilities {
+  mcp: boolean;
+  vision: boolean;
+  tools: boolean;
+  streaming: boolean;
+}
+
+export interface ClientDetection {
+  /** Environment variables that indicate running inside this agent. */
+  envVars: string[];
+  /** Project-level files or directories whose presence indicates this agent. */
+  projectMarkers: string[];
+}
+
+export interface ClientDefinition {
+  id: ClientId;
+  name: string;
+  binaries: string[];
+  config: PathCandidate[];
+  sessions: PathCandidate[];
+  persistence: StorageDescriptor[];
+  instructions: PathCandidate[];
+  skills: PathCandidate[];
+  commands: PathCandidate[];
+  hooks: PathCandidate[];
+  capabilities: ClientCapabilities;
+  detection?: ClientDetection;
+}
+
+export interface ResolveOptions {
+  homeDir?: string;
+  projectRoot?: string;
+  platform?: Platform;
+}
+
+export interface ResolvedPaths {
+  config: PathCandidate[];
+  sessions: PathCandidate[];
+  instructions: PathCandidate[];
+  skills: PathCandidate[];
+  commands: PathCandidate[];
+  hooks: PathCandidate[];
+}

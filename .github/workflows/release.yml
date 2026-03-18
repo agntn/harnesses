@@ -7,7 +7,7 @@ permissions:
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   release:
@@ -16,14 +16,21 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+
       - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v6
         with:
           node-version: lts/*
           cache: pnpm
           registry-url: https://registry.npmjs.org
-      - run: pnpm i
+
+      - run: pnpm i --frozen-lockfile
+
+      - run: pnpm test:run
+
       - run: pnpm build
+
       - run: pnpm publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}

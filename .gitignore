@@ -5,3 +5,6 @@ dist/
 gixa/
 regxa/
 websxa/
+CLAUDE.md
+src/**/CLAUDE.md
+test/**/CLAUDE.md
