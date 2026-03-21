@@ -1,6 +1,6 @@
-import { defineClient } from "../registry.ts";
+import type { ClientDefinition } from "../types.ts";
 
-export default defineClient({
+export default {
   id: "codex",
   name: "OpenAI Codex CLI",
   binaries: ["codex"],
@@ -94,4 +94,4 @@ export default defineClient({
     envVars: [],
     projectMarkers: [".codex", "AGENTS.md", "AGENTS.override.md", ".agents/skills"],
   },
-});
+} satisfies ClientDefinition;

@@ -1,6 +1,6 @@
-import { defineClient } from "../registry.ts";
+import type { ClientDefinition } from "../types.ts";
 
-export default defineClient({
+export default {
   id: "cursor",
   name: "Cursor",
   binaries: ["cursor"],
@@ -60,4 +60,4 @@ export default defineClient({
     envVars: ["CURSOR_SESSION", "CURSOR_TRACE_ID"],
     projectMarkers: [".cursor", ".cursorrules"],
   },
-});
+} satisfies ClientDefinition;

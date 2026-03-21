@@ -1,6 +1,6 @@
-import { defineClient } from "../registry.ts";
+import type { ClientDefinition } from "../types.ts";
 
-export default defineClient({
+export default {
   id: "opencode",
   name: "OpenCode CLI",
   binaries: ["opencode"],
@@ -97,4 +97,4 @@ export default defineClient({
     envVars: [],
     projectMarkers: [".opencode", "opencode.jsonc", "opencode.json"],
   },
-});
+} satisfies ClientDefinition;

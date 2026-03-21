@@ -1,5 +1,3 @@
-import "./clients/index.ts";
-
 export { version } from "./types.ts";
 export type {
   ClientId,

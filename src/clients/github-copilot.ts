@@ -1,6 +1,6 @@
-import { defineClient } from "../registry.ts";
+import type { ClientDefinition } from "../types.ts";
 
-export default defineClient({
+export default {
   id: "github-copilot",
   name: "GitHub Copilot",
   binaries: [],
@@ -47,4 +47,4 @@ export default defineClient({
     envVars: ["COPILOT_RUN_APP"],
     projectMarkers: [".github/copilot-instructions.md", ".github/skills", ".github/instructions"],
   },
-});
+} satisfies ClientDefinition;

@@ -1,26 +1,37 @@
 import { Client } from "./client.ts";
+import { definitions } from "./clients/index.ts";
 import type { ClientDefinition, ClientId } from "./types.ts";
 
-const registry = new Map<ClientId, Client>();
+let registry: Map<ClientId, Client> | undefined;
+
+function getRegistry(): Map<ClientId, Client> {
+  if (!registry) {
+    registry = new Map();
+    for (const def of definitions) {
+      registry.set(def.id, new Client(def));
+    }
+  }
+  return registry;
+}
 
 export function defineClient(definition: ClientDefinition): Client {
   const client = new Client(definition);
-  registry.set(definition.id, client);
+  getRegistry().set(definition.id, client);
   return client;
 }
 
 export function getClient(id: ClientId): Client {
-  const client = registry.get(id);
+  const client = getRegistry().get(id);
   if (!client) throw new Error(`Unknown client: ${id}`);
   return client;
 }
 
 export function listClients(): ClientId[] {
-  return [...registry.keys()];
+  return [...getRegistry().keys()];
 }
 
 export function getAllClients(): Client[] {
-  return [...registry.values()];
+  return [...getRegistry().values()];
 }
 
 /**
@@ -28,7 +39,7 @@ export function getAllClients(): Client[] {
  * Returns the first match since env detection is unambiguous.
  */
 export function detectClientFromEnv(): Client | null {
-  for (const client of registry.values()) {
+  for (const client of getRegistry().values()) {
     if (client.detectEnv()) return client;
   }
   return null;
@@ -39,7 +50,7 @@ export function detectClientFromEnv(): Client | null {
  * Returns all matches (multiple agents can be configured in the same project).
  */
 export function detectProjectClients(cwd?: string): Client[] {
-  return [...registry.values()].filter((client) => client.detectProject(cwd));
+  return [...getRegistry().values()].filter((client) => client.detectProject(cwd));
 }
 
 /**
@@ -53,7 +64,7 @@ export function detectClient(cwd?: string): Client | null {
   if (fromEnv) return fromEnv;
 
   let match: Client | null = null;
-  for (const client of registry.values()) {
+  for (const client of getRegistry().values()) {
     if (client.detectProject(cwd)) {
       if (match) return null;
       match = client;

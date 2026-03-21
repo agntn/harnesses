@@ -1,6 +1,6 @@
-import { defineClient } from "../registry.ts";
+import type { ClientDefinition } from "../types.ts";
 
-export default defineClient({
+export default {
   id: "gemini",
   name: "Google Gemini CLI",
   binaries: ["gemini"],
@@ -96,4 +96,4 @@ export default defineClient({
     envVars: ["GEMINI_CLI"],
     projectMarkers: [".gemini", "GEMINI.md"],
   },
-});
+} satisfies ClientDefinition;

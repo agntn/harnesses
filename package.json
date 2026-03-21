@@ -1,5 +1,5 @@
 {
-  "name": "aixa",
+  "name": "agmi",
   "version": "0.0.1",
   "description": "Agnostic metadata toolkit for AI tools: binaries, configs, sessions, and storage formats.",
   "homepage": "https://github.com/oritwoen/aixa#readme",
@@ -17,7 +17,7 @@
     "dist"
   ],
   "type": "module",
-  "sideEffects": true,
+  "sideEffects": false,
   "main": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
   "exports": {

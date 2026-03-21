@@ -1,6 +1,6 @@
-import { defineClient } from "../registry.ts";
+import type { ClientDefinition } from "../types.ts";
 
-export default defineClient({
+export default {
   id: "mastracode",
   name: "Mastra Code",
   binaries: ["mastracode"],
@@ -133,4 +133,4 @@ export default defineClient({
     envVars: [],
     projectMarkers: [".mastracode"],
   },
-});
+} satisfies ClientDefinition;

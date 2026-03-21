@@ -1,6 +1,6 @@
-import { defineClient } from "../registry.ts";
+import type { ClientDefinition } from "../types.ts";
 
-export default defineClient({
+export default {
   id: "claude",
   name: "Anthropic Claude Code",
   binaries: ["claude"],
@@ -128,4 +128,4 @@ export default defineClient({
       "CLAUDE.md",
     ],
   },
-});
+} satisfies ClientDefinition;
