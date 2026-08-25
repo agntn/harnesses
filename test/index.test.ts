@@ -222,9 +222,9 @@ describe("aixa", () => {
     expect(typeof client.isInstalled()).toBe("boolean");
   });
 
-  it("should attempt version detection without throwing", () => {
+  it("should expose detected version without throwing", () => {
     const client = getClient("codex");
-    const v = client.getVersion();
+    const v = client.version;
     expect(v === null || typeof v === "string").toBe(true);
   });
 

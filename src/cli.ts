@@ -104,7 +104,7 @@ const detect = defineCommand({
     const clients = getAllClients();
     const results = clients.map((client) => {
       const installed = client.isInstalled();
-      const v = installed ? client.getVersion() : null;
+      const v = installed ? client.version : null;
       return { id: client.id, name: client.name, installed, version: v };
     });
 

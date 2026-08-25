@@ -54,7 +54,7 @@ export abstract class Client {
     return this.detection.projectMarkers.some((marker) => existsSync(join(dir, marker)));
   }
 
-  getVersion(): string | null {
+  get version(): string | null {
     for (const binary of this.binaries) {
       try {
         const output = execFileSync(binary, ["--version"], {
