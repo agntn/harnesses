@@ -1,4 +1,4 @@
-import type { ClientConstructor } from "../client.ts";
+import type { HarnessConstructor } from "../harness.ts";
 import Claude from "./claude.ts";
 import Codex from "./codex.ts";
 import Cursor from "./cursor.ts";
@@ -7,7 +7,7 @@ import GitHubCopilot from "./github-copilot.ts";
 import MastraCode from "./mastracode.ts";
 import OpenCode from "./opencode.ts";
 
-export const clients: ClientConstructor[] = [
+export const harnesses: HarnessConstructor[] = [
   Claude,
   Codex,
   Cursor,

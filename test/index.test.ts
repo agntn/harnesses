@@ -1,29 +1,29 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
-  getAllClients,
-  getClient,
-  listClients,
+  getAllHarnesses,
+  getHarness,
+  listHarnesses,
   resolvePathTemplate,
-  detectClient,
-  detectClientFromEnv,
-  detectProjectClients,
-  clientIds,
+  detectHarness,
+  detectHarnessFromEnv,
+  detectProjectHarnesses,
+  harnessIds,
   version,
-  Client,
+  Harness,
 } from "../src/index";
 
 afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-describe("aixa", () => {
+describe("@agntn/harnesses", () => {
   it("should export version", () => {
     expect(version).toBeDefined();
     expect(version).toMatch(/^\d+\.\d+\.\d+/);
   });
 
-  it("should expose stable client ids", () => {
-    expect([...clientIds].sort()).toEqual([
+  it("should expose stable harness ids", () => {
+    expect([...harnessIds].sort()).toEqual([
       "claude",
       "codex",
       "cursor",
@@ -32,29 +32,29 @@ describe("aixa", () => {
       "mastracode",
       "opencode",
     ]);
-    expect(listClients().sort()).toEqual([...clientIds].sort());
+    expect(listHarnesses().sort()).toEqual([...harnessIds].sort());
   });
 
-  it("should return Client instance for a known client", () => {
-    const codex = getClient("codex");
+  it("should return a Harness instance for a known harness", () => {
+    const codex = getHarness("codex");
 
-    expect(codex).toBeInstanceOf(Client);
+    expect(codex).toBeInstanceOf(Harness);
     expect(codex.binaries).toContain("codex");
     expect(codex.config.some((entry) => entry.level === "official")).toBe(true);
     expect(codex.sessions.length).toBeGreaterThan(0);
   });
 
-  it("should return all supported clients", () => {
-    const all = getAllClients();
+  it("should return all supported harnesses", () => {
+    const all = getAllHarnesses();
 
-    expect(all).toHaveLength(clientIds.length);
-    expect(all.every((client) => client instanceof Client)).toBe(true);
-    const cliClients = all.filter((c) => c.id !== "github-copilot");
-    expect(cliClients.every((client) => client.binaries.length > 0)).toBe(true);
+    expect(all).toHaveLength(harnessIds.length);
+    expect(all.every((harness) => harness instanceof Harness)).toBe(true);
+    const cliHarnesses = all.filter((c) => c.id !== "github-copilot");
+    expect(cliHarnesses.every((harness) => harness.binaries.length > 0)).toBe(true);
   });
 
-  it("should instantiate a concrete subclass for every client", () => {
-    expect(getAllClients().every((client) => client.constructor !== Client)).toBe(true);
+  it("should instantiate a concrete subclass for every harness", () => {
+    expect(getAllHarnesses().every((harness) => harness.constructor !== Harness)).toBe(true);
   });
 
   it("should resolve template placeholders", () => {
@@ -66,8 +66,8 @@ describe("aixa", () => {
     expect(resolved).toBe("/tmp/home/x//repo/project");
   });
 
-  it("should resolve client config and session paths", () => {
-    const claude = getClient("claude");
+  it("should resolve harness config and session paths", () => {
+    const claude = getHarness("claude");
     const resolved = claude.resolve({
       homeDir: "/home/test",
       projectRoot: "/work/repo",
@@ -79,19 +79,19 @@ describe("aixa", () => {
   });
 
   it("should resolve %ENVVAR% placeholders", () => {
-    vi.stubEnv("AIXA_TEST_DIR", "/test/appdata");
+    vi.stubEnv("HARNESSES_TEST_DIR", "/test/appdata");
 
-    const resolved = resolvePathTemplate("%AIXA_TEST_DIR%/opencode/config.json");
+    const resolved = resolvePathTemplate("%HARNESSES_TEST_DIR%/opencode/config.json");
     expect(resolved).toBe("/test/appdata/opencode/config.json");
   });
 
   it("should leave unresolvable %ENVVAR% as-is", () => {
-    const resolved = resolvePathTemplate("%AIXA_NONEXISTENT_VAR%/config.json");
-    expect(resolved).toBe("%AIXA_NONEXISTENT_VAR%/config.json");
+    const resolved = resolvePathTemplate("%HARNESSES_NONEXISTENT_VAR%/config.json");
+    expect(resolved).toBe("%HARNESSES_NONEXISTENT_VAR%/config.json");
   });
 
   it("should use uniform xdg paths for opencode across platforms", () => {
-    const opencode = getClient("opencode");
+    const opencode = getHarness("opencode");
     const darwin = opencode.resolve({
       homeDir: "/Users/test",
       platform: "darwin",
@@ -110,7 +110,7 @@ describe("aixa", () => {
   });
 
   it("should include cross-platform paths regardless of platform filter", () => {
-    const claude = getClient("claude");
+    const claude = getHarness("claude");
     const resolved = claude.resolve({
       homeDir: "C:\\Users\\test",
       platform: "win32",
@@ -121,7 +121,7 @@ describe("aixa", () => {
   });
 
   it("should filter codex system paths to linux and darwin only", () => {
-    const codex = getClient("codex");
+    const codex = getHarness("codex");
     const win = codex.resolve({
       homeDir: "C:\\Users\\test",
       platform: "win32",
@@ -136,7 +136,7 @@ describe("aixa", () => {
   });
 
   it("should reject inherited property names as platforms", () => {
-    const codex = getClient("codex");
+    const codex = getHarness("codex");
 
     expect(() => Reflect.apply(codex.resolve, codex, [{ platform: "toString" }])).toThrow(
       "Unsupported platform: toString",
@@ -144,7 +144,7 @@ describe("aixa", () => {
   });
 
   it("should return platform-specific gemini system paths", () => {
-    const gemini = getClient("gemini");
+    const gemini = getHarness("gemini");
     const linux = gemini.resolve({ homeDir: "/home/test", platform: "linux" });
     const darwin = gemini.resolve({ homeDir: "/Users/test", platform: "darwin" });
 
@@ -158,7 +158,7 @@ describe("aixa", () => {
   });
 
   it("should expose platforms field in raw metadata", () => {
-    const codex = getClient("codex");
+    const codex = getHarness("codex");
 
     const unixOnly = codex.config.filter(
       (e) => e.platforms?.includes("linux") && e.platforms?.includes("darwin"),
@@ -169,24 +169,24 @@ describe("aixa", () => {
     expect(crossPlatform.length).toBeGreaterThan(0);
   });
 
-  it("should have instructions for each client", () => {
-    const all = getAllClients();
-    for (const client of all) {
-      expect(client.instructions.length).toBeGreaterThan(0);
-      expect(client.instructions.every((i) => i.level !== undefined)).toBe(true);
+  it("should have instructions for each harness", () => {
+    const all = getAllHarnesses();
+    for (const harness of all) {
+      expect(harness.instructions.length).toBeGreaterThan(0);
+      expect(harness.instructions.every((i) => i.level !== undefined)).toBe(true);
     }
   });
 
-  it("should have skills or commands for each client", () => {
-    const all = getAllClients();
-    for (const client of all) {
-      const hasSkillsOrCommands = client.skills.length > 0 || client.commands.length > 0;
+  it("should have skills or commands for each harness", () => {
+    const all = getAllHarnesses();
+    for (const harness of all) {
+      const hasSkillsOrCommands = harness.skills.length > 0 || harness.commands.length > 0;
       expect(hasSkillsOrCommands).toBe(true);
     }
   });
 
   it("should resolve skills paths", () => {
-    const claude = getClient("claude");
+    const claude = getHarness("claude");
     const resolved = claude.resolve({
       homeDir: "/home/test",
       platform: "linux",
@@ -196,18 +196,18 @@ describe("aixa", () => {
     expect(resolved.skills.some((sk) => sk.path.includes(".claude/skills/"))).toBe(true);
   });
 
-  it("should have capabilities for each client", () => {
-    const all = getAllClients();
-    for (const client of all) {
-      expect(typeof client.capabilities.mcp).toBe("boolean");
-      expect(typeof client.capabilities.vision).toBe("boolean");
-      expect(typeof client.capabilities.tools).toBe("boolean");
-      expect(typeof client.capabilities.streaming).toBe("boolean");
+  it("should have capabilities for each harness", () => {
+    const all = getAllHarnesses();
+    for (const harness of all) {
+      expect(typeof harness.capabilities.mcp).toBe("boolean");
+      expect(typeof harness.capabilities.vision).toBe("boolean");
+      expect(typeof harness.capabilities.tools).toBe("boolean");
+      expect(typeof harness.capabilities.streaming).toBe("boolean");
     }
   });
 
   it("should resolve instructions alongside config and sessions", () => {
-    const codex = getClient("codex");
+    const codex = getHarness("codex");
     const resolved = codex.resolve({
       homeDir: "/home/test",
       platform: "linux",
@@ -217,83 +217,83 @@ describe("aixa", () => {
     expect(resolved.instructions.some((i) => i.path === "AGENTS.md")).toBe(true);
   });
 
-  it("should check client installation without throwing", () => {
-    const client = getClient("codex");
-    expect(typeof client.isInstalled()).toBe("boolean");
+  it("should check harness installation without throwing", () => {
+    const harness = getHarness("codex");
+    expect(typeof harness.isInstalled()).toBe("boolean");
   });
 
   it("should expose detected version without throwing", () => {
-    const client = getClient("codex");
-    const v = client.version;
+    const harness = getHarness("codex");
+    const v = harness.version;
     expect(v === null || typeof v === "string").toBe(true);
   });
 
-  it("should detect client from env vars", () => {
+  it("should detect a harness from env vars", () => {
     vi.stubEnv("CLAUDE_CODE", "1");
-    const client = detectClientFromEnv();
-    expect(client).toBeInstanceOf(Client);
-    expect(client!.id).toBe("claude");
+    const harness = detectHarnessFromEnv();
+    expect(harness).toBeInstanceOf(Harness);
+    expect(harness!.id).toBe("claude");
   });
 
   it("should return null when no env vars match", () => {
     // Clear all known detection env vars to ensure clean state
-    for (const client of getAllClients()) {
-      for (const v of client.detection.envVars) {
+    for (const harness of getAllHarnesses()) {
+      for (const v of harness.detection.envVars) {
         vi.stubEnv(v, "");
       }
     }
-    expect(detectClientFromEnv()).toBeNull();
+    expect(detectHarnessFromEnv()).toBeNull();
   });
 
-  it("should have detection config for all clients", () => {
-    const all = getAllClients();
-    for (const client of all) {
-      expect(client.detection).toBeDefined();
-      expect(Array.isArray(client.detection.envVars)).toBe(true);
-      expect(Array.isArray(client.detection.projectMarkers)).toBe(true);
+  it("should have detection config for all harnesses", () => {
+    const all = getAllHarnesses();
+    for (const harness of all) {
+      expect(harness.detection).toBeDefined();
+      expect(Array.isArray(harness.detection.envVars)).toBe(true);
+      expect(Array.isArray(harness.detection.projectMarkers)).toBe(true);
     }
   });
 
   it("should detect cursor from env vars", () => {
     // Clear Claude env vars first (we might be running inside Claude Code)
-    for (const v of getClient("claude").detection.envVars) {
+    for (const v of getHarness("claude").detection.envVars) {
       vi.stubEnv(v, "");
     }
     vi.stubEnv("CURSOR_SESSION", "abc123");
-    const client = detectClientFromEnv();
-    expect(client).toBeInstanceOf(Client);
-    expect(client!.id).toBe("cursor");
+    const harness = detectHarnessFromEnv();
+    expect(harness).toBeInstanceOf(Harness);
+    expect(harness!.id).toBe("cursor");
   });
 
   it("should have skills for cursor and github-copilot", () => {
-    const cursor = getClient("cursor");
+    const cursor = getHarness("cursor");
     expect(cursor.skills.length).toBeGreaterThan(0);
     expect(cursor.skills.some((s) => s.path.includes(".cursor/skills/"))).toBe(true);
 
-    const copilot = getClient("github-copilot");
+    const copilot = getHarness("github-copilot");
     expect(copilot.skills.length).toBeGreaterThan(0);
     expect(copilot.skills.some((s) => s.path.includes(".github/skills/"))).toBe(true);
   });
 
   it("should have cross-compat skill dirs for cursor", () => {
-    const cursor = getClient("cursor");
+    const cursor = getHarness("cursor");
     expect(cursor.skills.some((s) => s.path.includes(".claude/skills/"))).toBe(true);
     expect(cursor.skills.some((s) => s.path.includes(".codex/skills/"))).toBe(true);
   });
 
-  it("should detect project clients from markers", () => {
-    const results = detectProjectClients("/nonexistent/path/that/has/no/markers");
+  it("should detect project harnesses from markers", () => {
+    const results = detectProjectHarnesses("/nonexistent/path/that/has/no/markers");
     expect(Array.isArray(results)).toBe(true);
   });
 
-  it("should return null from detectClient when no agent matches", () => {
+  it("should return null from detectHarness when no agent matches", () => {
     // Clear all detection env vars
-    for (const client of getAllClients()) {
-      for (const v of client.detection.envVars) {
+    for (const harness of getAllHarnesses()) {
+      for (const v of harness.detection.envVars) {
         vi.stubEnv(v, "");
       }
     }
-    const result = detectClient("/nonexistent/path/that/has/no/markers");
+    const result = detectHarness("/nonexistent/path/that/has/no/markers");
     expect(result).toBeNull();
   });
 });

@@ -1,6 +1,6 @@
-import { Client } from "../client.ts";
+import { Harness } from "../harness.ts";
 
-export default class GitHubCopilot extends Client {
+export default class GitHubCopilot extends Harness {
   readonly id = "github-copilot";
   readonly name = "GitHub Copilot";
   readonly binaries = [];
@@ -10,18 +10,18 @@ export default class GitHubCopilot extends Client {
     tools: true,
     streaming: true,
   };
-  readonly config: Client["config"] = [
+  readonly config: Harness["config"] = [
     {
       path: "~/.copilot/config.json",
       scope: "user",
       level: "inferred",
     },
   ];
-  readonly sessions: Client["sessions"] = [];
-  readonly persistence: Client["persistence"] = [
+  readonly sessions: Harness["sessions"] = [];
+  readonly persistence: Harness["persistence"] = [
     { format: "JSON", level: "official", note: "Configuration files." },
   ];
-  readonly instructions: Client["instructions"] = [
+  readonly instructions: Harness["instructions"] = [
     {
       path: ".github/copilot-instructions.md",
       scope: "project",
@@ -34,7 +34,7 @@ export default class GitHubCopilot extends Client {
       note: "Modular instructions in .instructions.md files.",
     },
   ];
-  readonly skills: Client["skills"] = [
+  readonly skills: Harness["skills"] = [
     { path: ".github/skills/", scope: "project", level: "official" },
     {
       path: ".claude/skills/",
@@ -43,8 +43,8 @@ export default class GitHubCopilot extends Client {
       note: "Copilot auto-detects Claude skills directory.",
     },
   ];
-  readonly commands: Client["commands"] = [];
-  readonly hooks: Client["hooks"] = [];
+  readonly commands: Harness["commands"] = [];
+  readonly hooks: Harness["hooks"] = [];
   readonly detection = {
     envVars: ["COPILOT_RUN_APP"],
     projectMarkers: [".github/copilot-instructions.md", ".github/skills", ".github/instructions"],

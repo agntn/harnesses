@@ -1,6 +1,6 @@
-import { Client } from "../client.ts";
+import { Harness } from "../harness.ts";
 
-export default class MastraCode extends Client {
+export default class MastraCode extends Harness {
   readonly id = "mastracode";
   readonly name = "Mastra Code";
   readonly binaries = ["mastracode"];
@@ -10,7 +10,7 @@ export default class MastraCode extends Client {
     tools: true,
     streaming: true,
   };
-  readonly config: Client["config"] = [
+  readonly config: Harness["config"] = [
     {
       path: ".mastracode/mcp.json",
       scope: "project",
@@ -36,7 +36,7 @@ export default class MastraCode extends Client {
       note: "Global hooks.",
     },
   ];
-  readonly sessions: Client["sessions"] = [
+  readonly sessions: Harness["sessions"] = [
     {
       path: "~/.local/share/mastracode/mastra.db",
       scope: "data",
@@ -45,7 +45,7 @@ export default class MastraCode extends Client {
       note: "LibSQL database with threads, messages, and observational memory.",
     },
   ];
-  readonly persistence: Client["persistence"] = [
+  readonly persistence: Harness["persistence"] = [
     { format: "JSON", level: "official", note: "MCP and hooks config files." },
     {
       format: "SQLite",
@@ -53,7 +53,7 @@ export default class MastraCode extends Client {
       note: "LibSQL database for threads, messages, and observational memory.",
     },
   ];
-  readonly instructions: Client["instructions"] = [
+  readonly instructions: Harness["instructions"] = [
     { path: "AGENTS.md", scope: "project", level: "official" },
     {
       path: "CLAUDE.md",
@@ -86,7 +86,7 @@ export default class MastraCode extends Client {
       note: "Global user-level instructions.",
     },
   ];
-  readonly skills: Client["skills"] = [
+  readonly skills: Harness["skills"] = [
     { path: ".mastracode/skills/", scope: "project", level: "official" },
     {
       path: "~/.mastracode/skills/",
@@ -107,7 +107,7 @@ export default class MastraCode extends Client {
       note: "Claude Code compatible.",
     },
   ];
-  readonly commands: Client["commands"] = [
+  readonly commands: Harness["commands"] = [
     { path: ".mastracode/commands/", scope: "project", level: "official" },
     {
       path: "~/.mastracode/commands/",
@@ -116,7 +116,7 @@ export default class MastraCode extends Client {
       note: "Global commands.",
     },
   ];
-  readonly hooks: Client["hooks"] = [
+  readonly hooks: Harness["hooks"] = [
     {
       path: ".mastracode/hooks.json",
       scope: "project",

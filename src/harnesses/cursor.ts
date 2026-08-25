@@ -1,6 +1,6 @@
-import { Client } from "../client.ts";
+import { Harness } from "../harness.ts";
 
-export default class Cursor extends Client {
+export default class Cursor extends Harness {
   readonly id = "cursor";
   readonly name = "Cursor";
   readonly binaries = ["cursor"];
@@ -10,18 +10,18 @@ export default class Cursor extends Client {
     tools: true,
     streaming: true,
   };
-  readonly config: Client["config"] = [
+  readonly config: Harness["config"] = [
     {
       path: "~/.cursor/settings.json",
       scope: "user",
       level: "official",
     },
   ];
-  readonly sessions: Client["sessions"] = [];
-  readonly persistence: Client["persistence"] = [
+  readonly sessions: Harness["sessions"] = [];
+  readonly persistence: Harness["persistence"] = [
     { format: "JSON", level: "official", note: "Settings and rules files." },
   ];
-  readonly instructions: Client["instructions"] = [
+  readonly instructions: Harness["instructions"] = [
     {
       path: ".cursor/rules/skilld-activation.mdc",
       scope: "project",
@@ -35,7 +35,7 @@ export default class Cursor extends Client {
       note: "Legacy project-level instructions.",
     },
   ];
-  readonly skills: Client["skills"] = [
+  readonly skills: Harness["skills"] = [
     { path: ".cursor/skills/", scope: "project", level: "official" },
     {
       path: "~/.cursor/skills/",
@@ -56,8 +56,8 @@ export default class Cursor extends Client {
       note: "Cursor natively scans Codex skills directory.",
     },
   ];
-  readonly commands: Client["commands"] = [];
-  readonly hooks: Client["hooks"] = [];
+  readonly commands: Harness["commands"] = [];
+  readonly hooks: Harness["hooks"] = [];
   readonly detection = {
     envVars: ["CURSOR_SESSION", "CURSOR_TRACE_ID"],
     projectMarkers: [".cursor", ".cursorrules"],

@@ -1,6 +1,6 @@
-import { Client } from "../client.ts";
+import { Harness } from "../harness.ts";
 
-export default class OpenCode extends Client {
+export default class OpenCode extends Harness {
   readonly id = "opencode";
   readonly name = "OpenCode CLI";
   readonly binaries = ["opencode"];
@@ -10,7 +10,7 @@ export default class OpenCode extends Client {
     tools: true,
     streaming: true,
   };
-  readonly config: Client["config"] = [
+  readonly config: Harness["config"] = [
     {
       path: "~/.config/opencode/opencode.jsonc",
       scope: "user",
@@ -43,7 +43,7 @@ export default class OpenCode extends Client {
       level: "official",
     },
   ];
-  readonly sessions: Client["sessions"] = [
+  readonly sessions: Harness["sessions"] = [
     {
       path: "~/.local/share/opencode/opencode.db",
       scope: "data",
@@ -51,7 +51,7 @@ export default class OpenCode extends Client {
       note: "SQLite database with sessions, messages, and parts. XDG-based, same path on all platforms.",
     },
   ];
-  readonly persistence: Client["persistence"] = [
+  readonly persistence: Harness["persistence"] = [
     { format: "JSON/JSONC", level: "official", note: "Config files." },
     {
       format: "SQLite",
@@ -59,7 +59,7 @@ export default class OpenCode extends Client {
       note: "Session and message storage via Drizzle ORM.",
     },
   ];
-  readonly instructions: Client["instructions"] = [
+  readonly instructions: Harness["instructions"] = [
     { path: "AGENTS.md", scope: "project", level: "official" },
     {
       path: "CLAUDE.md",
@@ -74,7 +74,7 @@ export default class OpenCode extends Client {
       note: "Global user-level instructions.",
     },
   ];
-  readonly skills: Client["skills"] = [
+  readonly skills: Harness["skills"] = [
     { path: ".opencode/skills/", scope: "project", level: "official" },
     {
       path: ".claude/skills/",
@@ -91,8 +91,8 @@ export default class OpenCode extends Client {
     },
     { path: "~/.agents/skills/", scope: "user", level: "official" },
   ];
-  readonly commands: Client["commands"] = [];
-  readonly hooks: Client["hooks"] = [];
+  readonly commands: Harness["commands"] = [];
+  readonly hooks: Harness["hooks"] = [];
   readonly detection = {
     envVars: [],
     projectMarkers: [".opencode", "opencode.jsonc", "opencode.json"],

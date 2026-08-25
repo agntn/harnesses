@@ -1,6 +1,6 @@
-import { Client } from "../client.ts";
+import { Harness } from "../harness.ts";
 
-export default class Claude extends Client {
+export default class Claude extends Harness {
   readonly id = "claude";
   readonly name = "Anthropic Claude Code";
   readonly binaries = ["claude"];
@@ -10,7 +10,7 @@ export default class Claude extends Client {
     tools: true,
     streaming: true,
   };
-  readonly config: Client["config"] = [
+  readonly config: Harness["config"] = [
     { path: "~/.claude/settings.json", scope: "user", level: "official" },
     {
       path: "~/.claude.json",
@@ -50,7 +50,7 @@ export default class Claude extends Client {
       note: "Enterprise managed settings.",
     },
   ];
-  readonly sessions: Client["sessions"] = [
+  readonly sessions: Harness["sessions"] = [
     {
       path: "~/.claude/projects/<project-path>/sessions/*.jsonl",
       scope: "data",
@@ -64,7 +64,7 @@ export default class Claude extends Client {
       note: "Global prompt history across all projects.",
     },
   ];
-  readonly persistence: Client["persistence"] = [
+  readonly persistence: Harness["persistence"] = [
     { format: "JSON", level: "official", note: "Settings and MCP config files." },
     {
       format: "JSONL",
@@ -72,7 +72,7 @@ export default class Claude extends Client {
       note: "Session transcripts and global history.",
     },
   ];
-  readonly instructions: Client["instructions"] = [
+  readonly instructions: Harness["instructions"] = [
     { path: "CLAUDE.md", scope: "project", level: "official" },
     {
       path: ".claude/CLAUDE.md",
@@ -87,7 +87,7 @@ export default class Claude extends Client {
       note: "Global user-level instructions.",
     },
   ];
-  readonly skills: Client["skills"] = [
+  readonly skills: Harness["skills"] = [
     { path: ".claude/skills/", scope: "project", level: "official" },
     {
       path: "~/.claude/skills/",
@@ -96,7 +96,7 @@ export default class Claude extends Client {
       note: "Global user-level skills.",
     },
   ];
-  readonly commands: Client["commands"] = [
+  readonly commands: Harness["commands"] = [
     {
       path: ".claude/commands/",
       scope: "project",
@@ -110,7 +110,7 @@ export default class Claude extends Client {
       note: "Legacy global slash commands.",
     },
   ];
-  readonly hooks: Client["hooks"] = [
+  readonly hooks: Harness["hooks"] = [
     { path: ".claude/hooks/", scope: "project", level: "official" },
     {
       path: "~/.claude/hooks/",

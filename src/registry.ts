@@ -1,37 +1,37 @@
-import type { Client, ClientConstructor } from "./client.ts";
-import { clients } from "./clients/index.ts";
-import type { ClientId } from "./types.ts";
+import type { Harness, HarnessConstructor } from "./harness.ts";
+import { harnesses } from "./harnesses/index.ts";
+import type { HarnessId } from "./types.ts";
 
-let registry: Map<ClientId, Client> | undefined;
+let registry: Map<HarnessId, Harness> | undefined;
 
-function getRegistry(): Map<ClientId, Client> {
+function getRegistry(): Map<HarnessId, Harness> {
   if (!registry) {
     registry = new Map();
-    for (const ClientClass of clients) {
-      const client = new ClientClass();
-      registry.set(client.id, client);
+    for (const HarnessClass of harnesses) {
+      const harness = new HarnessClass();
+      registry.set(harness.id, harness);
     }
   }
   return registry;
 }
 
-export function registerClient(ClientClass: ClientConstructor): Client {
-  const client = new ClientClass();
-  getRegistry().set(client.id, client);
-  return client;
+export function registerHarness(HarnessClass: HarnessConstructor): Harness {
+  const harness = new HarnessClass();
+  getRegistry().set(harness.id, harness);
+  return harness;
 }
 
-export function getClient(id: ClientId): Client {
-  const client = getRegistry().get(id);
-  if (!client) throw new Error(`Unknown client: ${id}`);
-  return client;
+export function getHarness(id: HarnessId): Harness {
+  const harness = getRegistry().get(id);
+  if (!harness) throw new Error(`Unknown harness: ${id}`);
+  return harness;
 }
 
-export function listClients(): ClientId[] {
+export function listHarnesses(): HarnessId[] {
   return [...getRegistry().keys()];
 }
 
-export function getAllClients(): Client[] {
+export function getAllHarnesses(): Harness[] {
   return [...getRegistry().values()];
 }
 
@@ -39,9 +39,9 @@ export function getAllClients(): Client[] {
  * Detect the active agent from environment variables.
  * Returns the first match since env detection is unambiguous.
  */
-export function detectClientFromEnv(): Client | null {
-  for (const client of getRegistry().values()) {
-    if (client.detectEnv()) return client;
+export function detectHarnessFromEnv(): Harness | null {
+  for (const harness of getRegistry().values()) {
+    if (harness.detectEnv()) return harness;
   }
   return null;
 }
@@ -50,8 +50,8 @@ export function detectClientFromEnv(): Client | null {
  * Detect which agents have project-level markers in the given directory.
  * Returns all matches (multiple agents can be configured in the same project).
  */
-export function detectProjectClients(cwd?: string): Client[] {
-  return [...getRegistry().values()].filter((client) => client.detectProject(cwd));
+export function detectProjectHarnesses(cwd?: string): Harness[] {
+  return [...getRegistry().values()].filter((harness) => harness.detectProject(cwd));
 }
 
 /**
@@ -60,15 +60,15 @@ export function detectProjectClients(cwd?: string): Client[] {
  * 2. Single project-level match
  * 3. null if ambiguous or no match
  */
-export function detectClient(cwd?: string): Client | null {
-  const fromEnv = detectClientFromEnv();
+export function detectHarness(cwd?: string): Harness | null {
+  const fromEnv = detectHarnessFromEnv();
   if (fromEnv) return fromEnv;
 
-  let match: Client | null = null;
-  for (const client of getRegistry().values()) {
-    if (client.detectProject(cwd)) {
+  let match: Harness | null = null;
+  for (const harness of getRegistry().values()) {
+    if (harness.detectProject(cwd)) {
       if (match) return null;
-      match = client;
+      match = harness;
     }
   }
   return match;

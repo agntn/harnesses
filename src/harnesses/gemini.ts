@@ -1,6 +1,6 @@
-import { Client } from "../client.ts";
+import { Harness } from "../harness.ts";
 
-export default class Gemini extends Client {
+export default class Gemini extends Harness {
   readonly id = "gemini";
   readonly name = "Google Gemini CLI";
   readonly binaries = ["gemini"];
@@ -10,7 +10,7 @@ export default class Gemini extends Client {
     tools: true,
     streaming: true,
   };
-  readonly config: Client["config"] = [
+  readonly config: Harness["config"] = [
     {
       path: "~/.gemini/settings.json",
       scope: "user",
@@ -40,7 +40,7 @@ export default class Gemini extends Client {
       platforms: ["win32"],
     },
   ];
-  readonly sessions: Client["sessions"] = [
+  readonly sessions: Harness["sessions"] = [
     {
       path: "~/.gemini/history/<project-id>/",
       scope: "data",
@@ -54,7 +54,7 @@ export default class Gemini extends Client {
       note: "Active chat session data.",
     },
   ];
-  readonly persistence: Client["persistence"] = [
+  readonly persistence: Harness["persistence"] = [
     { format: "JSON", level: "official", note: "Settings files." },
     {
       format: "JSON",
@@ -62,7 +62,7 @@ export default class Gemini extends Client {
       note: "Session and history records.",
     },
   ];
-  readonly instructions: Client["instructions"] = [
+  readonly instructions: Harness["instructions"] = [
     { path: "GEMINI.md", scope: "project", level: "official" },
     {
       path: "~/.gemini/GEMINI.md",
@@ -71,13 +71,13 @@ export default class Gemini extends Client {
       note: "Global instruction/memory file.",
     },
   ];
-  readonly skills: Client["skills"] = [
+  readonly skills: Harness["skills"] = [
     { path: ".gemini/skills/", scope: "project", level: "official" },
     { path: ".agents/skills/", scope: "project", level: "official" },
     { path: "~/.gemini/skills/", scope: "user", level: "official" },
     { path: "~/.agents/skills/", scope: "user", level: "official" },
   ];
-  readonly commands: Client["commands"] = [
+  readonly commands: Harness["commands"] = [
     {
       path: ".gemini/commands/",
       scope: "project",
@@ -91,7 +91,7 @@ export default class Gemini extends Client {
       note: "Global custom commands in TOML format.",
     },
   ];
-  readonly hooks: Client["hooks"] = [];
+  readonly hooks: Harness["hooks"] = [];
   readonly detection = {
     envVars: ["GEMINI_CLI"],
     projectMarkers: [".gemini", "GEMINI.md"],

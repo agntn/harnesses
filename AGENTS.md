@@ -1,6 +1,6 @@
-# aixa
+# @agntn/harnesses
 
-Metadata registry for AI coding agents. Paths, formats, detection rules, session schemas - one TypeScript API covering Claude Code, Codex, Gemini, OpenCode, Cursor, GitHub Copilot, and Mastra Code.
+Metadata registry for AI coding harnesses. Paths, formats, detection rules, session schemas - one TypeScript API covering Claude Code, Codex, Gemini, OpenCode, Cursor, GitHub Copilot, and Mastra Code.
 
 ## Commands
 
@@ -14,7 +14,7 @@ pnpm test:run             # vitest --run
 pnpm test                 # vitest watch mode
 
 # single test
-pnpm vitest run test/index.test.ts -t "should detect client from env"
+pnpm vitest run test/index.test.ts -t "should detect a harness from env vars"
 ```
 
 Run order after changes: `lint` -> `typecheck` -> `build` -> `test:run`. CI does the same.
@@ -24,14 +24,14 @@ Run order after changes: `lint` -> `typecheck` -> `build` -> `test:run`. CI does
 ```
 src/
   index.ts              # public API barrel - all exports go through here
-  types.ts              # ClientId, ClientDefinition, PathCandidate, etc.
-  client.ts             # Client class (resolve, detect, isInstalled, getVersion)
-  registry.ts           # global Map<ClientId, Client>, detect functions
+  types.ts              # HarnessId, HarnessCapabilities, PathCandidate, etc.
+  harness.ts            # abstract Harness class (resolve, detect, isInstalled, version)
+  registry.ts           # global Map<HarnessId, Harness>, detect functions
   resolve.ts            # path template expansion (~, ${HOME}, %ENVVAR%)
   cli.ts                # citty CLI (list, detect, info, paths)
-  clients/
-    index.ts            # side-effect imports that register all clients
-    claude.ts           # one file per agent definition
+  harnesses/
+    index.ts            # constructor registry for all built-in harnesses
+    claude.ts           # one file per harness implementation
     codex.ts
     gemini.ts
     opencode.ts
@@ -49,21 +49,21 @@ test/
 build.config.ts         # obuild entries: src/index + src/cli
 ```
 
-## Adding a new agent
+## Adding a new harness
 
-1. Add the ID to `ClientId` union in `src/types.ts`
-2. Create `src/clients/<name>.ts` with `defineClient({...})` call
-3. Import it in `src/clients/index.ts`
+1. Add the ID to `HarnessId` union in `src/types.ts`
+2. Create `src/harnesses/<name>.ts` with a concrete class extending `Harness`
+3. Import it in `src/harnesses/index.ts`
 4. Add a row in `README.md` agents table
-5. Update the client ID list in `test/index.test.ts` (`should expose stable client ids`)
+5. Update the harness ID list in `test/index.test.ts` (`should expose stable harness ids`)
 6. Run `pnpm lint && pnpm typecheck && pnpm build && pnpm test:run`
 
-Each client definition has: `config`, `sessions`, `persistence`, `instructions`, `skills`, `commands`, `hooks`, `capabilities`, `detection`. All path entries carry `scope` (user/project/system/data), `level` (official/community/inferred), optional `platforms`.
+Each harness class has: `config`, `sessions`, `persistence`, `instructions`, `skills`, `commands`, `hooks`, `capabilities`, `detection`. All path entries carry `scope` (user/project/system/data), `level` (official/community/inferred), optional `platforms`.
 
 ## Code conventions
 
-- ESM-only, no CommonJS. `sideEffects: true` in package.json because client imports register into global registry.
-- All local imports use `.ts` extensions (`import { Client } from "./client.ts"`) - required by nodenext moduleResolution.
+- ESM-only, no CommonJS. `sideEffects: false` is safe because built-in harnesses are referenced explicitly by the constructor registry.
+- All local imports use `.ts` extensions (`import { Harness } from "./harness.ts"`) - required by nodenext moduleResolution.
 - `obuild` builds artifacts. `tsgo` is typecheck-only (`noEmit: true`).
 - Public API is barrel-driven via `src/index.ts`. Don't export from submodules directly.
 - Types from `src/schemas/` are type-only re-exports - no runtime code, no validators.

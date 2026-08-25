@@ -5,7 +5,7 @@ const pkg = _require("../package.json") as { version: string };
 
 export const version: string = pkg.version;
 
-export type ClientId =
+export type HarnessId =
   | "codex"
   | "gemini"
   | "claude"
@@ -30,14 +30,14 @@ export interface StorageDescriptor {
   note?: string;
 }
 
-export interface ClientCapabilities {
+export interface HarnessCapabilities {
   mcp: boolean;
   vision: boolean;
   tools: boolean;
   streaming: boolean;
 }
 
-export interface ClientDetection {
+export interface HarnessDetection {
   /** Environment variables that indicate running inside this agent. */
   envVars: string[];
   /** Project-level files or directories whose presence indicates this agent. */

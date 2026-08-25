@@ -1,26 +1,26 @@
 export { version } from "./types.ts";
 export type {
-  ClientId,
+  HarnessId,
   EvidenceLevel,
   Platform,
   PathCandidate,
   StorageDescriptor,
-  ClientCapabilities,
-  ClientDetection,
+  HarnessCapabilities,
+  HarnessDetection,
   ResolveOptions,
   ResolvedPaths,
 } from "./types.ts";
 
-export { Client } from "./client.ts";
-export type { ClientConstructor } from "./client.ts";
+export { Harness } from "./harness.ts";
+export type { HarnessConstructor } from "./harness.ts";
 export {
-  registerClient,
-  getClient,
-  listClients,
-  getAllClients,
-  detectClient,
-  detectClientFromEnv,
-  detectProjectClients,
+  registerHarness,
+  getHarness,
+  listHarnesses,
+  getAllHarnesses,
+  detectHarness,
+  detectHarnessFromEnv,
+  detectProjectHarnesses,
 } from "./registry.ts";
 export { resolvePathTemplate } from "./resolve.ts";
 
@@ -64,7 +64,7 @@ export type {
   OpenCodeProject,
 } from "./schemas/index.ts";
 
-import type { ClientId } from "./types.ts";
-import { listClients } from "./registry.ts";
+import type { HarnessId } from "./types.ts";
+import { listHarnesses } from "./registry.ts";
 
-export const clientIds: readonly ClientId[] = Object.freeze(listClients());
+export const harnessIds: readonly HarnessId[] = Object.freeze(listHarnesses());

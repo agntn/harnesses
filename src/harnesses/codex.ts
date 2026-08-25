@@ -1,6 +1,6 @@
-import { Client } from "../client.ts";
+import { Harness } from "../harness.ts";
 
-export default class Codex extends Client {
+export default class Codex extends Harness {
   readonly id = "codex";
   readonly name = "OpenAI Codex CLI";
   readonly binaries = ["codex"];
@@ -10,7 +10,7 @@ export default class Codex extends Client {
     tools: true,
     streaming: true,
   };
-  readonly config: Client["config"] = [
+  readonly config: Harness["config"] = [
     { path: "~/.codex/config.toml", scope: "user", level: "official" },
     {
       path: ".codex/config.toml",
@@ -25,7 +25,7 @@ export default class Codex extends Client {
       platforms: ["linux", "darwin"],
     },
   ];
-  readonly sessions: Client["sessions"] = [
+  readonly sessions: Harness["sessions"] = [
     {
       path: "~/.codex/sessions/",
       scope: "data",
@@ -45,12 +45,12 @@ export default class Codex extends Client {
       note: "SQLite state database for threads and agent state.",
     },
   ];
-  readonly persistence: Client["persistence"] = [
+  readonly persistence: Harness["persistence"] = [
     { format: "TOML", level: "official", note: "Configuration files." },
     { format: "JSONL", level: "official", note: "Conversation transcripts." },
     { format: "SQLite", level: "official", note: "Thread and agent state." },
   ];
-  readonly instructions: Client["instructions"] = [
+  readonly instructions: Harness["instructions"] = [
     { path: "AGENTS.md", scope: "project", level: "official" },
     {
       path: "AGENTS.override.md",
@@ -71,7 +71,7 @@ export default class Codex extends Client {
       note: "Global override, takes precedence over global AGENTS.md.",
     },
   ];
-  readonly skills: Client["skills"] = [
+  readonly skills: Harness["skills"] = [
     { path: ".codex/skills/", scope: "project", level: "official" },
     { path: ".agents/skills/", scope: "project", level: "official" },
     {
@@ -88,8 +88,8 @@ export default class Codex extends Client {
       platforms: ["linux", "darwin"],
     },
   ];
-  readonly commands: Client["commands"] = [];
-  readonly hooks: Client["hooks"] = [];
+  readonly commands: Harness["commands"] = [];
+  readonly hooks: Harness["hooks"] = [];
   readonly detection = {
     envVars: [],
     projectMarkers: [".codex", "AGENTS.md", "AGENTS.override.md", ".agents/skills"],

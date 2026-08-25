@@ -2,11 +2,11 @@ import { existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import type {
-  ClientDetection,
-  ClientId,
+  HarnessDetection,
+  HarnessId,
   PathCandidate,
   StorageDescriptor,
-  ClientCapabilities,
+  HarnessCapabilities,
   ResolveOptions,
   ResolvedPaths,
   Platform,
@@ -19,8 +19,8 @@ const SUPPORTED_PLATFORMS: Record<Platform, true> = {
   win32: true,
 };
 
-export abstract class Client {
-  abstract readonly id: ClientId;
+export abstract class Harness {
+  abstract readonly id: HarnessId;
   abstract readonly name: string;
   abstract readonly binaries: string[];
   abstract readonly config: PathCandidate[];
@@ -30,8 +30,8 @@ export abstract class Client {
   abstract readonly skills: PathCandidate[];
   abstract readonly commands: PathCandidate[];
   abstract readonly hooks: PathCandidate[];
-  abstract readonly capabilities: ClientCapabilities;
-  abstract readonly detection: ClientDetection;
+  abstract readonly capabilities: HarnessCapabilities;
+  abstract readonly detection: HarnessDetection;
 
   isInstalled(): boolean {
     const cmd = process.platform === "win32" ? "where" : "which";
@@ -99,4 +99,4 @@ export abstract class Client {
   }
 }
 
-export type ClientConstructor = new () => Client;
+export type HarnessConstructor = new () => Harness;

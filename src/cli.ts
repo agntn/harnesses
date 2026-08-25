@@ -4,8 +4,8 @@ import { defineCommand, runMain } from "citty";
 import { consola } from "consola";
 import { encode as toToon } from "@toon-format/toon";
 import { version } from "./types.ts";
-import { getAllClients, getClient, listClients } from "./index.ts";
-import type { ClientId } from "./types.ts";
+import { getAllHarnesses, getHarness, listHarnesses } from "./index.ts";
+import type { HarnessId } from "./types.ts";
 
 const s = {
   cyan: (t: string) => `\x1b[36m${t}\x1b[0m`,
@@ -48,9 +48,9 @@ const formatArgs = {
   toon: { type: "boolean" as const, description: "Output as TOON" },
 };
 
-const clientArg = {
+const harnessArg = {
   type: "positional" as const,
-  description: "Client id",
+  description: "Harness id",
   required: true,
 };
 
@@ -66,28 +66,28 @@ function emit(data: unknown, args: { json?: boolean; toon?: boolean }) {
   return false;
 }
 
-function isClientId(id: string): id is ClientId {
-  return (listClients() as string[]).includes(id);
+function isHarnessId(id: string): id is HarnessId {
+  return (listHarnesses() as string[]).includes(id);
 }
 
-function resolveClient(id: string): ReturnType<typeof getClient> {
-  if (!isClientId(id)) {
-    consola.error(`Unknown client: ${id}\nKnown: ${listClients().join(", ")}`);
+function resolveHarness(id: string): ReturnType<typeof getHarness> {
+  if (!isHarnessId(id)) {
+    consola.error(`Unknown harness: ${id}\nKnown: ${listHarnesses().join(", ")}`);
     process.exit(1);
   }
-  return getClient(id);
+  return getHarness(id);
 }
 
 const list = defineCommand({
-  meta: { description: "List all known clients" },
+  meta: { description: "List all known harnesses" },
   args: { ...formatArgs },
   run({ args }) {
-    const clients = getAllClients();
-    const data = clients.map((c) => ({ id: c.id, name: c.name }));
+    const harnesses = getAllHarnesses();
+    const data = harnesses.map((harness) => ({ id: harness.id, name: harness.name }));
 
     if (emit(data, args)) return;
 
-    consola.log(header("Clients"));
+    consola.log(header("Harnesses"));
     consola.log("");
     const maxId = Math.max(...data.map((r) => r.id.length));
     for (const { id, name } of data) {
@@ -98,14 +98,14 @@ const list = defineCommand({
 });
 
 const detect = defineCommand({
-  meta: { description: "Detect installed clients and versions" },
+  meta: { description: "Detect installed harnesses and versions" },
   args: { ...formatArgs },
   run({ args }) {
-    const clients = getAllClients();
-    const results = clients.map((client) => {
-      const installed = client.isInstalled();
-      const v = installed ? client.version : null;
-      return { id: client.id, name: client.name, installed, version: v };
+    const harnesses = getAllHarnesses();
+    const results = harnesses.map((harness) => {
+      const installed = harness.isInstalled();
+      const v = installed ? harness.version : null;
+      return { id: harness.id, name: harness.name, installed, version: v };
     });
 
     if (emit(results, args)) return;
@@ -126,53 +126,53 @@ const detect = defineCommand({
 });
 
 const info = defineCommand({
-  meta: { description: "Show metadata for a client" },
-  args: { id: clientArg, ...formatArgs },
+  meta: { description: "Show metadata for a harness" },
+  args: { id: harnessArg, ...formatArgs },
   run({ args }) {
-    const client = resolveClient(args.id as string);
+    const harness = resolveHarness(args.id as string);
 
     if (
       emit(
         {
-          id: client.id,
-          name: client.name,
-          binaries: client.binaries,
-          capabilities: client.capabilities,
-          config: client.config,
-          sessions: client.sessions,
-          instructions: client.instructions,
-          skills: client.skills,
-          commands: client.commands,
-          hooks: client.hooks,
-          persistence: client.persistence,
-          detection: client.detection,
+          id: harness.id,
+          name: harness.name,
+          binaries: harness.binaries,
+          capabilities: harness.capabilities,
+          config: harness.config,
+          sessions: harness.sessions,
+          instructions: harness.instructions,
+          skills: harness.skills,
+          commands: harness.commands,
+          hooks: harness.hooks,
+          persistence: harness.persistence,
+          detection: harness.detection,
         },
         args,
       )
     )
       return;
 
-    consola.log(header(`${client.name}  ${s.dim(client.id)}`));
+    consola.log(header(`${harness.name}  ${s.dim(harness.id)}`));
 
     consola.log(section("Binaries"));
-    for (const b of client.binaries) consola.log(entry(s.white(b)));
+    for (const b of harness.binaries) consola.log(entry(s.white(b)));
 
     consola.log(section("Capabilities"));
-    const caps = Object.entries(client.capabilities)
+    const caps = Object.entries(harness.capabilities)
       .map(([k, v]) => (v ? s.green(k) : s.dim(k)))
       .join(s.dim("  ·  "));
     consola.log(entry(caps));
 
-    renderPathSection("Config", client.config);
-    renderPathSection("Sessions", client.sessions);
-    renderPathSection("Instructions", client.instructions);
-    renderPathSection("Skills", client.skills);
-    renderPathSection("Commands", client.commands);
-    renderPathSection("Hooks", client.hooks);
+    renderPathSection("Config", harness.config);
+    renderPathSection("Sessions", harness.sessions);
+    renderPathSection("Instructions", harness.instructions);
+    renderPathSection("Skills", harness.skills);
+    renderPathSection("Commands", harness.commands);
+    renderPathSection("Hooks", harness.hooks);
 
-    if (client.persistence.length) {
+    if (harness.persistence.length) {
       consola.log(section("Persistence"));
-      for (const e of client.persistence) {
+      for (const e of harness.persistence) {
         const note = e.note ? `  ${s.dim(e.note)}` : "";
         consola.log(entry(`${s.white(e.format)}${note}`));
       }
@@ -184,14 +184,14 @@ const info = defineCommand({
 
 const paths = defineCommand({
   meta: { description: "Show resolved paths for current platform" },
-  args: { id: clientArg, ...formatArgs },
+  args: { id: harnessArg, ...formatArgs },
   run({ args }) {
-    const client = resolveClient(args.id as string);
-    const resolved = client.resolve();
+    const harness = resolveHarness(args.id as string);
+    const resolved = harness.resolve();
 
     if (emit(resolved, args)) return;
 
-    consola.log(header(`${client.name}  ${s.dim(process.platform)}`));
+    consola.log(header(`${harness.name}  ${s.dim(process.platform)}`));
 
     if (resolved.config.length) {
       consola.log(section("Config"));
@@ -229,9 +229,9 @@ const paths = defineCommand({
 
 const main = defineCommand({
   meta: {
-    name: "aixa",
+    name: "harnesses",
     version,
-    description: "Metadata toolkit for AI CLIs",
+    description: "Metadata toolkit for AI coding harnesses",
   },
   subCommands: { list, detect, info, paths },
 });
