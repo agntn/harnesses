@@ -233,7 +233,13 @@ const main = defineCommand({
     version,
     description: "Metadata toolkit for AI coding harnesses",
   },
-  subCommands: { list, detect, info, paths },
+  subCommands: {
+    list,
+    detect,
+    info,
+    paths,
+    mcp: () => import("./commands/mcp.ts").then((m) => m.default),
+  },
 });
 
 runMain(main);

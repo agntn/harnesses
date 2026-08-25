@@ -26,6 +26,10 @@
     ".": {
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs"
+    },
+    "./mcp": {
+      "types": "./dist/mcp.d.mts",
+      "import": "./dist/mcp.mjs"
     }
   },
   "publishConfig": {
@@ -43,6 +47,7 @@
     "release": "pnpm test:run && pnpm build && changelogen --release --push"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
     "@toon-format/toon": "^2.1.0",
     "citty": "^0.2.1",
     "consola": "^3.4.2",

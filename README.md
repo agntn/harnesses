@@ -68,6 +68,7 @@ harnesses detect                # which ones are installed + versions
 harnesses info claude           # full metadata for a harness
 harnesses paths claude          # resolved paths for current platform
 harnesses info codex --json     # machine-readable output
+harnesses mcp                   # run the MCP server over stdio
 ```
 
 ## How harnesses compares to unagent
