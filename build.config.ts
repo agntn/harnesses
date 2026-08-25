@@ -10,7 +10,13 @@ export default defineBuildConfig({
   entries: [
     {
       type: "bundle",
-      input: ["./src/index.ts", "./src/cli.ts", "./src/mcp.ts", "./src/tool-operations.ts"],
+      input: [
+        "./src/index.ts",
+        "./src/cli.ts",
+        "./src/mcp.ts",
+        "./src/tool-operations.ts",
+        "./src/tool-schemas.ts",
+      ],
     },
   ],
   hooks: {

@@ -96,6 +96,24 @@ export default class Codex extends Harness {
     level: "official",
     note: "Non-interactive exec subcommand; add --json for structured output.",
   };
+  override readonly mcpConfigs: Harness["mcpConfigs"] = [
+    {
+      path: "~/.codex/config.toml",
+      scope: "user",
+      level: "official",
+      format: "toml",
+      key: ["mcp_servers"],
+      dialect: "standard",
+    },
+    {
+      path: ".codex/config.toml",
+      scope: "project",
+      level: "official",
+      format: "toml",
+      key: ["mcp_servers"],
+      dialect: "standard",
+    },
+  ];
   readonly detection = {
     envVars: [],
     projectMarkers: [".codex", "AGENTS.md", "AGENTS.override.md", ".agents/skills"],

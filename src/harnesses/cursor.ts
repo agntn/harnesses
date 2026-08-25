@@ -65,6 +65,24 @@ export default class Cursor extends Harness {
     level: "community",
     note: "Cursor CLI agent binary, separate from the editor binary.",
   };
+  override readonly mcpConfigs: Harness["mcpConfigs"] = [
+    {
+      path: "~/.cursor/mcp.json",
+      scope: "user",
+      level: "community",
+      format: "json",
+      key: ["mcpServers"],
+      dialect: "standard",
+    },
+    {
+      path: ".cursor/mcp.json",
+      scope: "project",
+      level: "community",
+      format: "json",
+      key: ["mcpServers"],
+      dialect: "standard",
+    },
+  ];
   readonly detection = {
     envVars: ["CURSOR_SESSION", "CURSOR_TRACE_ID"],
     projectMarkers: [".cursor", ".cursorrules"],

@@ -72,6 +72,28 @@ export interface InvokeResult {
   timedOut: boolean;
 }
 
+/** Normalized MCP server entry, shared across every harness dialect. */
+export interface McpServerConfig {
+  name: string;
+  transport: "stdio" | "http" | "sse";
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  url?: string;
+  headers?: Record<string, string>;
+  /** Present only when the harness tracks an on/off state per server. */
+  enabled?: boolean;
+}
+
+/** How one harness config file stores its MCP servers. */
+export interface McpConfigFile extends PathCandidate {
+  format: "json" | "toml";
+  /** Object path to the server map inside the file, e.g. ["mcpServers"]. */
+  key: string[];
+  /** Shape of individual entries; "standard" is the {command, args, env, url} family. */
+  dialect: "standard" | "opencode" | "vscode";
+}
+
 export interface HarnessDetection {
   /** Environment variables that indicate running inside this agent. */
   envVars: string[];

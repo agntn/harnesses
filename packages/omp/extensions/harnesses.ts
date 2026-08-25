@@ -2,11 +2,17 @@ import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { stripVTControlCharacters } from "node:util";
 
-import type { AgentToolResult, ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
+import type { AgentToolResult, ExtensionAPI, Theme } from "@oh-my-pi/pi-coding-agent";
 import { Text } from "@oh-my-pi/pi-coding-agent";
-import { renderStatusLine } from "@oh-my-pi/pi-coding-agent/tui";
+import { renderStatusLine, type StatusLineOptions } from "@oh-my-pi/pi-coding-agent/tui";
+import type { TSchema } from "@oh-my-pi/pi-ai";
+import type { AnySchema } from "@oh-my-pi/omptype/typebox";
 
 import type * as HarnessTools from "../../../dist/tool-operations.d.mts";
+// Schemas must exist synchronously at registration, so unlike the executors
+// below they load from dist; `pnpm build` keeps it current in the checkout.
+import { harnessToolSchemas } from "../../../dist/tool-schemas.mjs";
+import type * as HarnessSchemas from "../../../dist/tool-schemas.d.mts";
 
 const sourceModulePath = fileURLToPath(new URL("../../../src/tool-operations.ts", import.meta.url));
 let toolOperationsPromise: Promise<typeof HarnessTools> | undefined;
@@ -38,59 +44,77 @@ export function sanitizeTerminalText(value: unknown): string {
     .trim();
 }
 
+type RenderOptions = { isPartial?: boolean; spinnerFrame?: number };
+type RenderResult = { isError?: boolean; details?: unknown };
+
+/** Reads one property off an unknown-typed tool argument object. */
+function prop(args: unknown, key: string): unknown {
+  return typeof args === "object" && args !== null
+    ? (args as Record<string, unknown>)[key]
+    : undefined;
+}
+
+/** Builds the renderCall/renderResult pair every tool uses, varying only text. */
+function statusRenderers(
+  title: string,
+  badge: string,
+  describeCall?: (args: unknown) => string | undefined,
+  describeResult?: (details: unknown) => string[] | undefined,
+) {
+  return {
+    renderCall(args: unknown, options: RenderOptions, theme: Theme) {
+      const line: StatusLineOptions = {
+        icon: options.isPartial
+          ? options.spinnerFrame === undefined
+            ? "pending"
+            : "running"
+          : "done",
+        title,
+      };
+      if (options.spinnerFrame !== undefined) line.spinnerFrame = options.spinnerFrame;
+      const description = describeCall?.(args);
+      if (description !== undefined) line.description = description;
+
+      return new Text(renderStatusLine(line, theme), 0, 0);
+    },
+    renderResult(result: RenderResult, _options: RenderOptions, theme: Theme) {
+      const line: StatusLineOptions = {
+        icon: result.isError ? "error" : "done",
+        title,
+        badge: { label: badge, color: "accent" },
+      };
+      const meta = describeResult?.(result.details);
+      if (meta !== undefined) line.meta = meta;
+
+      return new Text(renderStatusLine(line, theme), 0, 0);
+    },
+  };
+}
+
 export default function harnessesExtension(pi: ExtensionAPI): void {
   // OMP validates tool parameters with its own TypeBox build, so schemas must
   // come from the host-injected facade rather than a standalone typebox import.
-  const { Type } = pi.typebox;
+  const schemas = harnessToolSchemas<AnySchema, TSchema>(pi.typebox.Type);
   pi.setLabel("Harnesses");
 
   pi.registerTool({
     name: "harnesses_detect",
     label: "Harnesses Detect",
     description: "List every known AI coding harness with its install state and version",
-    parameters: Type.Object({}),
+    parameters: schemas.detect,
     approval: "read",
     async execute(_toolCallId, _params): Promise<AgentToolResult<HarnessTools.HarnessListing>> {
       const { detectHarnesses } = await loadToolOperations();
       const { content, details } = detectHarnesses();
       return { content, details };
     },
-    renderCall(_args, options, theme) {
-      const icon = options.isPartial
-        ? options.spinnerFrame === undefined
-          ? "pending"
-          : "running"
-        : "done";
-
-      return new Text(
-        renderStatusLine(
-          { icon, spinnerFrame: options.spinnerFrame, title: "Harnesses Detect" },
-          theme,
-        ),
-        0,
-        0,
-      );
-    },
-    renderResult(result, _options, theme) {
-      const listing = result.details;
+    ...statusRenderers("Harnesses Detect", "read", undefined, (details) => {
+      const listing = details as HarnessTools.HarnessListing | undefined;
       const scanned = listing && "harnesses" in listing ? listing.harnesses : undefined;
-
-      return new Text(
-        renderStatusLine(
-          {
-            icon: result.isError ? "error" : "done",
-            title: "Harnesses Detect",
-            badge: { label: "read", color: "accent" },
-            meta: scanned
-              ? [`${scanned.filter((h) => h.installed).length}/${scanned.length} installed`]
-              : undefined,
-          },
-          theme,
-        ),
-        0,
-        0,
-      );
-    },
+      return scanned
+        ? [`${scanned.filter((h) => h.installed).length}/${scanned.length} installed`]
+        : undefined;
+    }),
   });
 
   pi.registerTool({
@@ -98,64 +122,30 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     label: "Harnesses Info",
     description:
       "Full metadata for one AI coding harness: config, session, instruction, skill, command, and hook paths, plus paths resolved for this platform",
-    parameters: Type.Object({
-      id: Type.String({
-        description: "Harness id",
-        minLength: 1,
-        maxLength: 50,
-        pattern: "^[a-z][a-z0-9-]*$",
-      }),
-    }),
+    parameters: schemas.info,
     approval: "read",
     async execute(
       _toolCallId,
-      params,
+      params: HarnessSchemas.InfoParams,
     ): Promise<AgentToolResult<HarnessTools.HarnessMetadata | HarnessTools.UnknownHarness>> {
       const { harnessInfo } = await loadToolOperations();
       const { content, details } = harnessInfo(params.id);
       return { content, details };
     },
-    renderCall(args, options, theme) {
-      const icon = options.isPartial
-        ? options.spinnerFrame === undefined
-          ? "pending"
-          : "running"
-        : "done";
-
-      return new Text(
-        renderStatusLine(
-          {
-            icon,
-            spinnerFrame: options.spinnerFrame,
-            title: "Harnesses Info",
-            description: sanitizeTerminalText(args.id),
-          },
-          theme,
-        ),
-        0,
-        0,
-      );
-    },
-    renderResult(result, _options, theme) {
-      const info = result.details;
-      const resolved = info && "name" in info ? info : undefined;
-
-      return new Text(
-        renderStatusLine(
-          {
-            icon: result.isError ? "error" : "done",
-            title: "Harnesses Info",
-            badge: { label: "read", color: "accent" },
-            meta: resolved
-              ? [sanitizeTerminalText(resolved.id), sanitizeTerminalText(resolved.name)]
-              : undefined,
-          },
-          theme,
-        ),
-        0,
-        0,
-      );
-    },
+    ...statusRenderers(
+      "Harnesses Info",
+      "read",
+      (args) => sanitizeTerminalText(prop(args, "id")),
+      (details) => {
+        const info = details as
+          | HarnessTools.HarnessMetadata
+          | HarnessTools.UnknownHarness
+          | undefined;
+        return info && "name" in info
+          ? [sanitizeTerminalText(info.id), sanitizeTerminalText(info.name)]
+          : undefined;
+      },
+    ),
   });
 
   pi.registerTool({
@@ -163,42 +153,11 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     label: "Harnesses Run",
     description:
       "Run one prompt through an AI coding harness's normalized non-interactive invocation and return its output",
-    parameters: Type.Object({
-      id: Type.String({
-        description: "Harness id",
-        minLength: 1,
-        maxLength: 50,
-        pattern: "^[a-z][a-z0-9-]*$",
-      }),
-      prompt: Type.String({
-        description: "Prompt to send to the harness",
-        minLength: 1,
-        maxLength: 100000,
-      }),
-      cwd: Type.Optional(
-        Type.String({
-          description: "Working directory for the run",
-          minLength: 1,
-          maxLength: 4096,
-        }),
-      ),
-      timeoutSeconds: Type.Optional(
-        Type.Integer({
-          description: "Wall-clock budget in seconds (default 600)",
-          minimum: 1,
-          maximum: 3600,
-        }),
-      ),
-      structured: Type.Optional(
-        Type.Boolean({
-          description: "Use the harness's structured (JSON) output mode instead of plain text",
-        }),
-      ),
-    }),
+    parameters: schemas.run,
     approval: "exec",
     async execute(
       _toolCallId,
-      params,
+      params: HarnessSchemas.RunParams,
     ): Promise<AgentToolResult<HarnessTools.RunOutcome | HarnessTools.RunFailure>> {
       const { runHarness } = await loadToolOperations();
       const { content, details } = await runHarness(params.id, params.prompt, {
@@ -208,49 +167,110 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       });
       return { content, details };
     },
-    renderCall(args, options, theme) {
-      const icon = options.isPartial
-        ? options.spinnerFrame === undefined
-          ? "pending"
-          : "running"
-        : "done";
+    ...statusRenderers(
+      "Harnesses Run",
+      "exec",
+      (args) =>
+        `${sanitizeTerminalText(prop(args, "id"))} ${sanitizeTerminalText(prop(args, "prompt"))}`,
+      (details) => {
+        const outcome = details as HarnessTools.RunOutcome | HarnessTools.RunFailure | undefined;
+        return outcome && "exitCode" in outcome
+          ? [
+              sanitizeTerminalText(outcome.id),
+              outcome.timedOut ? "timed out" : `exit ${outcome.exitCode}`,
+            ]
+          : undefined;
+      },
+    ),
+  });
 
-      return new Text(
-        renderStatusLine(
-          {
-            icon,
-            spinnerFrame: options.spinnerFrame,
-            title: "Harnesses Run",
-            description: `${sanitizeTerminalText(args.id)} ${sanitizeTerminalText(args.prompt)}`,
-          },
-          theme,
-        ),
-        0,
-        0,
-      );
+  pi.registerTool({
+    name: "harnesses_mcp_list",
+    label: "Harnesses MCP List",
+    description:
+      "List the MCP servers configured in each harness's config files, normalized across dialects",
+    parameters: schemas.mcpList,
+    approval: "read",
+    async execute(
+      _toolCallId,
+      params: HarnessSchemas.McpListParams,
+    ): Promise<AgentToolResult<HarnessTools.McpListing | HarnessTools.UnknownHarness>> {
+      const { mcpList } = await loadToolOperations();
+      const { content, details } = mcpList(params.id);
+      return { content, details };
     },
-    renderResult(result, _options, theme) {
-      const outcome = result.details;
-      const finished = outcome && "exitCode" in outcome ? outcome : undefined;
+    ...statusRenderers(
+      "Harnesses MCP List",
+      "read",
+      (args) =>
+        prop(args, "id") === undefined ? undefined : sanitizeTerminalText(prop(args, "id")),
+      (details) => {
+        const listing = details as
+          | HarnessTools.McpListing
+          | HarnessTools.UnknownHarness
+          | undefined;
+        return listing && "harnesses" in listing
+          ? [`${listing.harnesses.length} harnesses`]
+          : undefined;
+      },
+    ),
+  });
 
-      return new Text(
-        renderStatusLine(
-          {
-            icon: result.isError ? "error" : "done",
-            title: "Harnesses Run",
-            badge: { label: "exec", color: "accent" },
-            meta: finished
-              ? [
-                  sanitizeTerminalText(finished.id),
-                  finished.timedOut ? "timed out" : `exit ${finished.exitCode}`,
-                ]
-              : undefined,
-          },
-          theme,
-        ),
-        0,
-        0,
-      );
+  pi.registerTool({
+    name: "harnesses_mcp_add",
+    label: "Harnesses MCP Add",
+    description:
+      "Add or replace one MCP server in a harness config; TOML configs get a surgical, comment-preserving edit",
+    parameters: schemas.mcpAdd,
+    approval: "write",
+    async execute(
+      _toolCallId,
+      params: HarnessSchemas.McpAddParams,
+    ): Promise<AgentToolResult<HarnessTools.McpMutation | HarnessTools.RunFailure>> {
+      const { mcpAdd } = await loadToolOperations();
+      const { content, details } = mcpAdd(params.id, params, params.scope ?? "user");
+      return { content, details };
     },
+    ...statusRenderers(
+      "Harnesses MCP Add",
+      "write",
+      (args) =>
+        `${sanitizeTerminalText(prop(args, "id"))} ${sanitizeTerminalText(prop(args, "name"))}`,
+      (details) => {
+        const mutation = details as HarnessTools.McpMutation | HarnessTools.RunFailure | undefined;
+        return mutation && "action" in mutation
+          ? [sanitizeTerminalText(mutation.action)]
+          : undefined;
+      },
+    ),
+  });
+
+  pi.registerTool({
+    name: "harnesses_mcp_remove",
+    label: "Harnesses MCP Remove",
+    description:
+      "Remove one MCP server from a harness config; TOML configs get a surgical, comment-preserving edit",
+    parameters: schemas.mcpRemove,
+    approval: "write",
+    async execute(
+      _toolCallId,
+      params: HarnessSchemas.McpRemoveParams,
+    ): Promise<AgentToolResult<HarnessTools.McpMutation | HarnessTools.RunFailure>> {
+      const { mcpRemove } = await loadToolOperations();
+      const { content, details } = mcpRemove(params.id, params.name, params.scope ?? "user");
+      return { content, details };
+    },
+    ...statusRenderers(
+      "Harnesses MCP Remove",
+      "write",
+      (args) =>
+        `${sanitizeTerminalText(prop(args, "id"))} ${sanitizeTerminalText(prop(args, "name"))}`,
+      (details) => {
+        const mutation = details as HarnessTools.McpMutation | HarnessTools.RunFailure | undefined;
+        return mutation && "action" in mutation
+          ? [sanitizeTerminalText(mutation.action)]
+          : undefined;
+      },
+    ),
   });
 }

@@ -7,6 +7,11 @@ export type {
   StorageDescriptor,
   HarnessCapabilities,
   HarnessDetection,
+  HarnessInvocation,
+  InvokeOptions,
+  InvokeResult,
+  McpServerConfig,
+  McpConfigFile,
   ResolveOptions,
   ResolvedPaths,
 } from "./types.ts";
@@ -16,6 +21,7 @@ export type { HarnessConstructor } from "./harness.ts";
 export {
   registerHarness,
   getHarness,
+  isHarnessId,
   listHarnesses,
   getAllHarnesses,
   detectHarness,
@@ -23,6 +29,8 @@ export {
   detectProjectHarnesses,
 } from "./registry.ts";
 export { resolvePathTemplate } from "./resolve.ts";
+export { listMcpServers, addMcpServer, removeMcpServer } from "./mcp-servers.ts";
+export type { McpConfigListing } from "./mcp-servers.ts";
 
 export type {
   ClaudeContentBlock,

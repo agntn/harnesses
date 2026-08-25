@@ -4,8 +4,7 @@ import { defineCommand, runMain } from "citty";
 import { consola } from "consola";
 import { encode as toToon } from "@toon-format/toon";
 import { version } from "./types.ts";
-import { getAllHarnesses, getHarness, listHarnesses } from "./index.ts";
-import type { HarnessId } from "./types.ts";
+import { getAllHarnesses, getHarness, isHarnessId, listHarnesses } from "./registry.ts";
 
 const s = {
   cyan: (t: string) => `\x1b[36m${t}\x1b[0m`,
@@ -64,10 +63,6 @@ function emit(data: unknown, args: { json?: boolean; toon?: boolean }) {
     return true;
   }
   return false;
-}
-
-function isHarnessId(id: string): id is HarnessId {
-  return (listHarnesses() as string[]).includes(id);
 }
 
 function resolveHarness(id: string): ReturnType<typeof getHarness> {
@@ -290,6 +285,7 @@ const main = defineCommand({
     info,
     paths,
     run,
+    "mcp-servers": () => import("./commands/mcp-servers.ts").then((m) => m.default),
     mcp: () => import("./commands/mcp.ts").then((m) => m.default),
   },
 });

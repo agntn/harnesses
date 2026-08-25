@@ -108,6 +108,25 @@ export default class Grok extends Harness {
     level: "official",
     note: "-p is short for --single; add --output-format json for structured output.",
   };
+  override readonly mcpConfigs: Harness["mcpConfigs"] = [
+    {
+      path: "~/.grok/config.toml",
+      scope: "user",
+      level: "official",
+      format: "toml",
+      key: ["mcp_servers"],
+      dialect: "standard",
+      note: "grok mcp add/remove manage this file; Claude and Cursor configs are also scanned via vendor compatibility.",
+    },
+    {
+      path: ".grok/config.toml",
+      scope: "project",
+      level: "official",
+      format: "toml",
+      key: ["mcp_servers"],
+      dialect: "standard",
+    },
+  ];
   readonly detection = {
     envVars: ["GROK_SESSION_ID", "GROK_WORKSPACE_ROOT", "GROK_HOME"],
     projectMarkers: [".grok"],

@@ -10,10 +10,14 @@ import { Value } from "typebox/value";
 import {
   detectHarnesses,
   harnessInfo,
+  mcpAdd,
+  mcpList,
+  mcpRemove,
   runHarness,
-  RUN_DEFAULT_TIMEOUT_SECONDS,
+  type McpServerParams,
   type ToolResult,
 } from "./tool-operations.ts";
+import { harnessToolSchemas } from "./tool-schemas.ts";
 import { version } from "./types.ts";
 
 interface ToolDefinition {
@@ -32,13 +36,22 @@ const READ_ONLY: Tool["annotations"] = {
   openWorldHint: false,
 };
 
+const CONFIG_WRITE: Tool["annotations"] = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  idempotentHint: true,
+  openWorldHint: false,
+};
+
+const schemas = harnessToolSchemas<TSchema, TSchema>(Type);
+
 const tools: ToolDefinition[] = [
   {
     name: "harnesses_detect",
     title: "Harnesses Detect",
     description:
       "List every known AI coding harness with its install state and version, scanned from the binaries on PATH.",
-    inputSchema: Type.Object({}),
+    inputSchema: schemas.detect,
     annotations: READ_ONLY,
     execute: () => detectHarnesses(),
   },
@@ -47,14 +60,7 @@ const tools: ToolDefinition[] = [
     title: "Harnesses Info",
     description:
       "Full metadata for one AI coding harness: config, session, instruction, skill, command, and hook paths, plus paths resolved for this platform.",
-    inputSchema: Type.Object({
-      id: Type.String({
-        description: "Harness id",
-        minLength: 1,
-        maxLength: 50,
-        pattern: "^[a-z][a-z0-9-]*$",
-      }),
-    }),
+    inputSchema: schemas.info,
     annotations: READ_ONLY,
     execute: (args) => harnessInfo(args.id as string),
   },
@@ -63,38 +69,7 @@ const tools: ToolDefinition[] = [
     title: "Harnesses Run",
     description:
       "Run one prompt through an AI coding harness's normalized non-interactive invocation and return its output. The spawned harness is a full agent with its own tools.",
-    inputSchema: Type.Object({
-      id: Type.String({
-        description: "Harness id",
-        minLength: 1,
-        maxLength: 50,
-        pattern: "^[a-z][a-z0-9-]*$",
-      }),
-      prompt: Type.String({
-        description: "Prompt to send to the harness",
-        minLength: 1,
-        maxLength: 100000,
-      }),
-      cwd: Type.Optional(
-        Type.String({
-          description: "Working directory for the run; defaults to the server's cwd",
-          minLength: 1,
-          maxLength: 4096,
-        }),
-      ),
-      timeoutSeconds: Type.Optional(
-        Type.Integer({
-          description: `Wall-clock budget in seconds (default ${RUN_DEFAULT_TIMEOUT_SECONDS})`,
-          minimum: 1,
-          maximum: 3600,
-        }),
-      ),
-      structured: Type.Optional(
-        Type.Boolean({
-          description: "Use the harness's structured (JSON) output mode instead of plain text",
-        }),
-      ),
-    }),
+    inputSchema: schemas.run,
     annotations: {
       readOnlyHint: false,
       destructiveHint: true,
@@ -107,6 +82,43 @@ const tools: ToolDefinition[] = [
         timeoutSeconds: args.timeoutSeconds as number | undefined,
         structured: args.structured as boolean | undefined,
       }),
+  },
+  {
+    name: "harnesses_mcp_list",
+    title: "Harnesses MCP List",
+    description:
+      "List the MCP servers configured in each harness's config files, normalized across dialects. Omit id to scan every harness.",
+    inputSchema: schemas.mcpList,
+    annotations: READ_ONLY,
+    execute: (args) => mcpList(args.id as string | undefined),
+  },
+  {
+    name: "harnesses_mcp_add",
+    title: "Harnesses MCP Add",
+    description:
+      "Add or replace one MCP server in a harness config. JSON configs are rewritten; TOML configs get a surgical, comment-preserving edit.",
+    inputSchema: schemas.mcpAdd,
+    annotations: CONFIG_WRITE,
+    execute: (args) =>
+      mcpAdd(
+        args.id as string,
+        args as unknown as McpServerParams,
+        (args.scope as "user" | "project") ?? "user",
+      ),
+  },
+  {
+    name: "harnesses_mcp_remove",
+    title: "Harnesses MCP Remove",
+    description:
+      "Remove one MCP server from a harness config. JSON configs are rewritten; TOML configs get a surgical, comment-preserving edit.",
+    inputSchema: schemas.mcpRemove,
+    annotations: CONFIG_WRITE,
+    execute: (args) =>
+      mcpRemove(
+        args.id as string,
+        args.name as string,
+        (args.scope as "user" | "project") ?? "user",
+      ),
   },
 ];
 

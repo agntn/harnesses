@@ -31,6 +31,10 @@ export function listHarnesses(): HarnessId[] {
   return [...getRegistry().keys()];
 }
 
+export function isHarnessId(id: string): id is HarnessId {
+  return getRegistry().has(id as HarnessId);
+}
+
 export function getAllHarnesses(): Harness[] {
   return [...getRegistry().values()];
 }

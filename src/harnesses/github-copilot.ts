@@ -51,6 +51,16 @@ export default class GitHubCopilot extends Harness {
     level: "community",
     note: "GitHub Copilot CLI, separate from the editor integration.",
   };
+  override readonly mcpConfigs: Harness["mcpConfigs"] = [
+    {
+      path: ".vscode/mcp.json",
+      scope: "project",
+      level: "community",
+      format: "json",
+      key: ["servers"],
+      dialect: "vscode",
+    },
+  ];
   readonly detection = {
     envVars: ["COPILOT_RUN_APP"],
     projectMarkers: [".github/copilot-instructions.md", ".github/skills", ".github/instructions"],

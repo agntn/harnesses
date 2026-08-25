@@ -125,6 +125,24 @@ export default class Claude extends Harness {
     level: "official",
     note: "Headless print mode; add --output-format json for structured output.",
   };
+  override readonly mcpConfigs: Harness["mcpConfigs"] = [
+    {
+      path: "~/.claude.json",
+      scope: "user",
+      level: "official",
+      format: "json",
+      key: ["mcpServers"],
+      dialect: "standard",
+    },
+    {
+      path: ".mcp.json",
+      scope: "project",
+      level: "official",
+      format: "json",
+      key: ["mcpServers"],
+      dialect: "standard",
+    },
+  ];
   readonly detection = {
     envVars: ["CLAUDE_CODE", "CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CONFIG_DIR"],
     projectMarkers: [

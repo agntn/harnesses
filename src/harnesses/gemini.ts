@@ -98,6 +98,24 @@ export default class Gemini extends Harness {
     level: "official",
     note: "Non-interactive (headless) mode.",
   };
+  override readonly mcpConfigs: Harness["mcpConfigs"] = [
+    {
+      path: "~/.gemini/settings.json",
+      scope: "user",
+      level: "official",
+      format: "json",
+      key: ["mcpServers"],
+      dialect: "standard",
+    },
+    {
+      path: ".gemini/settings.json",
+      scope: "project",
+      level: "official",
+      format: "json",
+      key: ["mcpServers"],
+      dialect: "standard",
+    },
+  ];
   readonly detection = {
     envVars: ["GEMINI_CLI"],
     projectMarkers: [".gemini", "GEMINI.md"],

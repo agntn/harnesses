@@ -26,6 +26,7 @@ src/
   index.ts              # public API barrel - all exports go through here
   types.ts              # HarnessId, HarnessCapabilities, PathCandidate, etc.
   harness.ts            # abstract Harness class (resolve, detect, isInstalled, version, invoke)
+  mcp-servers.ts        # normalized MCP server read/write across harness config dialects
   registry.ts           # global Map<HarnessId, Harness>, detect functions
   resolve.ts            # path template expansion (~, ${HOME}, %ENVVAR%)
   cli.ts                # citty CLI (list, detect, info, paths)
@@ -58,7 +59,7 @@ build.config.ts         # obuild entries: src/index + src/cli
 5. Update the harness ID list in `test/index.test.ts` (`should expose stable harness ids`)
 6. Run `pnpm lint && pnpm typecheck && pnpm build && pnpm test:run`
 
-Each harness class has: `config`, `sessions`, `persistence`, `instructions`, `skills`, `commands`, `hooks`, `capabilities`, `detection`, `invocation` (null when the CLI has no headless mode). All path entries carry `scope` (user/project/system/data), `level` (official/community/inferred), optional `platforms`.
+Each harness class has: `config`, `sessions`, `persistence`, `instructions`, `skills`, `commands`, `hooks`, `capabilities`, `detection`, `invocation` (null when the CLI has no headless mode), `mcpConfigs` (empty when unknown). All path entries carry `scope` (user/project/system/data), `level` (official/community/inferred), optional `platforms`.
 
 ## Code conventions
 

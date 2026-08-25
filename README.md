@@ -58,7 +58,7 @@ import type { ClaudeSessionEntry, CodexThread, GeminiConversationRecord } from "
 | Pi Coding Agent | `pi`             | env + project | `.pi/skills/`         | -                        | JSON + JSONL   |
 | Freebuff        | `freebuff`       | project       | `.agents/skills/`     | -                        | JSON + JSONL   |
 
-Each agent is a concrete subclass of the abstract `Harness` class. Custom subclasses can be added with `registerHarness`. Every harness exposes config paths, session locations, instruction files, skills dirs, hooks, commands, persistence formats, capabilities (MCP, vision, tools, streaming), detection rules, and a normalized non-interactive invocation (`harness.invoke(prompt)`) where the CLI has a headless mode. All paths carry `scope` (user/project/system/data), `level` (official/community/inferred), and optional `platforms` tags.
+Each agent is a concrete subclass of the abstract `Harness` class. Custom subclasses can be added with `registerHarness`. Every harness exposes config paths, session locations, instruction files, skills dirs, hooks, commands, persistence formats, capabilities (MCP, vision, tools, streaming), detection rules, a normalized non-interactive invocation (`harness.invoke(prompt)`) where the CLI has a headless mode, and its MCP server config files (`listMcpServers`/`addMcpServer`/`removeMcpServer` normalize the dialects; writes rewrite JSON and surgically edit TOML with comments preserved). All paths carry `scope` (user/project/system/data), `level` (official/community/inferred), and optional `platforms` tags.
 
 ## CLI
 
@@ -69,6 +69,9 @@ harnesses info claude           # full metadata for a harness
 harnesses paths claude          # resolved paths for current platform
 harnesses info codex --json     # machine-readable output
 harnesses run codex "fix lint"  # one prompt through a harness's headless mode
+harnesses mcp-servers list      # MCP servers configured across all harnesses
+harnesses mcp-servers add omp probe --command node --args "srv.mjs mcp"
+harnesses mcp-servers remove omp probe
 harnesses mcp                   # run the MCP server over stdio
 ```
 

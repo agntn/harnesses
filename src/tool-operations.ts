@@ -6,12 +6,16 @@
  * the same compact shape the CLI's --toon flag prints.
  */
 import { encode as toToon } from "@toon-format/toon";
-import { getAllHarnesses, getHarness, listHarnesses } from "./registry.ts";
+import { getAllHarnesses, getHarness, isHarnessId, listHarnesses } from "./registry.ts";
+import { addMcpServer, listMcpServers, removeMcpServer } from "./mcp-servers.ts";
+import type { McpConfigListing } from "./mcp-servers.ts";
+import type { Harness } from "./harness.ts";
 import type {
   HarnessCapabilities,
   HarnessDetection,
   HarnessId,
   InvokeResult,
+  McpServerConfig,
   PathCandidate,
   ResolvedPaths,
   StorageDescriptor,
@@ -61,14 +65,25 @@ export interface UnknownHarness {
   known: HarnessId[];
 }
 
+import { RUN_TIMEOUT_DEFAULT_SECONDS } from "./tool-schemas.ts";
+
 /** Default wall-clock budget for one harness run, in seconds. */
-export const RUN_DEFAULT_TIMEOUT_SECONDS = 600;
+export const RUN_DEFAULT_TIMEOUT_SECONDS = RUN_TIMEOUT_DEFAULT_SECONDS;
 
 /** The run tool's per-stream cap: harness output is unbounded, model context is not. */
 export const RUN_MAX_OUTPUT_CHARS = 8000;
 
 function text(data: unknown): Array<{ type: "text"; text: string }> {
   return [{ type: "text", text: toToon(data) }];
+}
+
+function unknownHarness(id: string): ToolResult<UnknownHarness> {
+  const details: UnknownHarness = { error: `Unknown harness: ${id}`, known: listHarnesses() };
+  return { content: text(details), details, isError: true };
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function truncate(output: string): string {
@@ -95,14 +110,9 @@ export function detectHarnesses(): ToolResult<HarnessListing> {
 
 /** Full metadata for one harness, with paths resolved for the current platform. */
 export function harnessInfo(id: string): ToolResult<HarnessMetadata | UnknownHarness> {
-  const known = listHarnesses();
+  if (!isHarnessId(id)) return unknownHarness(id);
 
-  if (!(known as string[]).includes(id)) {
-    const details: UnknownHarness = { error: `Unknown harness: ${id}`, known };
-    return { content: text(details), details, isError: true };
-  }
-
-  const harness = getHarness(id as HarnessId);
+  const harness = getHarness(id);
   const details: HarnessMetadata = {
     id: harness.id,
     name: harness.name,
@@ -161,14 +171,9 @@ export async function runHarness(
   prompt: string,
   options: RunOptions = {},
 ): Promise<ToolResult<RunOutcome | RunFailure>> {
-  const known = listHarnesses();
+  if (!isHarnessId(id)) return unknownHarness(id);
 
-  if (!(known as string[]).includes(id)) {
-    const details: RunFailure = { error: `Unknown harness: ${id}`, known };
-    return { content: text(details), details, isError: true };
-  }
-
-  const harness = getHarness(id as HarnessId);
+  const harness = getHarness(id);
   const structured = options.structured ?? false;
   if (!harness.buildInvocation(prompt, { structured })) {
     const details: RunFailure = {
@@ -190,9 +195,7 @@ export async function runHarness(
       structured,
     });
   } catch (error) {
-    const details: RunFailure = {
-      error: `Failed to run ${id}: ${error instanceof Error ? error.message : String(error)}`,
-    };
+    const details: RunFailure = { error: `Failed to run ${id}: ${errorMessage(error)}` };
     return { content: text(details), details, isError: true };
   }
 
@@ -212,4 +215,95 @@ export async function runHarness(
     details,
     ...(result.timedOut || result.exitCode !== 0 ? { isError: true } : {}),
   };
+}
+
+/** MCP server listings for one harness or all of them. */
+export interface McpListing {
+  harnesses: Array<{ id: HarnessId; configs: McpConfigListing[] }>;
+}
+
+/** Result of one MCP config mutation. */
+export interface McpMutation {
+  id: HarnessId;
+  path: string;
+  action: "added" | "replaced" | "removed" | "noop";
+}
+
+/** Flat tool parameters describing one MCP server, shared by every surface. */
+export interface McpServerParams {
+  name: string;
+  transport?: McpServerConfig["transport"];
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  url?: string;
+  headers?: Record<string, string>;
+}
+
+/** Builds the normalized server shape from flat tool parameters. */
+export function toMcpServerConfig(params: McpServerParams): McpServerConfig {
+  const server: McpServerConfig = {
+    name: params.name,
+    transport: params.transport ?? (params.url ? "http" : "stdio"),
+  };
+  if (params.command !== undefined) server.command = params.command;
+  if (params.args !== undefined) server.args = params.args;
+  if (params.env !== undefined) server.env = params.env;
+  if (params.url !== undefined) server.url = params.url;
+  if (params.headers !== undefined) server.headers = params.headers;
+  return server;
+}
+
+/** Lists configured MCP servers, normalized across harness config dialects. */
+export function mcpList(id?: string): ToolResult<McpListing | UnknownHarness> {
+  if (id !== undefined && !isHarnessId(id)) return unknownHarness(id);
+
+  const targets = id !== undefined && isHarnessId(id) ? [getHarness(id)] : getAllHarnesses();
+  const details: McpListing = {
+    harnesses: targets
+      .map((harness) => ({ id: harness.id, configs: listMcpServers(harness) }))
+      .filter((entry) => entry.configs.length > 0),
+  };
+
+  return { content: text(details), details };
+}
+
+function mcpMutate(
+  id: string,
+  mutate: (harness: Harness) => { path: string; action: McpMutation["action"] },
+): ToolResult<McpMutation | RunFailure> {
+  if (!isHarnessId(id)) return unknownHarness(id);
+
+  try {
+    const { path, action } = mutate(getHarness(id));
+    const details: McpMutation = { id, path, action };
+    return { content: text(details), details, ...(action === "noop" ? { isError: true } : {}) };
+  } catch (error) {
+    const details: RunFailure = { error: errorMessage(error) };
+    return { content: text(details), details, isError: true };
+  }
+}
+
+/** Adds or replaces one MCP server in a harness's config. */
+export function mcpAdd(
+  id: string,
+  params: McpServerParams,
+  scope: "user" | "project" = "user",
+): ToolResult<McpMutation | RunFailure> {
+  return mcpMutate(id, (harness) => {
+    const { path, replaced } = addMcpServer(harness, toMcpServerConfig(params), scope);
+    return { path, action: replaced ? "replaced" : "added" };
+  });
+}
+
+/** Removes one MCP server from a harness's config. */
+export function mcpRemove(
+  id: string,
+  name: string,
+  scope: "user" | "project" = "user",
+): ToolResult<McpMutation | RunFailure> {
+  return mcpMutate(id, (harness) => {
+    const { path, removed } = removeMcpServer(harness, name, scope);
+    return { path, action: removed ? "removed" : "noop" };
+  });
 }

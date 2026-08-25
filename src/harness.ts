@@ -7,6 +7,7 @@ import type {
   HarnessInvocation,
   InvokeOptions,
   InvokeResult,
+  McpConfigFile,
   PathCandidate,
   StorageDescriptor,
   HarnessCapabilities,
@@ -37,6 +38,8 @@ export abstract class Harness {
   abstract readonly detection: HarnessDetection;
   /** Non-interactive invocation recipe; null when the harness has no headless mode. */
   abstract readonly invocation: HarnessInvocation | null;
+  /** Config files that hold MCP server definitions; empty when unknown or unsupported. */
+  readonly mcpConfigs: McpConfigFile[] = [];
 
   isInstalled(): boolean {
     const cmd = process.platform === "win32" ? "where" : "which";
@@ -154,7 +157,12 @@ export abstract class Harness {
     });
   }
 
-  resolve(options: ResolveOptions = {}): ResolvedPaths {
+  /**
+   * Filters one candidate list to the platform and expands its path
+   * templates: the shared pipeline behind {@link resolve} and the MCP
+   * config surface.
+   */
+  resolveCandidates<T extends PathCandidate>(entries: T[], options: ResolveOptions = {}): T[] {
     const raw = options.platform ?? process.platform;
 
     if (!Object.hasOwn(SUPPORTED_PLATFORMS, raw)) {
@@ -163,21 +171,19 @@ export abstract class Harness {
 
     const platform = raw as Platform;
 
-    const matchesPlatform = (entry: PathCandidate) =>
-      !entry.platforms || entry.platforms.includes(platform);
+    return entries
+      .filter((entry) => !entry.platforms || entry.platforms.includes(platform))
+      .map((entry) => ({ ...entry, path: resolvePathTemplate(entry.path, options) }));
+  }
 
-    const resolveEntry = (entry: PathCandidate): PathCandidate => ({
-      ...entry,
-      path: resolvePathTemplate(entry.path, options),
-    });
-
+  resolve(options: ResolveOptions = {}): ResolvedPaths {
     return {
-      config: this.config.filter(matchesPlatform).map(resolveEntry),
-      sessions: this.sessions.filter(matchesPlatform).map(resolveEntry),
-      instructions: this.instructions.filter(matchesPlatform).map(resolveEntry),
-      skills: this.skills.filter(matchesPlatform).map(resolveEntry),
-      commands: this.commands.filter(matchesPlatform).map(resolveEntry),
-      hooks: this.hooks.filter(matchesPlatform).map(resolveEntry),
+      config: this.resolveCandidates(this.config, options),
+      sessions: this.resolveCandidates(this.sessions, options),
+      instructions: this.resolveCandidates(this.instructions, options),
+      skills: this.resolveCandidates(this.skills, options),
+      commands: this.resolveCandidates(this.commands, options),
+      hooks: this.resolveCandidates(this.hooks, options),
     };
   }
 }

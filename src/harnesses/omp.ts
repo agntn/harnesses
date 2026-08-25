@@ -129,6 +129,24 @@ export default class Omp extends Harness {
     level: "official",
     note: "Add --mode json for structured event output.",
   };
+  override readonly mcpConfigs: Harness["mcpConfigs"] = [
+    {
+      path: "~/.omp/agent/mcp.json",
+      scope: "user",
+      level: "official",
+      format: "json",
+      key: ["mcpServers"],
+      dialect: "standard",
+    },
+    {
+      path: ".omp/mcp.json",
+      scope: "project",
+      level: "official",
+      format: "json",
+      key: ["mcpServers"],
+      dialect: "standard",
+    },
+  ];
   readonly detection = {
     envVars: ["OMP_PROFILE", "PI_CODING_AGENT_DIR"],
     projectMarkers: [".omp"],

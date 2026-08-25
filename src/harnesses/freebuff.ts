@@ -77,6 +77,25 @@ export default class Freebuff extends Harness {
   readonly commands: Harness["commands"] = [];
   readonly hooks: Harness["hooks"] = [];
   readonly invocation: Harness["invocation"] = null;
+  override readonly mcpConfigs: Harness["mcpConfigs"] = [
+    {
+      path: "~/.agents/mcp.json",
+      scope: "user",
+      level: "official",
+      format: "json",
+      key: ["mcpServers"],
+      dialect: "standard",
+    },
+    {
+      path: ".agents/mcp.json",
+      scope: "project",
+      level: "official",
+      format: "json",
+      key: ["mcpServers"],
+      dialect: "standard",
+      note: "The parent directory's .agents/mcp.json is scanned too; agent templates can also embed their own mcpServers.",
+    },
+  ];
   readonly detection = {
     envVars: [],
     projectMarkers: [".agents", "knowledge.md"],

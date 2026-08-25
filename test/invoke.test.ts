@@ -19,6 +19,7 @@ class FakeCursor extends Harness {
   readonly skills: Harness["skills"] = [];
   readonly commands: Harness["commands"] = [];
   readonly hooks: Harness["hooks"] = [];
+  readonly mcpConfigs: Harness["mcpConfigs"] = [];
   readonly detection = { envVars: [], projectMarkers: [] };
   readonly invocation: Harness["invocation"] = {
     args: ["-e", "console.log('echo:' + process.argv[1]); process.exitCode = 0", "{prompt}"],

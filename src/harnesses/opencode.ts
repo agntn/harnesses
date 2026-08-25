@@ -98,6 +98,24 @@ export default class OpenCode extends Harness {
     jsonArgs: ["run", "--format", "json", "{prompt}"],
     level: "official",
   };
+  override readonly mcpConfigs: Harness["mcpConfigs"] = [
+    {
+      path: "~/.config/opencode/opencode.json",
+      scope: "user",
+      level: "official",
+      format: "json",
+      key: ["mcp"],
+      dialect: "opencode",
+    },
+    {
+      path: "opencode.json",
+      scope: "project",
+      level: "official",
+      format: "json",
+      key: ["mcp"],
+      dialect: "opencode",
+    },
+  ];
   readonly detection = {
     envVars: [],
     projectMarkers: [".opencode", "opencode.jsonc", "opencode.json"],
