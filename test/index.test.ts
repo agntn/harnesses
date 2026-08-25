@@ -31,6 +31,7 @@ describe("@agntn/harnesses", () => {
       "github-copilot",
       "grok",
       "mastracode",
+      "omp",
       "opencode",
     ]);
     expect(listHarnesses().sort()).toEqual([...harnessIds].sort());
