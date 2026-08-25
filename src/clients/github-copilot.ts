@@ -1,25 +1,27 @@
-import type { ClientDefinition } from "../types.ts";
+import { Client } from "../client.ts";
 
-export default {
-  id: "github-copilot",
-  name: "GitHub Copilot",
-  binaries: [],
-  capabilities: {
+export default class GitHubCopilot extends Client {
+  readonly id = "github-copilot";
+  readonly name = "GitHub Copilot";
+  readonly binaries = [];
+  readonly capabilities = {
     mcp: true,
     vision: true,
     tools: true,
     streaming: true,
-  },
-  config: [
+  };
+  readonly config: Client["config"] = [
     {
       path: "~/.copilot/config.json",
       scope: "user",
       level: "inferred",
     },
-  ],
-  sessions: [],
-  persistence: [{ format: "JSON", level: "official", note: "Configuration files." }],
-  instructions: [
+  ];
+  readonly sessions: Client["sessions"] = [];
+  readonly persistence: Client["persistence"] = [
+    { format: "JSON", level: "official", note: "Configuration files." },
+  ];
+  readonly instructions: Client["instructions"] = [
     {
       path: ".github/copilot-instructions.md",
       scope: "project",
@@ -31,8 +33,8 @@ export default {
       level: "official",
       note: "Modular instructions in .instructions.md files.",
     },
-  ],
-  skills: [
+  ];
+  readonly skills: Client["skills"] = [
     { path: ".github/skills/", scope: "project", level: "official" },
     {
       path: ".claude/skills/",
@@ -40,11 +42,11 @@ export default {
       level: "official",
       note: "Copilot auto-detects Claude skills directory.",
     },
-  ],
-  commands: [],
-  hooks: [],
-  detection: {
+  ];
+  readonly commands: Client["commands"] = [];
+  readonly hooks: Client["hooks"] = [];
+  readonly detection = {
     envVars: ["COPILOT_RUN_APP"],
     projectMarkers: [".github/copilot-instructions.md", ".github/skills", ".github/instructions"],
-  },
-} satisfies ClientDefinition;
+  };
+}

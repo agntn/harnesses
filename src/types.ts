@@ -44,21 +44,6 @@ export interface ClientDetection {
   projectMarkers: string[];
 }
 
-export interface ClientDefinition {
-  id: ClientId;
-  name: string;
-  binaries: string[];
-  config: PathCandidate[];
-  sessions: PathCandidate[];
-  persistence: StorageDescriptor[];
-  instructions: PathCandidate[];
-  skills: PathCandidate[];
-  commands: PathCandidate[];
-  hooks: PathCandidate[];
-  capabilities: ClientCapabilities;
-  detection?: ClientDetection;
-}
-
 export interface ResolveOptions {
   homeDir?: string;
   projectRoot?: string;

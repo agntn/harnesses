@@ -2,7 +2,6 @@ import { existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import type {
-  ClientDefinition,
   ClientDetection,
   ClientId,
   PathCandidate,
@@ -14,36 +13,25 @@ import type {
 } from "./types.ts";
 import { resolvePathTemplate } from "./resolve.ts";
 
-const SUPPORTED_PLATFORMS = new Set<string>(["linux", "darwin", "win32"]);
+const SUPPORTED_PLATFORMS: Record<Platform, true> = {
+  linux: true,
+  darwin: true,
+  win32: true,
+};
 
-export class Client {
-  readonly id: ClientId;
-  readonly name: string;
-  readonly binaries: string[];
-  readonly config: PathCandidate[];
-  readonly sessions: PathCandidate[];
-  readonly persistence: StorageDescriptor[];
-  readonly instructions: PathCandidate[];
-  readonly skills: PathCandidate[];
-  readonly commands: PathCandidate[];
-  readonly hooks: PathCandidate[];
-  readonly capabilities: ClientCapabilities;
-  readonly detection: ClientDetection;
-
-  constructor(definition: ClientDefinition) {
-    this.id = definition.id;
-    this.name = definition.name;
-    this.binaries = definition.binaries;
-    this.config = definition.config;
-    this.sessions = definition.sessions;
-    this.persistence = definition.persistence;
-    this.instructions = definition.instructions;
-    this.skills = definition.skills;
-    this.commands = definition.commands;
-    this.hooks = definition.hooks;
-    this.capabilities = definition.capabilities;
-    this.detection = definition.detection ?? { envVars: [], projectMarkers: [] };
-  }
+export abstract class Client {
+  abstract readonly id: ClientId;
+  abstract readonly name: string;
+  abstract readonly binaries: string[];
+  abstract readonly config: PathCandidate[];
+  abstract readonly sessions: PathCandidate[];
+  abstract readonly persistence: StorageDescriptor[];
+  abstract readonly instructions: PathCandidate[];
+  abstract readonly skills: PathCandidate[];
+  abstract readonly commands: PathCandidate[];
+  abstract readonly hooks: PathCandidate[];
+  abstract readonly capabilities: ClientCapabilities;
+  abstract readonly detection: ClientDetection;
 
   isInstalled(): boolean {
     const cmd = process.platform === "win32" ? "where" : "which";
@@ -86,7 +74,7 @@ export class Client {
   resolve(options: ResolveOptions = {}): ResolvedPaths {
     const raw = options.platform ?? process.platform;
 
-    if (!SUPPORTED_PLATFORMS.has(raw)) {
+    if (!Object.hasOwn(SUPPORTED_PLATFORMS, raw)) {
       throw new Error(`Unsupported platform: ${raw}. Expected one of: linux, darwin, win32`);
     }
 
@@ -110,3 +98,5 @@ export class Client {
     };
   }
 }
+
+export type ClientConstructor = new () => Client;

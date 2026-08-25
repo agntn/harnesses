@@ -7,14 +7,14 @@ export type {
   StorageDescriptor,
   ClientCapabilities,
   ClientDetection,
-  ClientDefinition,
   ResolveOptions,
   ResolvedPaths,
 } from "./types.ts";
 
 export { Client } from "./client.ts";
+export type { ClientConstructor } from "./client.ts";
 export {
-  defineClient,
+  registerClient,
   getClient,
   listClients,
   getAllClients,

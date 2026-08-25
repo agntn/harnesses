@@ -54,7 +54,7 @@ import type { ClaudeSessionEntry, CodexThread, GeminiConversationRecord } from "
 | GitHub Copilot | `github-copilot` | env + project | `.github/skills/`     | -                        | -              |
 | Mastra Code    | `mastracode`     | project       | `.mastracode/skills/` | `.mastracode/hooks.json` | SQLite         |
 
-Each agent definition includes config paths, session locations, instruction files, skills dirs, hooks, commands, persistence formats, capabilities (MCP, vision, tools, streaming), and detection rules. All paths carry `scope` (user/project/system/data), `level` (official/community/inferred), and optional `platforms` tags.
+Each agent is a concrete subclass of the abstract `Client` class. Custom subclasses can be added with `registerClient`. Every client exposes config paths, session locations, instruction files, skills dirs, hooks, commands, persistence formats, capabilities (MCP, vision, tools, streaming), and detection rules. All paths carry `scope` (user/project/system/data), `level` (official/community/inferred), and optional `platforms` tags.
 
 ## CLI
 

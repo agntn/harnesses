@@ -1,16 +1,16 @@
-import type { ClientDefinition } from "../types.ts";
+import { Client } from "../client.ts";
 
-export default {
-  id: "opencode",
-  name: "OpenCode CLI",
-  binaries: ["opencode"],
-  capabilities: {
+export default class OpenCode extends Client {
+  readonly id = "opencode";
+  readonly name = "OpenCode CLI";
+  readonly binaries = ["opencode"];
+  readonly capabilities = {
     mcp: true,
     vision: true,
     tools: true,
     streaming: true,
-  },
-  config: [
+  };
+  readonly config: Client["config"] = [
     {
       path: "~/.config/opencode/opencode.jsonc",
       scope: "user",
@@ -42,24 +42,24 @@ export default {
       scope: "project",
       level: "official",
     },
-  ],
-  sessions: [
+  ];
+  readonly sessions: Client["sessions"] = [
     {
       path: "~/.local/share/opencode/opencode.db",
       scope: "data",
       level: "official",
       note: "SQLite database with sessions, messages, and parts. XDG-based, same path on all platforms.",
     },
-  ],
-  persistence: [
+  ];
+  readonly persistence: Client["persistence"] = [
     { format: "JSON/JSONC", level: "official", note: "Config files." },
     {
       format: "SQLite",
       level: "official",
       note: "Session and message storage via Drizzle ORM.",
     },
-  ],
-  instructions: [
+  ];
+  readonly instructions: Client["instructions"] = [
     { path: "AGENTS.md", scope: "project", level: "official" },
     {
       path: "CLAUDE.md",
@@ -73,8 +73,8 @@ export default {
       level: "official",
       note: "Global user-level instructions.",
     },
-  ],
-  skills: [
+  ];
+  readonly skills: Client["skills"] = [
     { path: ".opencode/skills/", scope: "project", level: "official" },
     {
       path: ".claude/skills/",
@@ -90,11 +90,11 @@ export default {
       note: "Claude Code compatible.",
     },
     { path: "~/.agents/skills/", scope: "user", level: "official" },
-  ],
-  commands: [],
-  hooks: [],
-  detection: {
+  ];
+  readonly commands: Client["commands"] = [];
+  readonly hooks: Client["hooks"] = [];
+  readonly detection = {
     envVars: [],
     projectMarkers: [".opencode", "opencode.jsonc", "opencode.json"],
-  },
-} satisfies ClientDefinition;
+  };
+}

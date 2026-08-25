@@ -1,22 +1,23 @@
-import { Client } from "./client.ts";
-import { definitions } from "./clients/index.ts";
-import type { ClientDefinition, ClientId } from "./types.ts";
+import type { Client, ClientConstructor } from "./client.ts";
+import { clients } from "./clients/index.ts";
+import type { ClientId } from "./types.ts";
 
 let registry: Map<ClientId, Client> | undefined;
 
 function getRegistry(): Map<ClientId, Client> {
   if (!registry) {
     registry = new Map();
-    for (const def of definitions) {
-      registry.set(def.id, new Client(def));
+    for (const ClientClass of clients) {
+      const client = new ClientClass();
+      registry.set(client.id, client);
     }
   }
   return registry;
 }
 
-export function defineClient(definition: ClientDefinition): Client {
-  const client = new Client(definition);
-  getRegistry().set(definition.id, client);
+export function registerClient(ClientClass: ClientConstructor): Client {
+  const client = new ClientClass();
+  getRegistry().set(client.id, client);
   return client;
 }
 

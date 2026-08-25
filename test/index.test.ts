@@ -53,6 +53,10 @@ describe("aixa", () => {
     expect(cliClients.every((client) => client.binaries.length > 0)).toBe(true);
   });
 
+  it("should instantiate a concrete subclass for every client", () => {
+    expect(getAllClients().every((client) => client.constructor !== Client)).toBe(true);
+  });
+
   it("should resolve template placeholders", () => {
     const resolved = resolvePathTemplate("${HOME}/x/${PROJECT_ROOT}", {
       homeDir: "/tmp/home",
@@ -129,6 +133,14 @@ describe("aixa", () => {
 
     expect(win.config.every((e) => !e.path.startsWith("/etc/"))).toBe(true);
     expect(linux.config.some((e) => e.path.startsWith("/etc/"))).toBe(true);
+  });
+
+  it("should reject inherited property names as platforms", () => {
+    const codex = getClient("codex");
+
+    expect(() => Reflect.apply(codex.resolve, codex, [{ platform: "toString" }])).toThrow(
+      "Unsupported platform: toString",
+    );
   });
 
   it("should return platform-specific gemini system paths", () => {

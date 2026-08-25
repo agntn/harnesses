@@ -1,16 +1,16 @@
-import type { ClientDefinition } from "../types.ts";
+import { Client } from "../client.ts";
 
-export default {
-  id: "claude",
-  name: "Anthropic Claude Code",
-  binaries: ["claude"],
-  capabilities: {
+export default class Claude extends Client {
+  readonly id = "claude";
+  readonly name = "Anthropic Claude Code";
+  readonly binaries = ["claude"];
+  readonly capabilities = {
     mcp: true,
     vision: true,
     tools: true,
     streaming: true,
-  },
-  config: [
+  };
+  readonly config: Client["config"] = [
     { path: "~/.claude/settings.json", scope: "user", level: "official" },
     {
       path: "~/.claude.json",
@@ -49,8 +49,8 @@ export default {
       platforms: ["darwin"],
       note: "Enterprise managed settings.",
     },
-  ],
-  sessions: [
+  ];
+  readonly sessions: Client["sessions"] = [
     {
       path: "~/.claude/projects/<project-path>/sessions/*.jsonl",
       scope: "data",
@@ -63,16 +63,16 @@ export default {
       level: "official",
       note: "Global prompt history across all projects.",
     },
-  ],
-  persistence: [
+  ];
+  readonly persistence: Client["persistence"] = [
     { format: "JSON", level: "official", note: "Settings and MCP config files." },
     {
       format: "JSONL",
       level: "official",
       note: "Session transcripts and global history.",
     },
-  ],
-  instructions: [
+  ];
+  readonly instructions: Client["instructions"] = [
     { path: "CLAUDE.md", scope: "project", level: "official" },
     {
       path: ".claude/CLAUDE.md",
@@ -86,8 +86,8 @@ export default {
       level: "official",
       note: "Global user-level instructions.",
     },
-  ],
-  skills: [
+  ];
+  readonly skills: Client["skills"] = [
     { path: ".claude/skills/", scope: "project", level: "official" },
     {
       path: "~/.claude/skills/",
@@ -95,8 +95,8 @@ export default {
       level: "official",
       note: "Global user-level skills.",
     },
-  ],
-  commands: [
+  ];
+  readonly commands: Client["commands"] = [
     {
       path: ".claude/commands/",
       scope: "project",
@@ -109,8 +109,8 @@ export default {
       level: "official",
       note: "Legacy global slash commands.",
     },
-  ],
-  hooks: [
+  ];
+  readonly hooks: Client["hooks"] = [
     { path: ".claude/hooks/", scope: "project", level: "official" },
     {
       path: "~/.claude/hooks/",
@@ -118,8 +118,8 @@ export default {
       level: "official",
       note: "Global user-level hooks.",
     },
-  ],
-  detection: {
+  ];
+  readonly detection = {
     envVars: ["CLAUDE_CODE", "CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CONFIG_DIR"],
     projectMarkers: [
       ".claude/settings.json",
@@ -127,5 +127,5 @@ export default {
       ".claude/skills",
       "CLAUDE.md",
     ],
-  },
-} satisfies ClientDefinition;
+  };
+}

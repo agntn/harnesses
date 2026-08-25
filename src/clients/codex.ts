@@ -1,16 +1,16 @@
-import type { ClientDefinition } from "../types.ts";
+import { Client } from "../client.ts";
 
-export default {
-  id: "codex",
-  name: "OpenAI Codex CLI",
-  binaries: ["codex"],
-  capabilities: {
+export default class Codex extends Client {
+  readonly id = "codex";
+  readonly name = "OpenAI Codex CLI";
+  readonly binaries = ["codex"];
+  readonly capabilities = {
     mcp: true,
     vision: true,
     tools: true,
     streaming: true,
-  },
-  config: [
+  };
+  readonly config: Client["config"] = [
     { path: "~/.codex/config.toml", scope: "user", level: "official" },
     {
       path: ".codex/config.toml",
@@ -24,8 +24,8 @@ export default {
       level: "official",
       platforms: ["linux", "darwin"],
     },
-  ],
-  sessions: [
+  ];
+  readonly sessions: Client["sessions"] = [
     {
       path: "~/.codex/sessions/",
       scope: "data",
@@ -44,13 +44,13 @@ export default {
       level: "official",
       note: "SQLite state database for threads and agent state.",
     },
-  ],
-  persistence: [
+  ];
+  readonly persistence: Client["persistence"] = [
     { format: "TOML", level: "official", note: "Configuration files." },
     { format: "JSONL", level: "official", note: "Conversation transcripts." },
     { format: "SQLite", level: "official", note: "Thread and agent state." },
-  ],
-  instructions: [
+  ];
+  readonly instructions: Client["instructions"] = [
     { path: "AGENTS.md", scope: "project", level: "official" },
     {
       path: "AGENTS.override.md",
@@ -70,8 +70,8 @@ export default {
       level: "official",
       note: "Global override, takes precedence over global AGENTS.md.",
     },
-  ],
-  skills: [
+  ];
+  readonly skills: Client["skills"] = [
     { path: ".codex/skills/", scope: "project", level: "official" },
     { path: ".agents/skills/", scope: "project", level: "official" },
     {
@@ -87,11 +87,11 @@ export default {
       level: "official",
       platforms: ["linux", "darwin"],
     },
-  ],
-  commands: [],
-  hooks: [],
-  detection: {
+  ];
+  readonly commands: Client["commands"] = [];
+  readonly hooks: Client["hooks"] = [];
+  readonly detection = {
     envVars: [],
     projectMarkers: [".codex", "AGENTS.md", "AGENTS.override.md", ".agents/skills"],
-  },
-} satisfies ClientDefinition;
+  };
+}

@@ -1,16 +1,16 @@
-import type { ClientDefinition } from "../types.ts";
+import { Client } from "../client.ts";
 
-export default {
-  id: "mastracode",
-  name: "Mastra Code",
-  binaries: ["mastracode"],
-  capabilities: {
+export default class MastraCode extends Client {
+  readonly id = "mastracode";
+  readonly name = "Mastra Code";
+  readonly binaries = ["mastracode"];
+  readonly capabilities = {
     mcp: true,
     vision: true,
     tools: true,
     streaming: true,
-  },
-  config: [
+  };
+  readonly config: Client["config"] = [
     {
       path: ".mastracode/mcp.json",
       scope: "project",
@@ -35,8 +35,8 @@ export default {
       level: "official",
       note: "Global hooks.",
     },
-  ],
-  sessions: [
+  ];
+  readonly sessions: Client["sessions"] = [
     {
       path: "~/.local/share/mastracode/mastra.db",
       scope: "data",
@@ -44,16 +44,16 @@ export default {
       platforms: ["linux"],
       note: "LibSQL database with threads, messages, and observational memory.",
     },
-  ],
-  persistence: [
+  ];
+  readonly persistence: Client["persistence"] = [
     { format: "JSON", level: "official", note: "MCP and hooks config files." },
     {
       format: "SQLite",
       level: "official",
       note: "LibSQL database for threads, messages, and observational memory.",
     },
-  ],
-  instructions: [
+  ];
+  readonly instructions: Client["instructions"] = [
     { path: "AGENTS.md", scope: "project", level: "official" },
     {
       path: "CLAUDE.md",
@@ -85,8 +85,8 @@ export default {
       level: "official",
       note: "Global user-level instructions.",
     },
-  ],
-  skills: [
+  ];
+  readonly skills: Client["skills"] = [
     { path: ".mastracode/skills/", scope: "project", level: "official" },
     {
       path: "~/.mastracode/skills/",
@@ -106,8 +106,8 @@ export default {
       level: "official",
       note: "Claude Code compatible.",
     },
-  ],
-  commands: [
+  ];
+  readonly commands: Client["commands"] = [
     { path: ".mastracode/commands/", scope: "project", level: "official" },
     {
       path: "~/.mastracode/commands/",
@@ -115,8 +115,8 @@ export default {
       level: "official",
       note: "Global commands.",
     },
-  ],
-  hooks: [
+  ];
+  readonly hooks: Client["hooks"] = [
     {
       path: ".mastracode/hooks.json",
       scope: "project",
@@ -128,9 +128,9 @@ export default {
       level: "official",
       note: "Global hooks.",
     },
-  ],
-  detection: {
+  ];
+  readonly detection = {
     envVars: [],
     projectMarkers: [".mastracode"],
-  },
-} satisfies ClientDefinition;
+  };
+}

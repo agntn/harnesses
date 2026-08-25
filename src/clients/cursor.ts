@@ -1,25 +1,27 @@
-import type { ClientDefinition } from "../types.ts";
+import { Client } from "../client.ts";
 
-export default {
-  id: "cursor",
-  name: "Cursor",
-  binaries: ["cursor"],
-  capabilities: {
+export default class Cursor extends Client {
+  readonly id = "cursor";
+  readonly name = "Cursor";
+  readonly binaries = ["cursor"];
+  readonly capabilities = {
     mcp: true,
     vision: true,
     tools: true,
     streaming: true,
-  },
-  config: [
+  };
+  readonly config: Client["config"] = [
     {
       path: "~/.cursor/settings.json",
       scope: "user",
       level: "official",
     },
-  ],
-  sessions: [],
-  persistence: [{ format: "JSON", level: "official", note: "Settings and rules files." }],
-  instructions: [
+  ];
+  readonly sessions: Client["sessions"] = [];
+  readonly persistence: Client["persistence"] = [
+    { format: "JSON", level: "official", note: "Settings and rules files." },
+  ];
+  readonly instructions: Client["instructions"] = [
     {
       path: ".cursor/rules/skilld-activation.mdc",
       scope: "project",
@@ -32,8 +34,8 @@ export default {
       level: "official",
       note: "Legacy project-level instructions.",
     },
-  ],
-  skills: [
+  ];
+  readonly skills: Client["skills"] = [
     { path: ".cursor/skills/", scope: "project", level: "official" },
     {
       path: "~/.cursor/skills/",
@@ -53,11 +55,11 @@ export default {
       level: "official",
       note: "Cursor natively scans Codex skills directory.",
     },
-  ],
-  commands: [],
-  hooks: [],
-  detection: {
+  ];
+  readonly commands: Client["commands"] = [];
+  readonly hooks: Client["hooks"] = [];
+  readonly detection = {
     envVars: ["CURSOR_SESSION", "CURSOR_TRACE_ID"],
     projectMarkers: [".cursor", ".cursorrules"],
-  },
-} satisfies ClientDefinition;
+  };
+}

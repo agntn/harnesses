@@ -1,16 +1,16 @@
-import type { ClientDefinition } from "../types.ts";
+import { Client } from "../client.ts";
 
-export default {
-  id: "gemini",
-  name: "Google Gemini CLI",
-  binaries: ["gemini"],
-  capabilities: {
+export default class Gemini extends Client {
+  readonly id = "gemini";
+  readonly name = "Google Gemini CLI";
+  readonly binaries = ["gemini"];
+  readonly capabilities = {
     mcp: true,
     vision: true,
     tools: true,
     streaming: true,
-  },
-  config: [
+  };
+  readonly config: Client["config"] = [
     {
       path: "~/.gemini/settings.json",
       scope: "user",
@@ -39,8 +39,8 @@ export default {
       level: "official",
       platforms: ["win32"],
     },
-  ],
-  sessions: [
+  ];
+  readonly sessions: Client["sessions"] = [
     {
       path: "~/.gemini/history/<project-id>/",
       scope: "data",
@@ -53,16 +53,16 @@ export default {
       level: "official",
       note: "Active chat session data.",
     },
-  ],
-  persistence: [
+  ];
+  readonly persistence: Client["persistence"] = [
     { format: "JSON", level: "official", note: "Settings files." },
     {
       format: "JSON",
       level: "official",
       note: "Session and history records.",
     },
-  ],
-  instructions: [
+  ];
+  readonly instructions: Client["instructions"] = [
     { path: "GEMINI.md", scope: "project", level: "official" },
     {
       path: "~/.gemini/GEMINI.md",
@@ -70,14 +70,14 @@ export default {
       level: "official",
       note: "Global instruction/memory file.",
     },
-  ],
-  skills: [
+  ];
+  readonly skills: Client["skills"] = [
     { path: ".gemini/skills/", scope: "project", level: "official" },
     { path: ".agents/skills/", scope: "project", level: "official" },
     { path: "~/.gemini/skills/", scope: "user", level: "official" },
     { path: "~/.agents/skills/", scope: "user", level: "official" },
-  ],
-  commands: [
+  ];
+  readonly commands: Client["commands"] = [
     {
       path: ".gemini/commands/",
       scope: "project",
@@ -90,10 +90,10 @@ export default {
       level: "official",
       note: "Global custom commands in TOML format.",
     },
-  ],
-  hooks: [],
-  detection: {
+  ];
+  readonly hooks: Client["hooks"] = [];
+  readonly detection = {
     envVars: ["GEMINI_CLI"],
     projectMarkers: [".gemini", "GEMINI.md"],
-  },
-} satisfies ClientDefinition;
+  };
+}
