@@ -7,8 +7,15 @@
  */
 import { encode as toToon } from "@toon-format/toon";
 import { getAllHarnesses, getHarness, isHarnessId, listHarnesses } from "./registry.ts";
-import { addMcpServer, listMcpServers, removeMcpServer } from "./mcp-servers.ts";
-import type { McpConfigListing } from "./mcp-servers.ts";
+import {
+  addMcpServer,
+  listMcpServers,
+  readMasterMcpServers,
+  removeMcpServer,
+  syncMcpServers,
+} from "./mcp-servers.ts";
+import type { McpConfigListing, SyncReport } from "./mcp-servers.ts";
+export type { SyncReport } from "./mcp-servers.ts";
 import type { Harness } from "./harness.ts";
 import type {
   HarnessCapabilities,
@@ -306,4 +313,29 @@ export function mcpRemove(
     const { path, removed } = removeMcpServer(harness, name, scope);
     return { path, action: removed ? "removed" : "noop" };
   });
+}
+
+/** Pushes the master MCP list from ~/.config/agntn/mcp.jsonc into harness configs. */
+export function mcpSync(id?: string): ToolResult<SyncReport | RunFailure> {
+  if (id !== undefined && !isHarnessId(id)) return unknownHarness(id);
+
+  try {
+    // Preflight before any write: a typo in excludes must fail the whole run,
+    // not silently leave the misspelled harness unprotected.
+    const unknown = readMasterMcpServers().excludes.filter((entry) => !isHarnessId(entry));
+    if (unknown.length > 0) {
+      const details: RunFailure = {
+        error: `Master MCP list excludes unknown harnesses: ${unknown.join(", ")}`,
+        known: listHarnesses(),
+      };
+      return { content: text(details), details, isError: true };
+    }
+    const details = syncMcpServers(
+      id !== undefined && isHarnessId(id) ? [getHarness(id)] : getAllHarnesses(),
+    );
+    return { content: text(details), details };
+  } catch (error) {
+    const details: RunFailure = { error: errorMessage(error) };
+    return { content: text(details), details, isError: true };
+  }
 }

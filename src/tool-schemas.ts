@@ -74,6 +74,9 @@ export function harnessToolSchemas<I, S>(Type: McpSchemaBuilder<I, S>) {
     mcpList: Type.Object({
       id: Type.Optional(harnessId("Harness id; omit to list every harness")),
     }),
+    mcpSync: Type.Object({
+      id: Type.Optional(harnessId("Harness id; omit to sync every harness")),
+    }),
     mcpAdd: Type.Object({
       id: harnessId("Harness id"),
       name: Type.String({
@@ -133,6 +136,10 @@ export interface RunParams {
 }
 
 export interface McpListParams {
+  id?: string;
+}
+
+export interface McpSyncParams {
   id?: string;
 }
 

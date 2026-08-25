@@ -246,6 +246,35 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
   });
 
   pi.registerTool({
+    name: "harnesses_mcp_sync",
+    label: "Harnesses MCP Sync",
+    description:
+      "Reset every harness's user-scope MCP config to exactly the master list from ~/.config/agntn/mcp.jsonc; extras are removed",
+    parameters: schemas.mcpSync,
+    approval: "write",
+    async execute(
+      _toolCallId,
+      params: HarnessSchemas.McpSyncParams,
+    ): Promise<AgentToolResult<HarnessTools.SyncReport | HarnessTools.RunFailure>> {
+      const { mcpSync } = await loadToolOperations();
+      const { content, details } = mcpSync(params.id);
+      return { content, details };
+    },
+    ...statusRenderers(
+      "Harnesses MCP Sync",
+      "write",
+      (args) =>
+        prop(args, "id") === undefined ? undefined : sanitizeTerminalText(prop(args, "id")),
+      (details) => {
+        const outcome = details as HarnessTools.SyncReport | HarnessTools.RunFailure | undefined;
+        return outcome && "targets" in outcome
+          ? [`${outcome.servers.length} servers`, `${outcome.targets.length} harnesses`]
+          : undefined;
+      },
+    ),
+  });
+
+  pi.registerTool({
     name: "harnesses_mcp_remove",
     label: "Harnesses MCP Remove",
     description:

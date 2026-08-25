@@ -2,7 +2,13 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { addMcpServer, getHarness, listMcpServers, removeMcpServer } from "../src/index.ts";
+import {
+  addMcpServer,
+  getHarness,
+  listMcpServers,
+  removeMcpServer,
+  syncMcpServers,
+} from "../src/index.ts";
 
 function fixtureDirs(): { homeDir: string; projectRoot: string } {
   const root = mkdtempSync(join(tmpdir(), "harnesses-mcp-"));
@@ -235,5 +241,179 @@ describe("addMcpServer / removeMcpServer", () => {
         dirs,
       ),
     ).toThrow(/no user-scope MCP config/);
+  });
+});
+
+describe("syncMcpServers", () => {
+  function writeMaster(homeDir: string, body: string): string {
+    const dir = join(homeDir, ".config", "agntn");
+    mkdirSync(dir, { recursive: true });
+    const path = join(dir, "mcp.jsonc");
+    writeFileSync(path, body);
+    return path;
+  }
+
+  const master = `{
+  // shared servers for every harness
+  "mcpServers": {
+    "probe": {
+      "command": "node",
+      "args": ["srv.mjs"], // trailing comma below is fine
+    },
+    "cloud": { "url": "https://example.com/mcp" },
+  },
+}`;
+
+  it("resets JSON and TOML configs to the master list and is idempotent", () => {
+    const dirs = fixtureDirs();
+    const previousXdg = process.env.XDG_CONFIG_HOME;
+    delete process.env.XDG_CONFIG_HOME;
+    try {
+      writeMaster(dirs.homeDir, master);
+      mkdirSync(join(dirs.homeDir, ".grok"), { recursive: true });
+      writeFileSync(
+        join(dirs.homeDir, ".grok", "config.toml"),
+        '# grok config\n[mcp_servers.keep]\ncommand = "npx"\n',
+      );
+
+      const first = syncMcpServers([getHarness("claude"), getHarness("grok")], dirs);
+      expect(first.servers).toEqual(["probe", "cloud"]);
+      expect(first.targets.find((t) => t.id === "claude")?.results.map((r) => r.action)).toEqual([
+        "added",
+        "added",
+      ]);
+      expect(first.targets.find((t) => t.id === "grok")?.results).toEqual([
+        { name: "probe", action: "added" },
+        { name: "cloud", action: "added" },
+        { name: "keep", action: "removed" },
+      ]);
+
+      const grokConfig = readFileSync(join(dirs.homeDir, ".grok", "config.toml"), "utf8");
+      expect(grokConfig).toContain("# grok config");
+      const grokServers = listMcpServers(getHarness("grok"), dirs).find(
+        (l) => l.scope === "user",
+      )?.servers;
+      expect(grokServers?.map((s) => s.name).sort()).toEqual(["cloud", "probe"]);
+
+      const second = syncMcpServers([getHarness("claude"), getHarness("grok")], dirs);
+      for (const target of second.targets) {
+        expect(target.results.map((r) => r.action)).toEqual(["unchanged", "unchanged"]);
+      }
+    } finally {
+      if (previousXdg !== undefined) process.env.XDG_CONFIG_HOME = previousXdg;
+    }
+  });
+
+  it("replaces a drifted server and skips harnesses without a user config", () => {
+    const dirs = fixtureDirs();
+    const previousXdg = process.env.XDG_CONFIG_HOME;
+    delete process.env.XDG_CONFIG_HOME;
+    try {
+      writeMaster(dirs.homeDir, master);
+      writeFileSync(
+        join(dirs.homeDir, ".claude.json"),
+        JSON.stringify({ mcpServers: { probe: { type: "stdio", command: "old" } } }),
+      );
+
+      const report = syncMcpServers(
+        [getHarness("claude"), getHarness("github-copilot"), getHarness("pi")],
+        dirs,
+      );
+
+      const claude = report.targets.find((t) => t.id === "claude");
+      expect(claude?.results).toEqual([
+        { name: "probe", action: "replaced" },
+        { name: "cloud", action: "added" },
+      ]);
+      expect(report.targets.find((t) => t.id === "github-copilot")?.skipped).toContain(
+        "no user-scope",
+      );
+      expect(report.targets.find((t) => t.id === "pi")?.skipped).toContain("no user-scope");
+    } finally {
+      if (previousXdg !== undefined) process.env.XDG_CONFIG_HOME = previousXdg;
+    }
+  });
+
+  it("skips harnesses excluded by the master list", () => {
+    const dirs = fixtureDirs();
+    const previousXdg = process.env.XDG_CONFIG_HOME;
+    delete process.env.XDG_CONFIG_HOME;
+    try {
+      writeMaster(
+        dirs.homeDir,
+        `{
+  // codex keeps its own MCP setup
+  "excludes": ["codex"],
+  "mcpServers": { "probe": { "command": "node" } },
+}`,
+      );
+
+      const report = syncMcpServers([getHarness("claude"), getHarness("codex")], dirs);
+
+      expect(report.targets.find((t) => t.id === "codex")?.skipped).toContain("excluded");
+      expect(report.targets.find((t) => t.id === "claude")?.results).toEqual([
+        { name: "probe", action: "added" },
+      ]);
+      const codexServers = listMcpServers(getHarness("codex"), dirs).find(
+        (l) => l.scope === "user",
+      );
+      expect(codexServers?.exists).toBe(false);
+    } finally {
+      if (previousXdg !== undefined) process.env.XDG_CONFIG_HOME = previousXdg;
+    }
+  });
+
+  it("expands ~ and ${HOME} from the master list into absolute paths", () => {
+    const dirs = fixtureDirs();
+    const previousXdg = process.env.XDG_CONFIG_HOME;
+    delete process.env.XDG_CONFIG_HOME;
+    try {
+      writeMaster(
+        dirs.homeDir,
+        JSON.stringify({
+          mcpServers: {
+            probe: {
+              command: "node",
+              args: ["~/proj/cli.mjs", "mcp"],
+              env: { ROOT: "${HOME}/data" },
+            },
+          },
+        }),
+      );
+
+      syncMcpServers([getHarness("claude")], dirs);
+
+      const server = listMcpServers(getHarness("claude"), dirs)
+        .find((l) => l.scope === "user")
+        ?.servers.find((s) => s.name === "probe");
+      expect(server?.args).toEqual([join(dirs.homeDir, "proj", "cli.mjs"), "mcp"]);
+      expect(server?.env).toEqual({ ROOT: join(dirs.homeDir, "data") });
+    } finally {
+      if (previousXdg !== undefined) process.env.XDG_CONFIG_HOME = previousXdg;
+    }
+  });
+
+  it("rejects an excludes field that is not an array of strings", () => {
+    const dirs = fixtureDirs();
+    const previousXdg = process.env.XDG_CONFIG_HOME;
+    delete process.env.XDG_CONFIG_HOME;
+    try {
+      writeMaster(dirs.homeDir, JSON.stringify({ excludes: "codex", mcpServers: {} }));
+
+      expect(() => syncMcpServers([getHarness("claude")], dirs)).toThrow(/invalid excludes/);
+    } finally {
+      if (previousXdg !== undefined) process.env.XDG_CONFIG_HOME = previousXdg;
+    }
+  });
+
+  it("fails clearly when the master list is missing", () => {
+    const dirs = fixtureDirs();
+    const previousXdg = process.env.XDG_CONFIG_HOME;
+    delete process.env.XDG_CONFIG_HOME;
+    try {
+      expect(() => syncMcpServers([getHarness("claude")], dirs)).toThrow(/No master MCP list/);
+    } finally {
+      if (previousXdg !== undefined) process.env.XDG_CONFIG_HOME = previousXdg;
+    }
   });
 });

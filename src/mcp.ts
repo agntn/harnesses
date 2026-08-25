@@ -13,6 +13,7 @@ import {
   mcpAdd,
   mcpList,
   mcpRemove,
+  mcpSync,
   runHarness,
   type McpServerParams,
   type ToolResult,
@@ -105,6 +106,15 @@ const tools: ToolDefinition[] = [
         args as unknown as McpServerParams,
         (args.scope as "user" | "project") ?? "user",
       ),
+  },
+  {
+    name: "harnesses_mcp_sync",
+    title: "Harnesses MCP Sync",
+    description:
+      "Reset every harness's user-scope MCP config to exactly the master list from ~/.config/agntn/mcp.jsonc: servers are added, replaced, and extras removed. The master file is the single source of truth.",
+    inputSchema: schemas.mcpSync,
+    annotations: CONFIG_WRITE,
+    execute: (args) => mcpSync(args.id as string | undefined),
   },
   {
     name: "harnesses_mcp_remove",

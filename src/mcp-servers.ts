@@ -9,6 +9,7 @@
  * written, and every write lands atomically via a temp file rename.
  */
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
 import { parse as parseToml } from "smol-toml";
 import type { Harness } from "./harness.ts";
@@ -406,4 +407,219 @@ export function removeMcpServer(
   delete map[name];
   writeAtomically(path, `${JSON.stringify(root, null, 2)}\n`);
   return { path, removed: true };
+}
+
+/**
+ * Strips JSONC extensions (comments and trailing commas) so the master sync
+ * file can be read with JSON.parse. String contents are left untouched.
+ */
+export function parseJsonc(text: string): unknown {
+  let out = "";
+  let inString = false;
+  let escaped = false;
+  let comment: "line" | "block" | null = null;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i] as string;
+    const next = text[i + 1];
+
+    if (comment === "line") {
+      if (ch === "\n") {
+        comment = null;
+        out += ch;
+      }
+      continue;
+    }
+    if (comment === "block") {
+      if (ch === "*" && next === "/") {
+        comment = null;
+        i++;
+      }
+      continue;
+    }
+    if (inString) {
+      out += ch;
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      out += ch;
+      continue;
+    }
+    if (ch === "/" && next === "/") {
+      comment = "line";
+      i++;
+      continue;
+    }
+    if (ch === "/" && next === "*") {
+      comment = "block";
+      i++;
+      continue;
+    }
+    if (ch === ",") {
+      const rest = text.slice(i + 1);
+      const significant = rest.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\/|\s+/g, "");
+      if (significant.startsWith("}") || significant.startsWith("]")) continue;
+    }
+    out += ch;
+  }
+
+  return JSON.parse(out);
+}
+
+/** Resolves the master sync file path: $XDG_CONFIG_HOME or ~/.config. */
+export function masterMcpPath(options: ResolveOptions = {}): string {
+  const configDir =
+    process.env.XDG_CONFIG_HOME && process.env.XDG_CONFIG_HOME !== ""
+      ? process.env.XDG_CONFIG_HOME
+      : join(options.homeDir ?? homedir(), ".config");
+  return join(configDir, "agntn", "mcp.jsonc");
+}
+
+/** One harness's outcome of a sync run. */
+export interface SyncTargetResult {
+  id: string;
+  path?: string;
+  /** Reason this harness could not be targeted; `results` is empty then. */
+  skipped?: string;
+  results: Array<{ name: string; action: "added" | "replaced" | "removed" | "unchanged" }>;
+}
+
+/** Outcome of resetting the harness configs to the master list. */
+export interface SyncReport {
+  source: string;
+  servers: string[];
+  targets: SyncTargetResult[];
+}
+
+function canonical(server: McpServerConfig): string {
+  return JSON.stringify(
+    Object.fromEntries(Object.entries(server).sort(([a], [b]) => a.localeCompare(b))),
+  );
+}
+
+/**
+ * Expands a leading `~` and `${HOME}` in master-list values. Harnesses spawn
+ * MCP commands without a shell, so the expansion has to happen here: the
+ * synced configs always carry absolute paths.
+ */
+function expandHome(value: string, home: string): string {
+  return value.replace(/^~(?=\/|$)/, home).replaceAll("${HOME}", home);
+}
+
+function expandServerHome(server: McpServerConfig, home: string): McpServerConfig {
+  return compact({
+    ...server,
+    command: server.command === undefined ? undefined : expandHome(server.command, home),
+    args: server.args?.map((arg) => expandHome(arg, home)),
+    env: server.env
+      ? Object.fromEntries(Object.entries(server.env).map(([k, v]) => [k, expandHome(v, home)]))
+      : undefined,
+  });
+}
+
+/** Reads and normalizes the master list; throws when the file is missing or invalid. */
+export function readMasterMcpServers(options: ResolveOptions = {}): {
+  path: string;
+  servers: McpServerConfig[];
+  /** Harness ids the master list opts out of syncing. */
+  excludes: string[];
+} {
+  const path = masterMcpPath(options);
+  const raw = readIfExists(path);
+  if (raw === null) {
+    throw new Error(`No master MCP list at ${path}`);
+  }
+  const parsed = parseJsonc(raw);
+  const map = drill(
+    (typeof parsed === "object" && parsed !== null ? parsed : {}) as Record<string, unknown>,
+    ["mcpServers"],
+  );
+  if (!map) {
+    throw new Error(`Master MCP list at ${path} has no mcpServers object`);
+  }
+  const home = options.homeDir ?? homedir();
+  const servers: McpServerConfig[] = [];
+  for (const [name, rawEntry] of Object.entries(map)) {
+    if (typeof rawEntry === "object" && rawEntry !== null) {
+      servers.push(
+        expandServerHome(
+          normalizeEntry(name, rawEntry as Record<string, unknown>, "standard"),
+          home,
+        ),
+      );
+    }
+  }
+  const rawExcludes = (parsed as Record<string, unknown>).excludes;
+  if (
+    rawExcludes !== undefined &&
+    (!Array.isArray(rawExcludes) || rawExcludes.some((item) => typeof item !== "string"))
+  ) {
+    throw new Error(
+      `Master MCP list at ${path} has an invalid excludes: expected an array of harness ids`,
+    );
+  }
+  const excludes = asStringArray(rawExcludes) ?? [];
+  return { path, servers, excludes };
+}
+
+/**
+ * Resets each harness's user-scope MCP config to exactly the master list:
+ * missing servers are added, drifted ones replaced, and servers absent from
+ * the master are removed. The master file is the single source of truth.
+ */
+export function syncMcpServers(harnesses: Harness[], options: ResolveOptions = {}): SyncReport {
+  const master = readMasterMcpServers(options);
+  const masterNames = new Set(master.servers.map((server) => server.name));
+  const targets: SyncTargetResult[] = [];
+
+  for (const harness of harnesses) {
+    if (master.excludes.includes(harness.id)) {
+      targets.push({ id: harness.id, skipped: "excluded by the master list", results: [] });
+      continue;
+    }
+    const entry = harness.mcpConfigs.find((candidate) => candidate.scope === "user");
+    if (!entry) {
+      targets.push({ id: harness.id, skipped: "no user-scope MCP config", results: [] });
+      continue;
+    }
+
+    const listing = listMcpServers(harness, options).find((l) => l.scope === "user");
+    if (listing?.error) {
+      targets.push({
+        id: harness.id,
+        path: listing.path,
+        skipped: `existing config is unreadable: ${listing.error}`,
+        results: [],
+      });
+      continue;
+    }
+
+    const existing = new Map((listing?.servers ?? []).map((s) => [s.name, canonical(s)]));
+    const results: SyncTargetResult["results"] = [];
+    let path = listing?.path;
+    for (const server of master.servers) {
+      if (existing.get(server.name) === canonical(server)) {
+        results.push({ name: server.name, action: "unchanged" });
+        continue;
+      }
+      const written = addMcpServer(harness, server, "user", options);
+      path = written.path;
+      results.push({ name: server.name, action: written.replaced ? "replaced" : "added" });
+    }
+    for (const name of existing.keys()) {
+      if (masterNames.has(name)) continue;
+      const removed = removeMcpServer(harness, name, "user", options);
+      if (removed.removed) {
+        path = removed.path;
+        results.push({ name, action: "removed" });
+      }
+    }
+    targets.push({ id: harness.id, ...(path === undefined ? {} : { path }), results });
+  }
+
+  return { source: master.path, servers: master.servers.map((s) => s.name), targets };
 }

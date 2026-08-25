@@ -3,7 +3,7 @@ import { defineCommand } from "citty";
 import { consola } from "consola";
 import { encode as toToon } from "@toon-format/toon";
 import { isHarnessId, listHarnesses } from "../registry.ts";
-import { mcpAdd, mcpList, mcpRemove, type ToolResult } from "../tool-operations.ts";
+import { mcpAdd, mcpList, mcpRemove, mcpSync, type ToolResult } from "../tool-operations.ts";
 
 const formatArgs = {
   json: { type: "boolean" as const, description: "Output as JSON" },
@@ -96,6 +96,19 @@ export default defineCommand({
           args.scope === "project" ? "project" : "user",
         );
         report(result, args);
+      },
+    }),
+    sync: defineCommand({
+      meta: {
+        description: "Reset harness configs to the master list from ~/.config/agntn/mcp.jsonc",
+      },
+      args: {
+        id: { type: "positional" as const, description: "Harness id", required: false },
+        ...formatArgs,
+      },
+      run({ args }) {
+        const id = args.id === undefined ? undefined : requireHarnessId(args.id as string);
+        report(mcpSync(id), args);
       },
     }),
     remove: defineCommand({

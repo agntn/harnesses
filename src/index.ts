@@ -29,8 +29,16 @@ export {
   detectProjectHarnesses,
 } from "./registry.ts";
 export { resolvePathTemplate } from "./resolve.ts";
-export { listMcpServers, addMcpServer, removeMcpServer } from "./mcp-servers.ts";
-export type { McpConfigListing } from "./mcp-servers.ts";
+export {
+  listMcpServers,
+  addMcpServer,
+  removeMcpServer,
+  syncMcpServers,
+  readMasterMcpServers,
+  masterMcpPath,
+  parseJsonc,
+} from "./mcp-servers.ts";
+export type { McpConfigListing, SyncReport, SyncTargetResult } from "./mcp-servers.ts";
 
 export type {
   ClaudeContentBlock,
