@@ -4,6 +4,7 @@ import Codex from "./codex.ts";
 import Cursor from "./cursor.ts";
 import Gemini from "./gemini.ts";
 import GitHubCopilot from "./github-copilot.ts";
+import Grok from "./grok.ts";
 import MastraCode from "./mastracode.ts";
 import OpenCode from "./opencode.ts";
 
@@ -13,6 +14,7 @@ export const harnesses: HarnessConstructor[] = [
   Cursor,
   Gemini,
   GitHubCopilot,
+  Grok,
   MastraCode,
   OpenCode,
 ];

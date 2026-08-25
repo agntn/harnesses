@@ -8,6 +8,7 @@ export const version: string = pkg.version;
 export type HarnessId =
   | "codex"
   | "gemini"
+  | "grok"
   | "claude"
   | "opencode"
   | "cursor"

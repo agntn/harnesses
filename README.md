@@ -49,6 +49,7 @@ import type { ClaudeSessionEntry, CodexThread, GeminiConversationRecord } from "
 | Claude Code    | `claude`         | env + project | `.claude/skills/`     | `.claude/hooks/`         | JSONL          |
 | Codex CLI      | `codex`          | project       | `.agents/skills/`     | -                        | SQLite + JSONL |
 | Gemini CLI     | `gemini`         | env + project | `.gemini/skills/`     | -                        | JSON           |
+| Grok CLI       | `grok`           | env + project | `.grok/skills/`       | `.grok/hooks/`           | TOML + JSONL   |
 | OpenCode       | `opencode`       | project       | `.opencode/skills/`   | -                        | SQLite         |
 | Cursor         | `cursor`         | env + project | `.cursor/skills/`     | -                        | -              |
 | GitHub Copilot | `github-copilot` | env + project | `.github/skills/`     | -                        | -              |

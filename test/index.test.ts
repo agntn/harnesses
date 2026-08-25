@@ -29,6 +29,7 @@ describe("@agntn/harnesses", () => {
       "cursor",
       "gemini",
       "github-copilot",
+      "grok",
       "mastracode",
       "opencode",
     ]);
