@@ -227,6 +227,47 @@ const paths = defineCommand({
   },
 });
 
+const run = defineCommand({
+  meta: { description: "Run one prompt through a harness's non-interactive mode" },
+  args: {
+    id: harnessArg,
+    prompt: {
+      type: "positional" as const,
+      description: "Prompt to send to the harness",
+      required: true,
+    },
+    cwd: { type: "string" as const, description: "Working directory for the run" },
+    timeout: { type: "string" as const, description: "Wall-clock budget in seconds" },
+  },
+  async run({ args }) {
+    const harness = resolveHarness(args.id as string);
+
+    if (!harness.buildInvocation("")) {
+      consola.error(`Harness ${harness.id} has no non-interactive invocation`);
+      process.exit(1);
+    }
+
+    const timeoutSeconds = args.timeout ? Number(args.timeout) : undefined;
+    if (timeoutSeconds !== undefined && !(Number.isFinite(timeoutSeconds) && timeoutSeconds > 0)) {
+      consola.error(`Invalid timeout: ${args.timeout}`);
+      process.exit(1);
+    }
+
+    const result = await harness.invoke(args.prompt as string, {
+      cwd: args.cwd,
+      timeoutMs: timeoutSeconds === undefined ? undefined : timeoutSeconds * 1000,
+    });
+
+    if (result.stdout) process.stdout.write(result.stdout);
+    if (result.stderr) process.stderr.write(result.stderr);
+    if (result.timedOut) {
+      consola.error(`Timed out after ${timeoutSeconds}s`);
+      process.exit(124);
+    }
+    process.exit(result.exitCode ?? 1);
+  },
+});
+
 const main = defineCommand({
   meta: {
     name: "harnesses",
@@ -238,6 +279,7 @@ const main = defineCommand({
     detect,
     info,
     paths,
+    run,
     mcp: () => import("./commands/mcp.ts").then((m) => m.default),
   },
 });

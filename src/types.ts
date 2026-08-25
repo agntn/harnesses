@@ -38,6 +38,33 @@ export interface HarnessCapabilities {
   streaming: boolean;
 }
 
+/** How to run one prompt through the harness non-interactively. */
+export interface HarnessInvocation {
+  /** Binary to spawn; defaults to the harness's first `binaries` entry. */
+  binary?: string;
+  /** Argument template; every "{prompt}" is replaced with the prompt text. */
+  args: string[];
+  level: EvidenceLevel;
+  note?: string;
+}
+
+export interface InvokeOptions {
+  cwd?: string;
+  env?: Record<string, string>;
+  /** Kill the harness after this many milliseconds; unset means no timeout. */
+  timeoutMs?: number;
+}
+
+export interface InvokeResult {
+  command: string;
+  args: string[];
+  stdout: string;
+  stderr: string;
+  /** Process exit code; null when the run hit `timeoutMs` and was killed. */
+  exitCode: number | null;
+  timedOut: boolean;
+}
+
 export interface HarnessDetection {
   /** Environment variables that indicate running inside this agent. */
   envVars: string[];

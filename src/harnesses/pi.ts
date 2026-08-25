@@ -85,6 +85,11 @@ export default class Pi extends Harness {
     },
   ];
   readonly hooks: Harness["hooks"] = [];
+  readonly invocation: Harness["invocation"] = {
+    args: ["-p", "{prompt}"],
+    level: "official",
+    note: "Add --mode json for structured event output.",
+  };
   readonly detection = {
     envVars: ["PI_CODING_AGENT", "PI_SESSION_ID", "PI_SESSION_FILE"],
     projectMarkers: [".pi"],

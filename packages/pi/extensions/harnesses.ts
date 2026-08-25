@@ -64,4 +64,54 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       return { content, details };
     },
   });
+
+  pi.registerTool({
+    name: "harnesses_run",
+    label: "Harnesses Run",
+    description:
+      "Run one prompt through an AI coding harness's normalized non-interactive invocation and return its output",
+    promptSnippet: "Use harnesses_run to delegate one prompt to another installed coding harness.",
+    promptGuidelines: [
+      "The spawned harness is a full agent with its own tools; the prompt owns the consequences.",
+      "Output is capped for context; long runs stop at the timeout.",
+    ],
+    parameters: Type.Object({
+      id: Type.String({
+        description: "Harness id",
+        minLength: 1,
+        maxLength: 50,
+        pattern: "^[a-z][a-z0-9-]*$",
+      }),
+      prompt: Type.String({
+        description: "Prompt to send to the harness",
+        minLength: 1,
+        maxLength: 100000,
+      }),
+      cwd: Type.Optional(
+        Type.String({
+          description: "Working directory for the run",
+          minLength: 1,
+          maxLength: 4096,
+        }),
+      ),
+      timeoutSeconds: Type.Optional(
+        Type.Integer({
+          description: "Wall-clock budget in seconds (default 600)",
+          minimum: 1,
+          maximum: 3600,
+        }),
+      ),
+    }),
+    async execute(
+      _toolCallId,
+      params,
+    ): Promise<AgentToolResult<HarnessTools.RunOutcome | HarnessTools.RunFailure>> {
+      const { runHarness } = await loadToolOperations();
+      const { content, details } = await runHarness(params.id, params.prompt, {
+        cwd: params.cwd,
+        timeoutSeconds: params.timeoutSeconds,
+      });
+      return { content, details };
+    },
+  });
 }

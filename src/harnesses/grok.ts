@@ -102,6 +102,11 @@ export default class Grok extends Harness {
       note: "JSON hook definitions (e.g. session-start.json); Claude/Cursor hook sources scanned via vendor compatibility.",
     },
   ];
+  readonly invocation: Harness["invocation"] = {
+    args: ["-p", "{prompt}"],
+    level: "official",
+    note: "-p is short for --single; add --output-format json for structured output.",
+  };
   readonly detection = {
     envVars: ["GROK_SESSION_ID", "GROK_WORKSPACE_ROOT", "GROK_HOME"],
     projectMarkers: [".grok"],

@@ -123,6 +123,11 @@ export default class Omp extends Harness {
     },
   ];
   readonly hooks: Harness["hooks"] = [];
+  readonly invocation: Harness["invocation"] = {
+    args: ["-p", "{prompt}"],
+    level: "official",
+    note: "Add --mode json for structured event output.",
+  };
   readonly detection = {
     envVars: ["OMP_PROFILE", "PI_CODING_AGENT_DIR"],
     projectMarkers: [".omp"],

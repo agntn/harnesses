@@ -45,6 +45,12 @@ export default class GitHubCopilot extends Harness {
   ];
   readonly commands: Harness["commands"] = [];
   readonly hooks: Harness["hooks"] = [];
+  readonly invocation: Harness["invocation"] = {
+    binary: "copilot",
+    args: ["-p", "{prompt}"],
+    level: "community",
+    note: "GitHub Copilot CLI, separate from the editor integration.",
+  };
   readonly detection = {
     envVars: ["COPILOT_RUN_APP"],
     projectMarkers: [".github/copilot-instructions.md", ".github/skills", ".github/instructions"],

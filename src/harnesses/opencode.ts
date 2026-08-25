@@ -93,6 +93,10 @@ export default class OpenCode extends Harness {
   ];
   readonly commands: Harness["commands"] = [];
   readonly hooks: Harness["hooks"] = [];
+  readonly invocation: Harness["invocation"] = {
+    args: ["run", "{prompt}"],
+    level: "official",
+  };
   readonly detection = {
     envVars: [],
     projectMarkers: [".opencode", "opencode.jsonc", "opencode.json"],

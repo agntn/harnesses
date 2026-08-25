@@ -119,6 +119,11 @@ export default class Claude extends Harness {
       note: "Global user-level hooks.",
     },
   ];
+  readonly invocation: Harness["invocation"] = {
+    args: ["-p", "{prompt}"],
+    level: "official",
+    note: "Headless print mode; add --output-format json for structured output.",
+  };
   readonly detection = {
     envVars: ["CLAUDE_CODE", "CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CONFIG_DIR"],
     projectMarkers: [

@@ -76,6 +76,7 @@ export default class Freebuff extends Harness {
   ];
   readonly commands: Harness["commands"] = [];
   readonly hooks: Harness["hooks"] = [];
+  readonly invocation: Harness["invocation"] = null;
   readonly detection = {
     envVars: [],
     projectMarkers: [".agents", "knowledge.md"],

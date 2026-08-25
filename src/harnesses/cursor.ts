@@ -58,6 +58,12 @@ export default class Cursor extends Harness {
   ];
   readonly commands: Harness["commands"] = [];
   readonly hooks: Harness["hooks"] = [];
+  readonly invocation: Harness["invocation"] = {
+    binary: "cursor-agent",
+    args: ["-p", "{prompt}"],
+    level: "community",
+    note: "Cursor CLI agent binary, separate from the editor binary.",
+  };
   readonly detection = {
     envVars: ["CURSOR_SESSION", "CURSOR_TRACE_ID"],
     projectMarkers: [".cursor", ".cursorrules"],

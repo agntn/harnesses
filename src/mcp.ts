@@ -7,7 +7,13 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { Type, type TSchema } from "typebox";
 import { Value } from "typebox/value";
-import { detectHarnesses, harnessInfo, type ToolResult } from "./tool-operations.ts";
+import {
+  detectHarnesses,
+  harnessInfo,
+  runHarness,
+  RUN_DEFAULT_TIMEOUT_SECONDS,
+  type ToolResult,
+} from "./tool-operations.ts";
 import { version } from "./types.ts";
 
 interface ToolDefinition {
@@ -15,8 +21,16 @@ interface ToolDefinition {
   title: string;
   description: string;
   inputSchema: TSchema;
-  execute(args: Record<string, unknown>): ToolResult<unknown>;
+  annotations: Tool["annotations"];
+  execute(args: Record<string, unknown>): ToolResult<unknown> | Promise<ToolResult<unknown>>;
 }
+
+const READ_ONLY: Tool["annotations"] = {
+  readOnlyHint: true,
+  destructiveHint: false,
+  idempotentHint: true,
+  openWorldHint: false,
+};
 
 const tools: ToolDefinition[] = [
   {
@@ -25,6 +39,7 @@ const tools: ToolDefinition[] = [
     description:
       "List every known AI coding harness with its install state and version, scanned from the binaries on PATH.",
     inputSchema: Type.Object({}),
+    annotations: READ_ONLY,
     execute: () => detectHarnesses(),
   },
   {
@@ -40,7 +55,52 @@ const tools: ToolDefinition[] = [
         pattern: "^[a-z][a-z0-9-]*$",
       }),
     }),
+    annotations: READ_ONLY,
     execute: (args) => harnessInfo(args.id as string),
+  },
+  {
+    name: "harnesses_run",
+    title: "Harnesses Run",
+    description:
+      "Run one prompt through an AI coding harness's normalized non-interactive invocation and return its output. The spawned harness is a full agent with its own tools.",
+    inputSchema: Type.Object({
+      id: Type.String({
+        description: "Harness id",
+        minLength: 1,
+        maxLength: 50,
+        pattern: "^[a-z][a-z0-9-]*$",
+      }),
+      prompt: Type.String({
+        description: "Prompt to send to the harness",
+        minLength: 1,
+        maxLength: 100000,
+      }),
+      cwd: Type.Optional(
+        Type.String({
+          description: "Working directory for the run; defaults to the server's cwd",
+          minLength: 1,
+          maxLength: 4096,
+        }),
+      ),
+      timeoutSeconds: Type.Optional(
+        Type.Integer({
+          description: `Wall-clock budget in seconds (default ${RUN_DEFAULT_TIMEOUT_SECONDS})`,
+          minimum: 1,
+          maximum: 3600,
+        }),
+      ),
+    }),
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    execute: (args) =>
+      runHarness(args.id as string, args.prompt as string, {
+        cwd: args.cwd as string | undefined,
+        timeoutSeconds: args.timeoutSeconds as number | undefined,
+      }),
   },
 ];
 
@@ -99,17 +159,12 @@ export function createMcpServer(): Server {
         title: tool.title,
         description: tool.description,
         inputSchema: tool.inputSchema as Tool["inputSchema"],
-        annotations: {
-          readOnlyHint: true,
-          destructiveHint: false,
-          idempotentHint: true,
-          openWorldHint: false,
-        },
+        annotations: tool.annotations,
       }),
     ),
   }));
 
-  server.setRequestHandler(CallToolRequestSchema, (request) => {
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const tool = toolsByName.get(request.params.name);
     if (!tool) {
       return errorResult(`Unknown harnesses tool: ${JSON.stringify(request.params.name)}`);
@@ -121,7 +176,7 @@ export function createMcpServer(): Server {
     }
 
     try {
-      return toCallToolResult(tool.execute(args));
+      return toCallToolResult(await tool.execute(args));
     } catch (error) {
       return errorResult(
         `${tool.name} failed: ${error instanceof Error ? error.message : String(error)}`,

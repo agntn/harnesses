@@ -11,6 +11,7 @@ import type {
   HarnessCapabilities,
   HarnessDetection,
   HarnessId,
+  InvokeResult,
   PathCandidate,
   ResolvedPaths,
   StorageDescriptor,
@@ -60,8 +61,19 @@ export interface UnknownHarness {
   known: HarnessId[];
 }
 
+/** Default wall-clock budget for one harness run, in seconds. */
+export const RUN_DEFAULT_TIMEOUT_SECONDS = 600;
+
+/** The run tool's per-stream cap: harness output is unbounded, model context is not. */
+export const RUN_MAX_OUTPUT_CHARS = 8000;
+
 function text(data: unknown): Array<{ type: "text"; text: string }> {
   return [{ type: "text", text: toToon(data) }];
+}
+
+function truncate(output: string): string {
+  if (output.length <= RUN_MAX_OUTPUT_CHARS) return output;
+  return `${output.slice(0, RUN_MAX_OUTPUT_CHARS)}\n[truncated ${output.length - RUN_MAX_OUTPUT_CHARS} of ${output.length} characters]`;
 }
 
 /** Scans every registered harness for its binaries and version. */
@@ -108,4 +120,87 @@ export function harnessInfo(id: string): ToolResult<HarnessMetadata | UnknownHar
   };
 
   return { content: text(details), details };
+}
+
+/** Options accepted by {@link runHarness}. */
+export interface RunOptions {
+  cwd?: string;
+  /** Wall-clock budget in seconds; defaults to {@link RUN_DEFAULT_TIMEOUT_SECONDS}. */
+  timeoutSeconds?: number;
+}
+
+/** One completed (or failed) harness run, with output capped for the model. */
+export interface RunOutcome {
+  id: HarnessId;
+  command: string;
+  args: string[];
+  exitCode: number | null;
+  timedOut: boolean;
+  stdout: string;
+  stderr: string;
+}
+
+/** Returned when the harness cannot be run at all. */
+export interface RunFailure {
+  error: string;
+  known?: HarnessId[];
+}
+
+/**
+ * Runs one prompt through a harness's normalized non-interactive invocation.
+ *
+ * The spawned harness is a full agent with its own tools, so the caller owns
+ * the consequences of the prompt; this layer only normalizes the command line,
+ * closes stdin, enforces the timeout, and caps the echoed output.
+ */
+export async function runHarness(
+  id: string,
+  prompt: string,
+  options: RunOptions = {},
+): Promise<ToolResult<RunOutcome | RunFailure>> {
+  const known = listHarnesses();
+
+  if (!(known as string[]).includes(id)) {
+    const details: RunFailure = { error: `Unknown harness: ${id}`, known };
+    return { content: text(details), details, isError: true };
+  }
+
+  const harness = getHarness(id as HarnessId);
+  if (!harness.buildInvocation(prompt)) {
+    const details: RunFailure = {
+      error: `Harness ${id} has no non-interactive invocation`,
+    };
+    return { content: text(details), details, isError: true };
+  }
+
+  const timeoutSeconds = options.timeoutSeconds ?? RUN_DEFAULT_TIMEOUT_SECONDS;
+
+  let result: InvokeResult;
+  try {
+    result = await harness.invoke(prompt, {
+      cwd: options.cwd,
+      timeoutMs: timeoutSeconds * 1000,
+    });
+  } catch (error) {
+    const details: RunFailure = {
+      error: `Failed to run ${id}: ${error instanceof Error ? error.message : String(error)}`,
+    };
+    return { content: text(details), details, isError: true };
+  }
+
+  const details: RunOutcome = {
+    id: harness.id,
+    command: result.command,
+    args: result.args,
+    exitCode: result.exitCode,
+    timedOut: result.timedOut,
+    stdout: truncate(result.stdout),
+    stderr: truncate(result.stderr),
+  };
+
+  return {
+    content: text(details),
+    details,
+    ...(result.timedOut || result.exitCode !== 0 ? { isError: true } : {}),
+  };
 }

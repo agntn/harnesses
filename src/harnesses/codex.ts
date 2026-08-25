@@ -90,6 +90,11 @@ export default class Codex extends Harness {
   ];
   readonly commands: Harness["commands"] = [];
   readonly hooks: Harness["hooks"] = [];
+  readonly invocation: Harness["invocation"] = {
+    args: ["exec", "{prompt}"],
+    level: "official",
+    note: "Non-interactive exec subcommand; add --json for structured output.",
+  };
   readonly detection = {
     envVars: [],
     projectMarkers: [".codex", "AGENTS.md", "AGENTS.override.md", ".agents/skills"],

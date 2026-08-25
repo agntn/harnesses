@@ -129,6 +129,7 @@ export default class MastraCode extends Harness {
       note: "Global hooks.",
     },
   ];
+  readonly invocation: Harness["invocation"] = null;
   readonly detection = {
     envVars: [],
     projectMarkers: [".mastracode"],

@@ -157,4 +157,94 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       );
     },
   });
+
+  pi.registerTool({
+    name: "harnesses_run",
+    label: "Harnesses Run",
+    description:
+      "Run one prompt through an AI coding harness's normalized non-interactive invocation and return its output",
+    parameters: Type.Object({
+      id: Type.String({
+        description: "Harness id",
+        minLength: 1,
+        maxLength: 50,
+        pattern: "^[a-z][a-z0-9-]*$",
+      }),
+      prompt: Type.String({
+        description: "Prompt to send to the harness",
+        minLength: 1,
+        maxLength: 100000,
+      }),
+      cwd: Type.Optional(
+        Type.String({
+          description: "Working directory for the run",
+          minLength: 1,
+          maxLength: 4096,
+        }),
+      ),
+      timeoutSeconds: Type.Optional(
+        Type.Integer({
+          description: "Wall-clock budget in seconds (default 600)",
+          minimum: 1,
+          maximum: 3600,
+        }),
+      ),
+    }),
+    approval: "exec",
+    async execute(
+      _toolCallId,
+      params,
+    ): Promise<AgentToolResult<HarnessTools.RunOutcome | HarnessTools.RunFailure>> {
+      const { runHarness } = await loadToolOperations();
+      const { content, details } = await runHarness(params.id, params.prompt, {
+        cwd: params.cwd,
+        timeoutSeconds: params.timeoutSeconds,
+      });
+      return { content, details };
+    },
+    renderCall(args, options, theme) {
+      const icon = options.isPartial
+        ? options.spinnerFrame === undefined
+          ? "pending"
+          : "running"
+        : "done";
+
+      return new Text(
+        renderStatusLine(
+          {
+            icon,
+            spinnerFrame: options.spinnerFrame,
+            title: "Harnesses Run",
+            description: `${sanitizeTerminalText(args.id)} ${sanitizeTerminalText(args.prompt)}`,
+          },
+          theme,
+        ),
+        0,
+        0,
+      );
+    },
+    renderResult(result, _options, theme) {
+      const outcome = result.details;
+      const finished = outcome && "exitCode" in outcome ? outcome : undefined;
+
+      return new Text(
+        renderStatusLine(
+          {
+            icon: result.isError ? "error" : "done",
+            title: "Harnesses Run",
+            badge: { label: "exec", color: "accent" },
+            meta: finished
+              ? [
+                  sanitizeTerminalText(finished.id),
+                  finished.timedOut ? "timed out" : `exit ${finished.exitCode}`,
+                ]
+              : undefined,
+          },
+          theme,
+        ),
+        0,
+        0,
+      );
+    },
+  });
 }

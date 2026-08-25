@@ -1,0 +1,120 @@
+import { describe, expect, it } from "vitest";
+import { getHarness, registerHarness } from "../src/index.ts";
+import { Harness } from "../src/harness.ts";
+import { runHarness, RUN_MAX_OUTPUT_CHARS } from "../src/tool-operations.ts";
+
+/**
+ * Overrides the (locally absent) cursor harness with an invocation backed by
+ * the node binary, so invoke() is exercised without any external harness.
+ */
+class FakeCursor extends Harness {
+  readonly id = "cursor";
+  readonly name = "Fake Cursor";
+  readonly binaries = ["node"];
+  readonly capabilities = { mcp: false, vision: false, tools: false, streaming: false };
+  readonly config: Harness["config"] = [];
+  readonly sessions: Harness["sessions"] = [];
+  readonly persistence: Harness["persistence"] = [];
+  readonly instructions: Harness["instructions"] = [];
+  readonly skills: Harness["skills"] = [];
+  readonly commands: Harness["commands"] = [];
+  readonly hooks: Harness["hooks"] = [];
+  readonly detection = { envVars: [], projectMarkers: [] };
+  readonly invocation: Harness["invocation"] = {
+    args: ["-e", "console.log('echo:' + process.argv[1]); process.exitCode = 0", "{prompt}"],
+    level: "inferred",
+  };
+}
+
+describe("normalized invocation", () => {
+  it("expands the {prompt} placeholder without spawning", () => {
+    const claude = getHarness("claude");
+    expect(claude.buildInvocation("do the thing")).toEqual({
+      command: "claude",
+      args: ["-p", "do the thing"],
+    });
+  });
+
+  it("returns null for a harness without a headless mode", () => {
+    expect(getHarness("mastracode").buildInvocation("x")).toBeNull();
+    expect(getHarness("freebuff").buildInvocation("x")).toBeNull();
+  });
+
+  it("runs a prompt through the invocation and captures the output", async () => {
+    const fake = registerHarness(FakeCursor);
+
+    const result = await fake.invoke("hello world");
+
+    expect(result.stdout.trim()).toBe("echo:hello world");
+    expect(result.exitCode).toBe(0);
+    expect(result.timedOut).toBe(false);
+  });
+
+  it("kills a run that exceeds the timeout", async () => {
+    registerHarness(
+      class extends FakeCursor {
+        override readonly invocation: Harness["invocation"] = {
+          args: ["-e", "setTimeout(() => {}, 60000)"],
+          level: "inferred",
+        };
+      },
+    );
+
+    const result = await getHarness("cursor").invoke("x", { timeoutMs: 300 });
+
+    expect(result.timedOut).toBe(true);
+    expect(result.exitCode).toBeNull();
+  });
+
+  it("rejects invoking a harness without a headless mode", async () => {
+    await expect(getHarness("mastracode").invoke("x")).rejects.toThrow(
+      "no non-interactive invocation",
+    );
+  });
+});
+
+describe("runHarness tool operation", () => {
+  it("flags an unknown harness id", async () => {
+    const result = await runHarness("nope", "x");
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain("Unknown harness: nope");
+  });
+
+  it("flags a harness without a headless mode", async () => {
+    const result = await runHarness("freebuff", "x");
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain("no non-interactive invocation");
+  });
+
+  it("returns the outcome of a successful run", async () => {
+    registerHarness(FakeCursor);
+
+    const result = await runHarness("cursor", "ping");
+
+    expect(result.isError).toBeUndefined();
+    const outcome = result.details as { stdout: string; exitCode: number | null };
+    expect(outcome.stdout.trim()).toBe("echo:ping");
+    expect(outcome.exitCode).toBe(0);
+  });
+
+  it("marks a non-zero exit as an error and truncates long output", async () => {
+    registerHarness(
+      class extends FakeCursor {
+        override readonly invocation: Harness["invocation"] = {
+          args: ["-e", "console.log('x'.repeat(20000)); process.exit(3)"],
+          level: "inferred",
+        };
+      },
+    );
+
+    const result = await runHarness("cursor", "x");
+
+    expect(result.isError).toBe(true);
+    const outcome = result.details as { stdout: string; exitCode: number | null };
+    expect(outcome.exitCode).toBe(3);
+    expect(outcome.stdout.length).toBeLessThan(RUN_MAX_OUTPUT_CHARS + 100);
+    expect(outcome.stdout).toContain("[truncated");
+  });
+});
