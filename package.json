@@ -48,12 +48,12 @@
   "devDependencies": {
     "@types/node": "latest",
     "@typescript/native-preview": "latest",
-    "changelogen": "latest",
-    "obuild": "latest",
-    "oxfmt": "latest",
-    "oxlint": "latest",
-    "typescript": "latest",
-    "vitest": "latest"
+    "changelogen": "^0.6.2",
+    "obuild": "^0.4.32",
+    "oxfmt": "^0.36.0",
+    "oxlint": "^1.51.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
   },
   "engines": {
     "node": ">=22"
