@@ -89,6 +89,11 @@ const tools: ToolDefinition[] = [
           maximum: 3600,
         }),
       ),
+      structured: Type.Optional(
+        Type.Boolean({
+          description: "Use the harness's structured (JSON) output mode instead of plain text",
+        }),
+      ),
     }),
     annotations: {
       readOnlyHint: false,
@@ -100,6 +105,7 @@ const tools: ToolDefinition[] = [
       runHarness(args.id as string, args.prompt as string, {
         cwd: args.cwd as string | undefined,
         timeoutSeconds: args.timeoutSeconds as number | undefined,
+        structured: args.structured as boolean | undefined,
       }),
   },
 ];

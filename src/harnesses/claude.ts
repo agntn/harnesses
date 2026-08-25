@@ -121,6 +121,7 @@ export default class Claude extends Harness {
   ];
   readonly invocation: Harness["invocation"] = {
     args: ["-p", "{prompt}"],
+    jsonArgs: ["-p", "--output-format", "json", "{prompt}"],
     level: "official",
     note: "Headless print mode; add --output-format json for structured output.",
   };

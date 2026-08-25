@@ -78,15 +78,21 @@ export abstract class Harness {
 
   /**
    * Expands the invocation template for one prompt, without spawning anything.
-   * Returns null when the harness has no headless mode.
+   * Returns null when the harness has no headless mode, or no structured mode
+   * when `structured` is requested.
    */
-  buildInvocation(prompt: string): { command: string; args: string[] } | null {
+  buildInvocation(
+    prompt: string,
+    options: { structured?: boolean } = {},
+  ): { command: string; args: string[] } | null {
     if (!this.invocation) return null;
     const command = this.invocation.binary ?? this.binaries[0];
     if (!command) return null;
+    const template = options.structured ? this.invocation.jsonArgs : this.invocation.args;
+    if (!template) return null;
     return {
       command,
-      args: this.invocation.args.map((arg) => arg.replaceAll("{prompt}", prompt)),
+      args: template.map((arg) => arg.replaceAll("{prompt}", prompt)),
     };
   }
 
@@ -96,9 +102,15 @@ export abstract class Harness {
    * exits instead of waiting forever.
    */
   invoke(prompt: string, options: InvokeOptions = {}): Promise<InvokeResult> {
-    const built = this.buildInvocation(prompt);
+    const built = this.buildInvocation(prompt, { structured: options.structured });
     if (!built) {
-      return Promise.reject(new Error(`Harness ${this.id} has no non-interactive invocation`));
+      return Promise.reject(
+        new Error(
+          options.structured && this.invocation
+            ? `Harness ${this.id} has no structured (JSON) invocation`
+            : `Harness ${this.id} has no non-interactive invocation`,
+        ),
+      );
     }
 
     return new Promise((resolve, reject) => {

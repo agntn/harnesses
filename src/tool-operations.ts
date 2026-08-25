@@ -127,6 +127,8 @@ export interface RunOptions {
   cwd?: string;
   /** Wall-clock budget in seconds; defaults to {@link RUN_DEFAULT_TIMEOUT_SECONDS}. */
   timeoutSeconds?: number;
+  /** Use the harness's structured (JSON) output mode instead of plain text. */
+  structured?: boolean;
 }
 
 /** One completed (or failed) harness run, with output capped for the model. */
@@ -134,6 +136,7 @@ export interface RunOutcome {
   id: HarnessId;
   command: string;
   args: string[];
+  structured: boolean;
   exitCode: number | null;
   timedOut: boolean;
   stdout: string;
@@ -166,9 +169,13 @@ export async function runHarness(
   }
 
   const harness = getHarness(id as HarnessId);
-  if (!harness.buildInvocation(prompt)) {
+  const structured = options.structured ?? false;
+  if (!harness.buildInvocation(prompt, { structured })) {
     const details: RunFailure = {
-      error: `Harness ${id} has no non-interactive invocation`,
+      error:
+        structured && harness.invocation
+          ? `Harness ${id} has no structured (JSON) invocation`
+          : `Harness ${id} has no non-interactive invocation`,
     };
     return { content: text(details), details, isError: true };
   }
@@ -180,6 +187,7 @@ export async function runHarness(
     result = await harness.invoke(prompt, {
       cwd: options.cwd,
       timeoutMs: timeoutSeconds * 1000,
+      structured,
     });
   } catch (error) {
     const details: RunFailure = {
@@ -192,6 +200,7 @@ export async function runHarness(
     id: harness.id,
     command: result.command,
     args: result.args,
+    structured,
     exitCode: result.exitCode,
     timedOut: result.timedOut,
     stdout: truncate(result.stdout),

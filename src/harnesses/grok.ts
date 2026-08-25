@@ -104,6 +104,7 @@ export default class Grok extends Harness {
   ];
   readonly invocation: Harness["invocation"] = {
     args: ["-p", "{prompt}"],
+    jsonArgs: ["-p", "{prompt}", "--output-format", "json"],
     level: "official",
     note: "-p is short for --single; add --output-format json for structured output.",
   };

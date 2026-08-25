@@ -22,6 +22,7 @@ class FakeCursor extends Harness {
   readonly detection = { envVars: [], projectMarkers: [] };
   readonly invocation: Harness["invocation"] = {
     args: ["-e", "console.log('echo:' + process.argv[1]); process.exitCode = 0", "{prompt}"],
+    jsonArgs: ["-e", "console.log(JSON.stringify({ echo: process.argv[1] }))", "{prompt}"],
     level: "inferred",
   };
 }
@@ -38,6 +39,26 @@ describe("normalized invocation", () => {
   it("returns null for a harness without a headless mode", () => {
     expect(getHarness("mastracode").buildInvocation("x")).toBeNull();
     expect(getHarness("freebuff").buildInvocation("x")).toBeNull();
+  });
+
+  it("expands the structured template when requested", () => {
+    expect(getHarness("claude").buildInvocation("q", { structured: true })).toEqual({
+      command: "claude",
+      args: ["-p", "--output-format", "json", "q"],
+    });
+  });
+
+  it("returns null when structured mode is requested but unavailable", () => {
+    expect(getHarness("github-copilot").buildInvocation("x", { structured: true })).toBeNull();
+  });
+
+  it("runs the structured invocation and yields parseable JSON", async () => {
+    const fake = registerHarness(FakeCursor);
+
+    const result = await fake.invoke("ping", { structured: true });
+
+    expect(result.exitCode).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual({ echo: "ping" });
   });
 
   it("runs a prompt through the invocation and captures the output", async () => {
@@ -86,6 +107,13 @@ describe("runHarness tool operation", () => {
 
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("no non-interactive invocation");
+  });
+
+  it("flags a structured request on a harness without a JSON mode", async () => {
+    const result = await runHarness("github-copilot", "x", { structured: true });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain("no structured (JSON) invocation");
   });
 
   it("returns the outcome of a successful run", async () => {

@@ -61,6 +61,7 @@ export default class Cursor extends Harness {
   readonly invocation: Harness["invocation"] = {
     binary: "cursor-agent",
     args: ["-p", "{prompt}"],
+    jsonArgs: ["-p", "--output-format", "json", "{prompt}"],
     level: "community",
     note: "Cursor CLI agent binary, separate from the editor binary.",
   };

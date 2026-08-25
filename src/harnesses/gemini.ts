@@ -94,6 +94,7 @@ export default class Gemini extends Harness {
   readonly hooks: Harness["hooks"] = [];
   readonly invocation: Harness["invocation"] = {
     args: ["-p", "{prompt}"],
+    jsonArgs: ["-p", "{prompt}", "--output-format", "json"],
     level: "official",
     note: "Non-interactive (headless) mode.",
   };

@@ -125,6 +125,7 @@ export default class Omp extends Harness {
   readonly hooks: Harness["hooks"] = [];
   readonly invocation: Harness["invocation"] = {
     args: ["-p", "{prompt}"],
+    jsonArgs: ["-p", "--mode", "json", "{prompt}"],
     level: "official",
     note: "Add --mode json for structured event output.",
   };

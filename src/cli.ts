@@ -238,12 +238,21 @@ const run = defineCommand({
     },
     cwd: { type: "string" as const, description: "Working directory for the run" },
     timeout: { type: "string" as const, description: "Wall-clock budget in seconds" },
+    json: {
+      type: "boolean" as const,
+      description: "Use the harness's structured (JSON) output mode",
+    },
   },
   async run({ args }) {
     const harness = resolveHarness(args.id as string);
+    const structured = args.json === true;
 
-    if (!harness.buildInvocation("")) {
-      consola.error(`Harness ${harness.id} has no non-interactive invocation`);
+    if (!harness.buildInvocation("", { structured })) {
+      consola.error(
+        structured && harness.invocation
+          ? `Harness ${harness.id} has no structured (JSON) invocation`
+          : `Harness ${harness.id} has no non-interactive invocation`,
+      );
       process.exit(1);
     }
 
@@ -256,6 +265,7 @@ const run = defineCommand({
     const result = await harness.invoke(args.prompt as string, {
       cwd: args.cwd,
       timeoutMs: timeoutSeconds === undefined ? undefined : timeoutSeconds * 1000,
+      structured,
     });
 
     if (result.stdout) process.stdout.write(result.stdout);

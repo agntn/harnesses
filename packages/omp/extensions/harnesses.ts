@@ -189,6 +189,11 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
           maximum: 3600,
         }),
       ),
+      structured: Type.Optional(
+        Type.Boolean({
+          description: "Use the harness's structured (JSON) output mode instead of plain text",
+        }),
+      ),
     }),
     approval: "exec",
     async execute(
@@ -199,6 +204,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       const { content, details } = await runHarness(params.id, params.prompt, {
         cwd: params.cwd,
         timeoutSeconds: params.timeoutSeconds,
+        structured: params.structured,
       });
       return { content, details };
     },

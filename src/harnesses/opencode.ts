@@ -95,6 +95,7 @@ export default class OpenCode extends Harness {
   readonly hooks: Harness["hooks"] = [];
   readonly invocation: Harness["invocation"] = {
     args: ["run", "{prompt}"],
+    jsonArgs: ["run", "--format", "json", "{prompt}"],
     level: "official",
   };
   readonly detection = {

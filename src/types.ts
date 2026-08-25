@@ -44,6 +44,11 @@ export interface HarnessInvocation {
   binary?: string;
   /** Argument template; every "{prompt}" is replaced with the prompt text. */
   args: string[];
+  /**
+   * Argument template for the harness's structured (JSON) output mode; absent
+   * when the harness has no such mode. Same "{prompt}" substitution as `args`.
+   */
+  jsonArgs?: string[];
   level: EvidenceLevel;
   note?: string;
 }
@@ -53,6 +58,8 @@ export interface InvokeOptions {
   env?: Record<string, string>;
   /** Kill the harness after this many milliseconds; unset means no timeout. */
   timeoutMs?: number;
+  /** Use the harness's structured (JSON) output mode instead of plain text. */
+  structured?: boolean;
 }
 
 export interface InvokeResult {
