@@ -1,6 +1,6 @@
 # @agntn/harnesses
 
-Metadata registry for AI coding harnesses. Paths, formats, detection rules, session schemas - one TypeScript API covering Claude Code, Codex, Gemini, Grok, OpenCode, Cursor, GitHub Copilot, Mastra Code, OMP, and Pi.
+Metadata registry for AI coding harnesses. Paths, formats, detection rules, session schemas - one TypeScript API covering Claude Code, Codex, Gemini, Grok, OpenCode, Cursor, GitHub Copilot, Mastra Code, OMP, Pi, and Freebuff.
 
 ## Commands
 

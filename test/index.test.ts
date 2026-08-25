@@ -27,6 +27,7 @@ describe("@agntn/harnesses", () => {
       "claude",
       "codex",
       "cursor",
+      "freebuff",
       "gemini",
       "github-copilot",
       "grok",

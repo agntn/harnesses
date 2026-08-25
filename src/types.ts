@@ -12,6 +12,7 @@ export type HarnessId =
   | "claude"
   | "opencode"
   | "cursor"
+  | "freebuff"
   | "github-copilot"
   | "mastracode"
   | "omp"
