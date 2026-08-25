@@ -44,17 +44,18 @@ import type { ClaudeSessionEntry, CodexThread, GeminiConversationRecord } from "
 
 ## Supported agents
 
-| Agent          | ID               | Detection     | Skills                | Hooks                    | Sessions       |
-| -------------- | ---------------- | ------------- | --------------------- | ------------------------ | -------------- |
-| Claude Code    | `claude`         | env + project | `.claude/skills/`     | `.claude/hooks/`         | JSONL          |
-| Codex CLI      | `codex`          | project       | `.agents/skills/`     | -                        | SQLite + JSONL |
-| Gemini CLI     | `gemini`         | env + project | `.gemini/skills/`     | -                        | JSON           |
-| Grok CLI       | `grok`           | env + project | `.grok/skills/`       | `.grok/hooks/`           | TOML + JSONL   |
-| OpenCode       | `opencode`       | project       | `.opencode/skills/`   | -                        | SQLite         |
-| Cursor         | `cursor`         | env + project | `.cursor/skills/`     | -                        | -              |
-| GitHub Copilot | `github-copilot` | env + project | `.github/skills/`     | -                        | -              |
-| Mastra Code    | `mastracode`     | project       | `.mastracode/skills/` | `.mastracode/hooks.json` | SQLite         |
-| OMP (oh-my-pi) | `omp`            | env + project | `.omp/skills/`        | -                        | JSONL + SQLite |
+| Agent           | ID               | Detection     | Skills                | Hooks                    | Sessions       |
+| --------------- | ---------------- | ------------- | --------------------- | ------------------------ | -------------- |
+| Claude Code     | `claude`         | env + project | `.claude/skills/`     | `.claude/hooks/`         | JSONL          |
+| Codex CLI       | `codex`          | project       | `.agents/skills/`     | -                        | SQLite + JSONL |
+| Gemini CLI      | `gemini`         | env + project | `.gemini/skills/`     | -                        | JSON           |
+| Grok CLI        | `grok`           | env + project | `.grok/skills/`       | `.grok/hooks/`           | TOML + JSONL   |
+| OpenCode        | `opencode`       | project       | `.opencode/skills/`   | -                        | SQLite         |
+| Cursor          | `cursor`         | env + project | `.cursor/skills/`     | -                        | -              |
+| GitHub Copilot  | `github-copilot` | env + project | `.github/skills/`     | -                        | -              |
+| Mastra Code     | `mastracode`     | project       | `.mastracode/skills/` | `.mastracode/hooks.json` | SQLite         |
+| OMP (oh-my-pi)  | `omp`            | env + project | `.omp/skills/`        | -                        | JSONL + SQLite |
+| Pi Coding Agent | `pi`             | env + project | `.pi/skills/`         | -                        | JSON + JSONL   |
 
 Each agent is a concrete subclass of the abstract `Harness` class. Custom subclasses can be added with `registerHarness`. Every harness exposes config paths, session locations, instruction files, skills dirs, hooks, commands, persistence formats, capabilities (MCP, vision, tools, streaming), and detection rules. All paths carry `scope` (user/project/system/data), `level` (official/community/inferred), and optional `platforms` tags.
 
@@ -72,7 +73,7 @@ harnesses info codex --json     # machine-readable output
 
 [unagent](https://github.com/onmax/unagent) covers similar ground but makes different tradeoffs.
 
-**harnesses is deep and narrow.** Each harness gets verified, platform-specific paths with scope, evidence level, and platform tags. Session formats are typed per harness. Seven harnesses, each fully mapped.
+**harnesses is deep and narrow.** Each harness gets verified, platform-specific paths with scope, evidence level, and platform tags. Session formats are typed per harness. Ten harnesses, each fully mapped.
 
 **unagent is wide and shallow.** 40+ agents detected by env vars, but each definition is just `configDir` + `rulesFile` + `skillsDir`. No platform-specific paths, no session schemas. In exchange, it ships runtime primitives harnesses doesn't touch yet: skill install/uninstall, vector stores, browser automation, sandboxes, queues, workflows.
 

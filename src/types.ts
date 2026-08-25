@@ -14,7 +14,8 @@ export type HarnessId =
   | "cursor"
   | "github-copilot"
   | "mastracode"
-  | "omp";
+  | "omp"
+  | "pi";
 export type EvidenceLevel = "official" | "community" | "inferred";
 export type Platform = "linux" | "darwin" | "win32";
 

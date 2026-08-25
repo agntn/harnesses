@@ -33,6 +33,7 @@ describe("@agntn/harnesses", () => {
       "mastracode",
       "omp",
       "opencode",
+      "pi",
     ]);
     expect(listHarnesses().sort()).toEqual([...harnessIds].sort());
   });
