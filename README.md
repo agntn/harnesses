@@ -69,7 +69,8 @@ harnesses detect                # which ones are installed + versions
 harnesses info claude           # full metadata for a harness
 harnesses paths claude          # resolved paths for current platform
 harnesses info codex --json     # machine-readable output
-harnesses run codex "fix lint"  # one prompt through a harness's headless mode
+harnesses run claude "review this design"       # advisor without tools mode (default)
+harnesses run claude --tools "fix lint"         # full agent with tools enabled
 harnesses mcp-servers list      # MCP servers configured across all harnesses
 harnesses mcp-servers add omp probe --command node --args "srv.mjs mcp"
 harnesses mcp-servers remove omp probe
@@ -77,6 +78,8 @@ harnesses mcp-servers sync      # reset all harnesses to ~/.config/agntn/mcp.jso
 harnesses agents sync --check   # doctor: link global AGENTS.md files to one master
 harnesses mcp                   # run the MCP server over stdio
 ```
+
+`tools` defaults to `false` across the library, CLI, MCP server, and Pi/OMP extensions. In that mode the harness must use a native CLI flag that removes tools from the model context; it is a lightweight advisor, not an agent constrained only by prompt wording. Set `tools: true` (or CLI `--tools`) for the full agent invocation. Harnesses whose CLI cannot disable tools reject advisor mode instead of silently running an agent.
 
 ## How harnesses compares to unagent
 

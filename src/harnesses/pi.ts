@@ -88,6 +88,8 @@ export default class Pi extends Harness {
   readonly invocation: Harness["invocation"] = {
     args: ["-p", "{prompt}"],
     jsonArgs: ["-p", "--mode", "json", "{prompt}"],
+    noToolsArgs: ["-p", "--no-tools", "{prompt}"],
+    noToolsJsonArgs: ["-p", "--no-tools", "--mode", "json", "{prompt}"],
     level: "official",
     note: "Add --mode json for structured event output.",
   };

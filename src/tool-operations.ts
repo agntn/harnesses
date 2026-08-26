@@ -149,6 +149,8 @@ export interface RunOptions {
   timeoutSeconds?: number;
   /** Use the harness's structured (JSON) output mode instead of plain text. */
   structured?: boolean;
+  /** Enable tools; defaults to a native advisor without tools invocation. */
+  tools?: boolean;
 }
 
 /** One completed (or failed) harness run, with output capped for the model. */
@@ -157,6 +159,7 @@ export interface RunOutcome {
   command: string;
   args: string[];
   structured: boolean;
+  tools: boolean;
   exitCode: number | null;
   timedOut: boolean;
   stdout: string;
@@ -172,9 +175,10 @@ export interface RunFailure {
 /**
  * Runs one prompt through a harness's normalized non-interactive invocation.
  *
- * The spawned harness is a full agent with its own tools, so the caller owns
- * the consequences of the prompt; this layer only normalizes the command line,
- * closes stdin, enforces the timeout, and caps the echoed output.
+ * Tool use defaults to a native advisor without tools invocation. Harnesses that
+ * cannot disable tools reject that mode; setting `tools` selects their full
+ * agent invocation. This layer also closes stdin, enforces the timeout, and
+ * caps the echoed output.
  */
 export async function runHarness(
   id: string,
@@ -185,12 +189,14 @@ export async function runHarness(
 
   const harness = getHarness(id);
   const structured = options.structured ?? false;
-  if (!harness.buildInvocation(prompt, { structured })) {
+  const tools = options.tools ?? false;
+  if (!harness.buildInvocation(prompt, { structured, tools })) {
     const details: RunFailure = {
-      error:
-        structured && harness.invocation
-          ? `Harness ${id} has no structured (JSON) invocation`
-          : `Harness ${id} has no non-interactive invocation`,
+      error: !harness.invocation
+        ? `Harness ${id} has no non-interactive invocation`
+        : tools
+          ? `Harness ${id} has no${structured ? " structured (JSON)" : ""} full agent invocation`
+          : `Harness ${id} has no${structured ? " structured (JSON)" : ""} advisor without tools invocation`,
     };
     return { content: text(details), details, isError: true };
   }
@@ -203,6 +209,7 @@ export async function runHarness(
       cwd: options.cwd,
       timeoutMs: timeoutSeconds * 1000,
       structured,
+      tools,
     });
   } catch (error) {
     const details: RunFailure = { error: `Failed to run ${id}: ${errorMessage(error)}` };
@@ -214,6 +221,7 @@ export async function runHarness(
     command: result.command,
     args: result.args,
     structured,
+    tools,
     exitCode: result.exitCode,
     timedOut: result.timedOut,
     stdout: truncate(result.stdout),

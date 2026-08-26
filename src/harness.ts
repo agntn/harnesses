@@ -92,12 +92,19 @@ export abstract class Harness {
    */
   buildInvocation(
     prompt: string,
-    options: { structured?: boolean } = {},
+    options: { structured?: boolean; tools?: boolean } = {},
   ): { command: string; args: string[] } | null {
     if (!this.invocation) return null;
     const command = this.invocation.binary ?? this.binaries[0];
     if (!command) return null;
-    const template = options.structured ? this.invocation.jsonArgs : this.invocation.args;
+    const tools = options.tools ?? false;
+    const template = tools
+      ? options.structured
+        ? this.invocation.jsonArgs
+        : this.invocation.args
+      : options.structured
+        ? this.invocation.noToolsJsonArgs
+        : this.invocation.noToolsArgs;
     if (!template) return null;
     return {
       command,
@@ -111,13 +118,18 @@ export abstract class Harness {
    * exits instead of waiting forever.
    */
   invoke(prompt: string, options: InvokeOptions = {}): Promise<InvokeResult> {
-    const built = this.buildInvocation(prompt, { structured: options.structured });
+    const built = this.buildInvocation(prompt, {
+      structured: options.structured,
+      tools: options.tools,
+    });
     if (!built) {
       return Promise.reject(
         new Error(
-          options.structured && this.invocation
-            ? `Harness ${this.id} has no structured (JSON) invocation`
-            : `Harness ${this.id} has no non-interactive invocation`,
+          !this.invocation
+            ? `Harness ${this.id} has no non-interactive invocation`
+            : options.tools === true
+              ? `Harness ${this.id} has no${options.structured ? " structured (JSON)" : ""} full agent invocation`
+              : `Harness ${this.id} has no${options.structured ? " structured (JSON)" : ""} advisor without tools invocation`,
         ),
       );
     }

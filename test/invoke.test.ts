@@ -24,14 +24,32 @@ class FakeCursor extends Harness {
   readonly invocation: Harness["invocation"] = {
     args: ["-e", "console.log('echo:' + process.argv[1]); process.exitCode = 0", "{prompt}"],
     jsonArgs: ["-e", "console.log(JSON.stringify({ echo: process.argv[1] }))", "{prompt}"],
+    noToolsArgs: [
+      "-e",
+      "console.log('advisor:' + process.argv[1]); process.exitCode = 0",
+      "{prompt}",
+    ],
+    noToolsJsonArgs: [
+      "-e",
+      "console.log(JSON.stringify({ advisor: process.argv[1] }))",
+      "{prompt}",
+    ],
     level: "inferred",
   };
 }
 
 describe("normalized invocation", () => {
-  it("expands the {prompt} placeholder without spawning", () => {
+  it("defaults to an advisor invocation without tools", () => {
     const claude = getHarness("claude");
-    expect(claude.buildInvocation("do the thing")).toEqual({
+    expect(claude.buildInvocation("answer this")).toEqual({
+      command: "claude",
+      args: ["-p", "--tools", "", "answer this"],
+    });
+  });
+
+  it("uses the full agent invocation only when tools are enabled", () => {
+    const claude = getHarness("claude");
+    expect(claude.buildInvocation("do the thing", { tools: true })).toEqual({
       command: "claude",
       args: ["-p", "do the thing"],
     });
@@ -43,14 +61,16 @@ describe("normalized invocation", () => {
   });
 
   it("expands the structured template when requested", () => {
-    expect(getHarness("claude").buildInvocation("q", { structured: true })).toEqual({
+    expect(getHarness("claude").buildInvocation("q", { structured: true, tools: true })).toEqual({
       command: "claude",
       args: ["-p", "--output-format", "json", "q"],
     });
   });
 
   it("returns null when structured mode is requested but unavailable", () => {
-    expect(getHarness("github-copilot").buildInvocation("x", { structured: true })).toBeNull();
+    expect(
+      getHarness("github-copilot").buildInvocation("x", { structured: true, tools: true }),
+    ).toBeNull();
   });
 
   it("runs the structured invocation and yields parseable JSON", async () => {
@@ -59,7 +79,7 @@ describe("normalized invocation", () => {
     const result = await fake.invoke("ping", { structured: true });
 
     expect(result.exitCode).toBe(0);
-    expect(JSON.parse(result.stdout)).toEqual({ echo: "ping" });
+    expect(JSON.parse(result.stdout)).toEqual({ advisor: "ping" });
   });
 
   it("runs a prompt through the invocation and captures the output", async () => {
@@ -67,7 +87,7 @@ describe("normalized invocation", () => {
 
     const result = await fake.invoke("hello world");
 
-    expect(result.stdout.trim()).toBe("echo:hello world");
+    expect(result.stdout.trim()).toBe("advisor:hello world");
     expect(result.exitCode).toBe(0);
     expect(result.timedOut).toBe(false);
   });
@@ -82,7 +102,7 @@ describe("normalized invocation", () => {
       },
     );
 
-    const result = await getHarness("cursor").invoke("x", { timeoutMs: 300 });
+    const result = await getHarness("cursor").invoke("x", { timeoutMs: 300, tools: true });
 
     expect(result.timedOut).toBe(true);
     expect(result.exitCode).toBeNull();
@@ -110,11 +130,18 @@ describe("runHarness tool operation", () => {
     expect(result.content[0]?.text).toContain("no non-interactive invocation");
   });
 
-  it("flags a structured request on a harness without a JSON mode", async () => {
-    const result = await runHarness("github-copilot", "x", { structured: true });
+  it("flags advisor mode when the harness cannot disable tools", async () => {
+    const result = await runHarness("codex", "x");
 
     expect(result.isError).toBe(true);
-    expect(result.content[0]?.text).toContain("no structured (JSON) invocation");
+    expect(result.content[0]?.text).toContain("no advisor without tools invocation");
+  });
+
+  it("flags a structured request on a harness without a JSON mode", async () => {
+    const result = await runHarness("github-copilot", "x", { structured: true, tools: true });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain("no structured (JSON) full agent invocation");
   });
 
   it("returns the outcome of a successful run", async () => {
@@ -123,9 +150,10 @@ describe("runHarness tool operation", () => {
     const result = await runHarness("cursor", "ping");
 
     expect(result.isError).toBeUndefined();
-    const outcome = result.details as { stdout: string; exitCode: number | null };
-    expect(outcome.stdout.trim()).toBe("echo:ping");
+    const outcome = result.details as { stdout: string; exitCode: number | null; tools: boolean };
+    expect(outcome.stdout.trim()).toBe("advisor:ping");
     expect(outcome.exitCode).toBe(0);
+    expect(outcome.tools).toBe(false);
   });
 
   it("marks a non-zero exit as an error and truncates long output", async () => {
@@ -138,7 +166,7 @@ describe("runHarness tool operation", () => {
       },
     );
 
-    const result = await runHarness("cursor", "x");
+    const result = await runHarness("cursor", "x", { tools: true });
 
     expect(result.isError).toBe(true);
     const outcome = result.details as { stdout: string; exitCode: number | null };

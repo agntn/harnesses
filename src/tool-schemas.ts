@@ -70,6 +70,12 @@ export function harnessToolSchemas<I, S>(Type: McpSchemaBuilder<I, S>) {
           description: "Use the harness's structured (JSON) output mode instead of plain text",
         }),
       ),
+      tools: Type.Optional(
+        Type.Boolean({
+          description:
+            "Enable the spawned harness's tools (default false: native advisor without tools mode)",
+        }),
+      ),
     }),
     mcpList: Type.Object({
       id: Type.Optional(harnessId("Harness id; omit to list every harness")),
@@ -139,6 +145,7 @@ export interface RunParams {
   cwd?: string;
   timeoutSeconds?: number;
   structured?: boolean;
+  tools?: boolean;
 }
 
 export interface McpListParams {

@@ -70,7 +70,7 @@ const tools: ToolDefinition[] = [
     name: "harnesses_run",
     title: "Harnesses Run",
     description:
-      "Run one prompt through an AI coding harness's normalized non-interactive invocation and return its output. The spawned harness is a full agent with its own tools.",
+      "Run one prompt through an AI coding harness's normalized non-interactive invocation and return its output. tools=false (default) selects native advisor without tools mode; tools=true selects the full agent.",
     inputSchema: schemas.run,
     annotations: {
       readOnlyHint: false,
@@ -83,6 +83,7 @@ const tools: ToolDefinition[] = [
         cwd: args.cwd as string | undefined,
         timeoutSeconds: args.timeoutSeconds as number | undefined,
         structured: args.structured as boolean | undefined,
+        tools: args.tools as boolean | undefined,
       }),
   },
   {

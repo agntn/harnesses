@@ -237,16 +237,24 @@ const run = defineCommand({
       type: "boolean" as const,
       description: "Use the harness's structured (JSON) output mode",
     },
+    tools: {
+      type: "boolean" as const,
+      description: "Enable tools; default false uses native advisor without tools mode",
+    },
   },
   async run({ args }) {
     const harness = resolveHarness(args.id as string);
     const structured = args.json === true;
 
-    if (!harness.buildInvocation("", { structured })) {
+    const tools = args.tools === true;
+
+    if (!harness.buildInvocation("", { structured, tools })) {
       consola.error(
-        structured && harness.invocation
-          ? `Harness ${harness.id} has no structured (JSON) invocation`
-          : `Harness ${harness.id} has no non-interactive invocation`,
+        !harness.invocation
+          ? `Harness ${harness.id} has no non-interactive invocation`
+          : tools
+            ? `Harness ${harness.id} has no${structured ? " structured (JSON)" : ""} full agent invocation`
+            : `Harness ${harness.id} has no${structured ? " structured (JSON)" : ""} advisor without tools invocation`,
       );
       process.exit(1);
     }
@@ -261,6 +269,7 @@ const run = defineCommand({
       cwd: args.cwd,
       timeoutMs: timeoutSeconds === undefined ? undefined : timeoutSeconds * 1000,
       structured,
+      tools,
     });
 
     if (result.stdout) process.stdout.write(result.stdout);

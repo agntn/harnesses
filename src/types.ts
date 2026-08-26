@@ -43,13 +43,14 @@ export interface HarnessCapabilities {
 export interface HarnessInvocation {
   /** Binary to spawn; defaults to the harness's first `binaries` entry. */
   binary?: string;
-  /** Argument template; every "{prompt}" is replaced with the prompt text. */
+  /** Full agent argument template; every "{prompt}" is replaced with the prompt text. */
   args: string[];
-  /**
-   * Argument template for the harness's structured (JSON) output mode; absent
-   * when the harness has no such mode. Same "{prompt}" substitution as `args`.
-   */
+  /** Structured full agent argument template. */
   jsonArgs?: string[];
+  /** Advisor argument template without tools; absent when the CLI cannot disable tools. */
+  noToolsArgs?: string[];
+  /** Structured advisor argument template without tools. */
+  noToolsJsonArgs?: string[];
   level: EvidenceLevel;
   note?: string;
 }
@@ -57,6 +58,8 @@ export interface HarnessInvocation {
 export interface InvokeOptions {
   cwd?: string;
   env?: Record<string, string>;
+  /** Enable the spawned harness's tools; defaults to advisor without tools mode. */
+  tools?: boolean;
   /** Kill the harness after this many milliseconds; unset means no timeout. */
   timeoutMs?: number;
   /** Use the harness's structured (JSON) output mode instead of plain text. */

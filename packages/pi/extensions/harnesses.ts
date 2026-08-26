@@ -71,7 +71,8 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       "Run one prompt through an AI coding harness's normalized non-interactive invocation and return its output",
     promptSnippet: "Use harnesses_run to delegate one prompt to another installed coding harness.",
     promptGuidelines: [
-      "The spawned harness is a full agent with its own tools; the prompt owns the consequences.",
+      "tools=false (default) uses the harness CLI's native advisor without tools mode.",
+      "Set tools=true only when the delegated task needs a full agent; unsupported advisor mode returns an error.",
       "Output is capped for context; long runs stop at the timeout.",
     ],
     parameters: schemas.run,
@@ -80,11 +81,21 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       params: HarnessSchemas.RunParams,
     ): Promise<AgentToolResult<HarnessTools.RunOutcome | HarnessTools.RunFailure>> {
       const { runHarness } = await loadToolOperations();
-      const { content, details } = await runHarness(params.id, params.prompt, {
+      const { content, details, isError } = await runHarness(params.id, params.prompt, {
         cwd: params.cwd,
         timeoutSeconds: params.timeoutSeconds,
         structured: params.structured,
+        tools: params.tools,
       });
+      if (isError) {
+        const message =
+          "error" in details
+            ? details.error
+            : details.timedOut
+              ? `Harness ${details.id} timed out`
+              : details.stderr || `Harness ${details.id} exited with code ${details.exitCode}`;
+        throw new Error(message);
+      }
       return { content, details };
     },
   });
