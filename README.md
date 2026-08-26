@@ -88,7 +88,7 @@ harnesses agents sync --check   # doctor: link global AGENTS.md files to one mas
 harnesses mcp                   # run the MCP server over stdio
 ```
 
-`tools` defaults to `false` across the library, CLI, MCP server, and Pi/OMP extensions. In that mode the harness must use a native CLI flag that removes tools from the model context; it is a lightweight advisor, not an agent constrained only by prompt wording. Set `tools: true` (or CLI `--tools`) for the full agent invocation. Harnesses whose CLI cannot disable tools reject advisor mode instead of silently running an agent.
+`tools` defaults to `false` in the library and CLI. The MCP, Pi, and OMP tools require agents to choose it explicitly. `false` must use a native CLI flag that removes tools from the model context; it is a lightweight advisor, not an agent constrained only by prompt wording. Set `tools: true` (or CLI `--tools`) whenever the task needs harness tools, including Grok's native X search. Harnesses whose CLI cannot disable tools reject advisor mode instead of silently running an agent and return an explicit `tools` retry when their full agent mode can handle the request.
 
 ## How harnesses compares to unagent
 

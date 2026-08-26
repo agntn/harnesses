@@ -101,12 +101,10 @@ export function harnessToolSchemas<I, S>(Type: McpSchemaBuilder<I, S>) {
           description: "Use the harness's structured (JSON) output mode instead of plain text",
         }),
       ),
-      tools: Type.Optional(
-        Type.Boolean({
-          description:
-            "Enable the spawned harness's tools (default false: native advisor without tools mode)",
-        }),
-      ),
+      tools: Type.Boolean({
+        description:
+          "Explicit execution mode. Set true when the task needs any harness tools, including Grok native X search. Set false only for an advisor without tools.",
+      }),
     }),
     mcpList: Type.Object({
       id: Type.Optional(harnessId("Harness id; omit to list every harness")),
@@ -184,7 +182,7 @@ export interface RunParams {
   model?: string;
   timeoutSeconds?: number;
   structured?: boolean;
-  tools?: boolean;
+  tools: boolean;
 }
 
 export interface McpListParams {

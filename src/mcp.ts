@@ -92,7 +92,7 @@ const tools: ToolDefinition[] = [
     name: "harnesses_run",
     title: "Harnesses Run",
     description:
-      "Run one prompt through an AI coding harness's normalized non-interactive invocation and return its output. An optional model selects the harness-native model. tools=false (default) selects native advisor without tools mode; tools=true selects the full agent.",
+      "Run one prompt through an AI coding harness's normalized non-interactive invocation and return its output. Pass tools=true whenever the task needs harness tools, including Grok native X search. Pass tools=false only for an advisor without tools. The choice is required and never silently falls back to a full agent.",
     inputSchema: schemas.run,
     annotations: {
       readOnlyHint: false,

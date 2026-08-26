@@ -252,6 +252,10 @@ export interface RunOutcome {
 export interface RunFailure {
   error: string;
   known?: HarnessId[];
+  /** Modes accepted by the selected harness when invocation mode caused the failure. */
+  invocationModes?: HarnessInvocationModes;
+  /** Explicit mode change that makes the same invocation shape executable. */
+  retry?: { tools: boolean };
 }
 
 /**
@@ -275,8 +279,29 @@ export async function runHarness(
   const tools = options.tools ?? false;
   const invocationOptions = { model: options.model, structured, tools };
   if (!harness.buildInvocation(prompt, invocationOptions)) {
+    const invocationModes = harness.invocationModes;
+    const requestedModeExists = structured
+      ? tools
+        ? invocationModes.agentStructured
+        : invocationModes.advisorStructured
+      : tools
+        ? invocationModes.agent
+        : invocationModes.advisor;
+    const alternateModeExists = structured
+      ? tools
+        ? invocationModes.advisorStructured
+        : invocationModes.agentStructured
+      : tools
+        ? invocationModes.advisor
+        : invocationModes.agent;
+    const modeCausedFailure =
+      !requestedModeExists &&
+      harness.invocation !== null &&
+      (options.model === undefined || harness.invocation.modelArgs !== undefined);
     const details: RunFailure = {
       error: harness.invocationError(invocationOptions) ?? `Invalid ${id} invocation`,
+      ...(modeCausedFailure ? { invocationModes } : {}),
+      ...(modeCausedFailure && alternateModeExists ? { retry: { tools: !tools } } : {}),
     };
     return { content: text(details), details, isError: true };
   }

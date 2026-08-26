@@ -165,11 +165,20 @@ describe("runHarness tool operation", () => {
     expect(result.content[0]?.text).toContain("no non-interactive invocation");
   });
 
-  it("flags advisor mode when the harness cannot disable tools", async () => {
-    const result = await runHarness("codex", "x");
+  it("returns an actionable full agent retry when Grok advisor mode is unavailable", async () => {
+    const result = await runHarness("grok", "search X");
 
     expect(result.isError).toBe(true);
-    expect(result.content[0]?.text).toContain("no advisor without tools invocation");
+    expect(result.content[0]?.text).toContain("retry with tools: true to start its full agent");
+    expect(result.details).toMatchObject({
+      invocationModes: {
+        advisor: false,
+        advisorStructured: false,
+        agent: true,
+        agentStructured: true,
+      },
+      retry: { tools: true },
+    });
   });
 
   it("flags a structured request on a harness without a JSON mode", async () => {

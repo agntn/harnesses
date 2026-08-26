@@ -188,9 +188,23 @@ export abstract class Harness {
         ? this.invocation.noToolsJsonArgs
         : this.invocation.noToolsArgs;
     if (available) return null;
+
+    const alternateAvailable = tools
+      ? options.structured
+        ? this.invocation.noToolsJsonArgs
+        : this.invocation.noToolsArgs
+      : options.structured
+        ? this.invocation.jsonArgs
+        : this.invocation.args;
+    const retry = alternateAvailable
+      ? tools
+        ? "; retry with tools: false to use its advisor without tools"
+        : "; retry with tools: true to start its full agent"
+      : "";
+
     return tools
-      ? `Harness ${this.id} has no${options.structured ? " structured (JSON)" : ""} full agent invocation`
-      : `Harness ${this.id} has no${options.structured ? " structured (JSON)" : ""} advisor without tools invocation`;
+      ? `Harness ${this.id} has no${options.structured ? " structured (JSON)" : ""} full agent invocation${retry}`
+      : `Harness ${this.id} has no${options.structured ? " structured (JSON)" : ""} advisor without tools invocation${retry}`;
   }
 
   /**

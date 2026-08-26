@@ -36,6 +36,9 @@ describe("harnesses MCP server", () => {
       "harnesses_agents_sync",
       "harnesses_mcp_remove",
     ]);
+    const runTool = response.tools.find((tool) => tool.name === "harnesses_run");
+    expect(runTool?.inputSchema.required).toContain("tools");
+
     const readOnlyTools = new Set(["harnesses_detect", "harnesses_info", "harnesses_mcp_list"]);
     for (const tool of response.tools) {
       const readOnly = readOnlyTools.has(tool.name);

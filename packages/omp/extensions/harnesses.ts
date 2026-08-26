@@ -193,7 +193,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     name: "harnesses_run",
     label: "Harnesses Run",
     description:
-      "Run one prompt through an AI coding harness's normalized non-interactive invocation, optionally selecting a model, and return its output",
+      "Run one prompt through a harness. Always choose tools explicitly. Set true for any harness tools, including Grok native X search, or false for an advisor without tools.",
     parameters: schemas.run,
     approval: "exec",
     async execute(

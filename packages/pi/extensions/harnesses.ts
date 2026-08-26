@@ -106,8 +106,9 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       "Run one prompt through an AI coding harness's normalized non-interactive invocation, optionally selecting a model, and return its output",
     promptSnippet: "Use harnesses_run to delegate one prompt to another installed coding harness.",
     promptGuidelines: [
-      "tools=false (default) uses the harness CLI's native advisor without tools mode.",
-      "Set tools=true only when the delegated task needs a full agent; unsupported advisor mode returns an error.",
+      "Always choose tools explicitly. Set true whenever the task needs harness tools, including Grok native X search.",
+      "Set false only for an advisor without tools. It never silently falls back to a full agent.",
+      "An unsupported mode returns an explicit retry when the alternate mode is available.",
       "Output is capped for context; long runs stop at the timeout.",
     ],
     parameters: schemas.run,
