@@ -1,4 +1,21 @@
+import { stripVTControlCharacters } from "node:util";
 import { Harness } from "../harness.ts";
+import type { AvailableModel } from "../types.ts";
+
+const MODEL_HEADERS = ["provider", "model", "context", "max-out", "thinking", "images"];
+
+function parseTokenCount(value: string): number {
+  const match = /^(\d+(?:\.\d+)?)([KM])?$/.exec(value);
+  if (!match?.[1]) throw new Error(`Invalid Pi token count: ${JSON.stringify(value)}`);
+  const multiplier = match[2] === "M" ? 1_000_000 : match[2] === "K" ? 1_000 : 1;
+  return Number(match[1]) * multiplier;
+}
+
+function parseBoolean(value: string, column: string): boolean {
+  if (value === "yes") return true;
+  if (value === "no") return false;
+  throw new Error(`Invalid Pi ${column} value: ${JSON.stringify(value)}`);
+}
 
 export default class Pi extends Harness {
   readonly id = "pi";
@@ -90,12 +107,63 @@ export default class Pi extends Harness {
     jsonArgs: ["-p", "--mode", "json", "{prompt}"],
     noToolsArgs: ["-p", "--no-tools", "{prompt}"],
     noToolsJsonArgs: ["-p", "--no-tools", "--mode", "json", "{prompt}"],
+    modelArgs: ["--model", "{model}"],
     level: "official",
     note: "Add --mode json for structured event output.",
+  };
+  override readonly modelListing: Harness["modelListing"] = {
+    args: ["--list-models"],
+    searchArgs: ["--list-models", "{search}"],
+    level: "official",
+    note: "Lists models with configured provider authentication; accepts an optional fuzzy search.",
   };
   override readonly agentsFile = "~/.pi/agent/AGENTS.md";
   readonly detection = {
     envVars: ["PI_CODING_AGENT", "PI_SESSION_ID", "PI_SESSION_FILE"],
     projectMarkers: [".pi"],
   };
+
+  protected override parseModelListingOutput(stdout: string): AvailableModel[] {
+    const lines = stripVTControlCharacters(stdout)
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const first = lines[0];
+    if (!first) throw new Error("Unexpected empty Pi model-list output");
+    if (first.startsWith("No models available.") || first.startsWith("No models matching ")) {
+      return [];
+    }
+
+    const headers = first.split(/\s{2,}/);
+    if (
+      headers.length !== MODEL_HEADERS.length ||
+      headers.some((value, i) => value !== MODEL_HEADERS[i])
+    ) {
+      throw new Error(`Unexpected Pi model-list header: ${JSON.stringify(first)}`);
+    }
+
+    return lines.slice(1).map((line) => {
+      const columns = line.split(/\s{2,}/);
+      const [provider, id, context, maxOutput, thinking, images] = columns;
+      if (
+        columns.length !== MODEL_HEADERS.length ||
+        !provider ||
+        !id ||
+        !context ||
+        !maxOutput ||
+        !thinking ||
+        !images
+      ) {
+        throw new Error(`Unexpected Pi model-list row: ${JSON.stringify(line)}`);
+      }
+      return {
+        provider,
+        id,
+        contextWindow: parseTokenCount(context),
+        maxOutputTokens: parseTokenCount(maxOutput),
+        thinking: parseBoolean(thinking, "thinking"),
+        images: parseBoolean(images, "images"),
+      };
+    });
+  }
 }

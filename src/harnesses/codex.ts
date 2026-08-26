@@ -93,6 +93,7 @@ export default class Codex extends Harness {
   readonly invocation: Harness["invocation"] = {
     args: ["exec", "{prompt}"],
     jsonArgs: ["exec", "--json", "{prompt}"],
+    modelArgs: ["--model", "{model}"],
     level: "official",
     note: "Non-interactive exec subcommand; add --json for structured output.",
   };

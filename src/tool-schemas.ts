@@ -44,6 +44,30 @@ export function harnessToolSchemas<I, S>(Type: McpSchemaBuilder<I, S>) {
   return {
     detect: Type.Object({}),
     info: Type.Object({ id: harnessId("Harness id") }),
+    models: Type.Object({
+      id: harnessId("Harness id"),
+      search: Type.Optional(
+        Type.String({
+          description: "Optional native model search filter",
+          minLength: 1,
+          maxLength: 1024,
+        }),
+      ),
+      cwd: Type.Optional(
+        Type.String({
+          description: "Working directory used while loading harness configuration",
+          minLength: 1,
+          maxLength: 4096,
+        }),
+      ),
+      timeoutSeconds: Type.Optional(
+        Type.Integer({
+          description: `Wall-clock budget in seconds (default ${RUN_TIMEOUT_DEFAULT_SECONDS})`,
+          minimum: 1,
+          maximum: 3600,
+        }),
+      ),
+    }),
     run: Type.Object({
       id: harnessId("Harness id"),
       prompt: Type.String({
@@ -56,6 +80,13 @@ export function harnessToolSchemas<I, S>(Type: McpSchemaBuilder<I, S>) {
           description: "Working directory for the run",
           minLength: 1,
           maxLength: 4096,
+        }),
+      ),
+      model: Type.Optional(
+        Type.String({
+          description: "Harness-native model id or selector",
+          minLength: 1,
+          maxLength: 512,
         }),
       ),
       timeoutSeconds: Type.Optional(
@@ -139,10 +170,18 @@ export interface InfoParams {
   id: string;
 }
 
+export interface ModelsParams {
+  id: string;
+  search?: string;
+  cwd?: string;
+  timeoutSeconds?: number;
+}
+
 export interface RunParams {
   id: string;
   prompt: string;
   cwd?: string;
+  model?: string;
   timeoutSeconds?: number;
   structured?: boolean;
   tools?: boolean;

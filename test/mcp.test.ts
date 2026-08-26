@@ -20,7 +20,7 @@ afterEach(async () => {
 });
 
 describe("harnesses MCP server", () => {
-  it("advertises the registry tools as read-only and the run tool as not", async () => {
+  it("distinguishes metadata reads, executable reads, and mutations", async () => {
     const client = await connectTestClient();
 
     const response = await client.listTools();
@@ -28,6 +28,7 @@ describe("harnesses MCP server", () => {
     expect(response.tools.map((tool) => tool.name)).toEqual([
       "harnesses_detect",
       "harnesses_info",
+      "harnesses_models",
       "harnesses_run",
       "harnesses_mcp_list",
       "harnesses_mcp_add",
@@ -40,8 +41,8 @@ describe("harnesses MCP server", () => {
       const readOnly = readOnlyTools.has(tool.name);
       expect(tool.annotations).toMatchObject({
         readOnlyHint: readOnly,
-        destructiveHint: !readOnly,
-        openWorldHint: tool.name === "harnesses_run",
+        destructiveHint: tool.name === "harnesses_models" ? false : !readOnly,
+        openWorldHint: tool.name === "harnesses_run" || tool.name === "harnesses_models",
       });
     }
   });

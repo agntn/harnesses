@@ -106,6 +106,7 @@ export default class Antigravity extends Harness {
   readonly invocation: Harness["invocation"] = {
     args: ["--print", "{prompt}"],
     jsonArgs: ["--print", "--output-format", "json", "{prompt}"],
+    modelArgs: ["--model", "{model}"],
     level: "official",
     note: "Non-interactive print mode.",
   };

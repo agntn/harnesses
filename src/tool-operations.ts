@@ -22,11 +22,13 @@ export type { SyncReport } from "./mcp-servers.ts";
 export type { HarnessInvocationModes } from "./types.ts";
 import type { Harness } from "./harness.ts";
 import type {
+  AvailableModel,
   HarnessCapabilities,
   HarnessDetection,
   HarnessId,
   HarnessInvocationModes,
   InvokeResult,
+  ListModelsResult,
   McpServerConfig,
   PathCandidate,
   ResolvedPaths,
@@ -61,6 +63,8 @@ export interface HarnessMetadata {
   binaries: string[];
   capabilities: HarnessCapabilities;
   invocationModes: HarnessInvocationModes;
+  modelListing: boolean;
+  modelSelection: boolean;
   config: PathCandidate[];
   sessions: PathCandidate[];
   instructions: PathCandidate[];
@@ -132,6 +136,8 @@ export function harnessInfo(id: string): ToolResult<HarnessMetadata | UnknownHar
     binaries: harness.binaries,
     capabilities: harness.capabilities,
     invocationModes: harness.invocationModes,
+    modelListing: harness.modelListing !== null,
+    modelSelection: harness.invocation?.modelArgs !== undefined,
     config: harness.config,
     sessions: harness.sessions,
     instructions: harness.instructions,
@@ -146,9 +152,80 @@ export function harnessInfo(id: string): ToolResult<HarnessMetadata | UnknownHar
   return { content: text(details), details };
 }
 
+/** Options accepted by {@link listHarnessModels}. */
+export interface ModelsOptions {
+  search?: string;
+  cwd?: string;
+  /** Wall-clock budget in seconds; defaults to {@link RUN_DEFAULT_TIMEOUT_SECONDS}. */
+  timeoutSeconds?: number;
+}
+
+/** One completed native model-listing query. */
+export interface ModelsOutcome {
+  id: HarnessId;
+  command: string;
+  args: string[];
+  search?: string;
+  models: AvailableModel[];
+  exitCode: number | null;
+  timedOut: boolean;
+  stderr: string;
+}
+
+/** Lists the models currently available to one harness through its native CLI. */
+export async function listHarnessModels(
+  id: string,
+  options: ModelsOptions = {},
+): Promise<ToolResult<ModelsOutcome | RunFailure>> {
+  if (!isHarnessId(id)) return unknownHarness(id);
+
+  const harness = getHarness(id);
+  const built = harness.buildModelListInvocation(options.search);
+  if (!built) {
+    const details: RunFailure = {
+      error: harness.modelListing
+        ? `Harness ${id} does not support filtering its model listing`
+        : `Harness ${id} does not support model listing`,
+    };
+    return { content: text(details), details, isError: true };
+  }
+
+  const timeoutSeconds = options.timeoutSeconds ?? RUN_DEFAULT_TIMEOUT_SECONDS;
+  let result: ListModelsResult;
+  try {
+    result = await harness.listModels({
+      search: options.search,
+      cwd: options.cwd,
+      timeoutMs: timeoutSeconds * 1000,
+    });
+  } catch (error) {
+    const details: RunFailure = { error: `Failed to list ${id} models: ${errorMessage(error)}` };
+    return { content: text(details), details, isError: true };
+  }
+
+  const details: ModelsOutcome = {
+    id: harness.id,
+    command: result.command,
+    args: result.args,
+    ...(options.search === undefined ? {} : { search: options.search }),
+    models: result.models,
+    exitCode: result.exitCode,
+    timedOut: result.timedOut,
+    stderr: truncate(result.stderr),
+  };
+
+  return {
+    content: text(details),
+    details,
+    ...(result.timedOut || result.exitCode !== 0 ? { isError: true } : {}),
+  };
+}
+
 /** Options accepted by {@link runHarness}. */
 export interface RunOptions {
   cwd?: string;
+  /** Harness-native model id or selector. */
+  model?: string;
   /** Wall-clock budget in seconds; defaults to {@link RUN_DEFAULT_TIMEOUT_SECONDS}. */
   timeoutSeconds?: number;
   /** Use the harness's structured (JSON) output mode instead of plain text. */
@@ -162,6 +239,7 @@ export interface RunOutcome {
   id: HarnessId;
   command: string;
   args: string[];
+  model?: string;
   structured: boolean;
   tools: boolean;
   exitCode: number | null;
@@ -181,7 +259,8 @@ export interface RunFailure {
  *
  * Tool use defaults to a native advisor without tools invocation. Harnesses that
  * cannot disable tools reject that mode; setting `tools` selects their full
- * agent invocation. This layer also closes stdin, enforces the timeout, and
+ * agent invocation. `model` is translated through the harness-specific recipe.
+ * This layer also closes stdin, enforces the timeout, and
  * caps the echoed output.
  */
 export async function runHarness(
@@ -194,13 +273,10 @@ export async function runHarness(
   const harness = getHarness(id);
   const structured = options.structured ?? false;
   const tools = options.tools ?? false;
-  if (!harness.buildInvocation(prompt, { structured, tools })) {
+  const invocationOptions = { model: options.model, structured, tools };
+  if (!harness.buildInvocation(prompt, invocationOptions)) {
     const details: RunFailure = {
-      error: !harness.invocation
-        ? `Harness ${id} has no non-interactive invocation`
-        : tools
-          ? `Harness ${id} has no${structured ? " structured (JSON)" : ""} full agent invocation`
-          : `Harness ${id} has no${structured ? " structured (JSON)" : ""} advisor without tools invocation`,
+      error: harness.invocationError(invocationOptions) ?? `Invalid ${id} invocation`,
     };
     return { content: text(details), details, isError: true };
   }
@@ -211,6 +287,7 @@ export async function runHarness(
   try {
     result = await harness.invoke(prompt, {
       cwd: options.cwd,
+      model: options.model,
       timeoutMs: timeoutSeconds * 1000,
       structured,
       tools,
@@ -224,6 +301,7 @@ export async function runHarness(
     id: harness.id,
     command: result.command,
     args: result.args,
+    ...(options.model === undefined ? {} : { model: options.model }),
     structured,
     tools,
     exitCode: result.exitCode,

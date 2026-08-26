@@ -124,6 +124,7 @@ export default class Claude extends Harness {
     jsonArgs: ["-p", "--output-format", "json", "{prompt}"],
     noToolsArgs: ["-p", "--tools", "", "{prompt}"],
     noToolsJsonArgs: ["-p", "--tools", "", "--output-format", "json", "{prompt}"],
+    modelArgs: ["--model", "{model}"],
     level: "official",
     note: "Headless print mode; add --output-format json for structured output.",
   };

@@ -96,6 +96,7 @@ export default class OpenCode extends Harness {
   readonly invocation: Harness["invocation"] = {
     args: ["run", "{prompt}"],
     jsonArgs: ["run", "--format", "json", "{prompt}"],
+    modelArgs: ["--model", "{model}"],
     level: "official",
   };
   override readonly mcpConfigs: Harness["mcpConfigs"] = [

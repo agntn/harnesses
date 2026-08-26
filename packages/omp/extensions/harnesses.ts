@@ -121,7 +121,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     name: "harnesses_info",
     label: "Harnesses Info",
     description:
-      "Full metadata for one AI coding harness, including supported advisor and agent invocation modes, configuration, sessions, instructions, skills, commands, hooks, and resolved paths",
+      "Full metadata for one AI coding harness, including supported invocation and model operations, configuration, sessions, instructions, skills, commands, hooks, and resolved paths",
     parameters: schemas.info,
     approval: "read",
     async execute(
@@ -149,10 +149,51 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
   });
 
   pi.registerTool({
+    name: "harnesses_models",
+    label: "Harnesses Models",
+    description:
+      "List the models currently available to one AI coding harness through its native CLI",
+    parameters: schemas.models,
+    approval: "exec",
+    async execute(
+      _toolCallId,
+      params: HarnessSchemas.ModelsParams,
+    ): Promise<AgentToolResult<HarnessTools.ModelsOutcome | HarnessTools.RunFailure>> {
+      const { listHarnessModels } = await loadToolOperations();
+      const { content, details, isError } = await listHarnessModels(params.id, {
+        search: params.search,
+        cwd: params.cwd,
+        timeoutSeconds: params.timeoutSeconds,
+      });
+      if (isError) {
+        const message =
+          "error" in details
+            ? details.error
+            : details.timedOut
+              ? `Harness ${details.id} model listing timed out`
+              : details.stderr || `Harness ${details.id} exited with code ${details.exitCode}`;
+        throw new Error(message);
+      }
+      return { content, details };
+    },
+    ...statusRenderers(
+      "Harnesses Models",
+      "exec",
+      (args) => sanitizeTerminalText(prop(args, "id")),
+      (details) => {
+        const outcome = details as HarnessTools.ModelsOutcome | HarnessTools.RunFailure | undefined;
+        return outcome && "models" in outcome
+          ? [sanitizeTerminalText(outcome.id), `${outcome.models.length} models`]
+          : undefined;
+      },
+    ),
+  });
+
+  pi.registerTool({
     name: "harnesses_run",
     label: "Harnesses Run",
     description:
-      "Run one prompt through an AI coding harness's normalized non-interactive invocation and return its output",
+      "Run one prompt through an AI coding harness's normalized non-interactive invocation, optionally selecting a model, and return its output",
     parameters: schemas.run,
     approval: "exec",
     async execute(
@@ -162,6 +203,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       const { runHarness } = await loadToolOperations();
       const { content, details, isError } = await runHarness(params.id, params.prompt, {
         cwd: params.cwd,
+        model: params.model,
         timeoutSeconds: params.timeoutSeconds,
         structured: params.structured,
         tools: params.tools,

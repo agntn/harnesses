@@ -5,6 +5,7 @@ import { consola } from "consola";
 import { encode as toToon } from "@toon-format/toon";
 import { version } from "./types.ts";
 import { getAllHarnesses, getHarness, isHarnessId, listHarnesses } from "./registry.ts";
+import { listHarnessModels } from "./tool-operations.ts";
 
 const s = {
   cyan: (t: string) => `\x1b[36m${t}\x1b[0m`,
@@ -134,6 +135,8 @@ const info = defineCommand({
           binaries: harness.binaries,
           capabilities: harness.capabilities,
           invocationModes: harness.invocationModes,
+          modelListing: harness.modelListing !== null,
+          modelSelection: harness.invocation?.modelArgs !== undefined,
           config: harness.config,
           sessions: harness.sessions,
           instructions: harness.instructions,
@@ -164,6 +167,19 @@ const info = defineCommand({
       .map(([k, v]) => (v ? s.green(k) : s.dim(k)))
       .join(s.dim("  ·  "));
     consola.log(entry(modes));
+
+    consola.log(section("Models"));
+    const modelFeatures = {
+      listing: harness.modelListing !== null,
+      selection: harness.invocation?.modelArgs !== undefined,
+    };
+    consola.log(
+      entry(
+        Object.entries(modelFeatures)
+          .map(([k, v]) => (v ? s.green(k) : s.dim(k)))
+          .join(s.dim("  ·  ")),
+      ),
+    );
 
     renderPathSection("Config", harness.config);
     renderPathSection("Sessions", harness.sessions);
@@ -229,6 +245,65 @@ const paths = defineCommand({
   },
 });
 
+const models = defineCommand({
+  meta: { description: "List models available to a harness" },
+  args: {
+    id: harnessArg,
+    search: {
+      type: "positional" as const,
+      description: "Optional native model search filter",
+      required: false,
+    },
+    cwd: {
+      type: "string" as const,
+      description: "Working directory used while loading harness configuration",
+    },
+    timeout: { type: "string" as const, description: "Wall-clock budget in seconds" },
+    ...formatArgs,
+  },
+  async run({ args }) {
+    const timeoutSeconds = args.timeout ? Number(args.timeout) : undefined;
+    if (timeoutSeconds !== undefined && !(Number.isFinite(timeoutSeconds) && timeoutSeconds > 0)) {
+      consola.error(`Invalid timeout: ${args.timeout}`);
+      process.exitCode = 1;
+      return;
+    }
+
+    const result = await listHarnessModels(args.id as string, {
+      search: args.search as string | undefined,
+      cwd: args.cwd,
+      timeoutSeconds,
+    });
+    if (emit(result.details, args)) {
+      if (result.isError) process.exitCode = 1;
+      return;
+    }
+    if (result.isError || !("models" in result.details)) {
+      consola.error("error" in result.details ? result.details.error : `Failed to list models`);
+      process.exitCode = 1;
+      return;
+    }
+
+    consola.log(header(`${result.details.id} models`));
+    consola.log("");
+    for (const model of result.details.models) {
+      const features = [
+        model.thinking ? "thinking" : undefined,
+        model.images ? "images" : undefined,
+      ]
+        .filter(Boolean)
+        .join(", ");
+      consola.log(
+        entry(
+          `${s.hi(`${model.provider}/${model.id}`)}  ${s.dim(`${model.contextWindow} context · ${model.maxOutputTokens} max-out${features ? ` · ${features}` : ""}`)}`,
+        ),
+      );
+    }
+    if (result.details.models.length === 0) consola.log(entry(s.dim("No models found")));
+    consola.log("");
+  },
+});
+
 const run = defineCommand({
   meta: { description: "Run one prompt through a harness's non-interactive mode" },
   args: {
@@ -239,6 +314,7 @@ const run = defineCommand({
       required: true,
     },
     cwd: { type: "string" as const, description: "Working directory for the run" },
+    model: { type: "string" as const, description: "Harness-native model id or selector" },
     timeout: { type: "string" as const, description: "Wall-clock budget in seconds" },
     json: {
       type: "boolean" as const,
@@ -255,14 +331,9 @@ const run = defineCommand({
 
     const tools = args.tools === true;
 
-    if (!harness.buildInvocation("", { structured, tools })) {
-      consola.error(
-        !harness.invocation
-          ? `Harness ${harness.id} has no non-interactive invocation`
-          : tools
-            ? `Harness ${harness.id} has no${structured ? " structured (JSON)" : ""} full agent invocation`
-            : `Harness ${harness.id} has no${structured ? " structured (JSON)" : ""} advisor without tools invocation`,
-      );
+    const invocationOptions = { model: args.model, structured, tools };
+    if (!harness.buildInvocation("", invocationOptions)) {
+      consola.error(harness.invocationError(invocationOptions) ?? "Invalid invocation");
       process.exit(1);
     }
 
@@ -274,6 +345,7 @@ const run = defineCommand({
 
     const result = await harness.invoke(args.prompt as string, {
       cwd: args.cwd,
+      model: args.model,
       timeoutMs: timeoutSeconds === undefined ? undefined : timeoutSeconds * 1000,
       structured,
       tools,
@@ -300,6 +372,7 @@ const main = defineCommand({
     detect,
     info,
     paths,
+    models,
     run,
     "mcp-servers": () => import("./commands/mcp-servers.ts").then((m) => m.default),
     agents: () => import("./commands/agents.ts").then((m) => m.default),

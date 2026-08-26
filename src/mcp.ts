@@ -10,6 +10,7 @@ import { Value } from "typebox/value";
 import {
   detectHarnesses,
   harnessInfo,
+  listHarnessModels,
   mcpAdd,
   mcpList,
   mcpRemove,
@@ -38,6 +39,13 @@ const READ_ONLY: Tool["annotations"] = {
   openWorldHint: false,
 };
 
+const EXEC_READ: Tool["annotations"] = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: false,
+  openWorldHint: true,
+};
+
 const CONFIG_WRITE: Tool["annotations"] = {
   readOnlyHint: false,
   destructiveHint: true,
@@ -61,16 +69,30 @@ const tools: ToolDefinition[] = [
     name: "harnesses_info",
     title: "Harnesses Info",
     description:
-      "Full metadata for one AI coding harness, including supported advisor and agent invocation modes, configuration, sessions, instructions, skills, commands, hooks, and resolved paths.",
+      "Full metadata for one AI coding harness, including supported invocation and model operations, configuration, sessions, instructions, skills, commands, hooks, and resolved paths.",
     inputSchema: schemas.info,
     annotations: READ_ONLY,
     execute: (args) => harnessInfo(args.id as string),
   },
   {
+    name: "harnesses_models",
+    title: "Harnesses Models",
+    description:
+      "List the models currently available to one AI coding harness through its native CLI, normalized across providers. An optional search filter is passed to harnesses that support it. The command may load project configuration and extensions.",
+    inputSchema: schemas.models,
+    annotations: EXEC_READ,
+    execute: (args) =>
+      listHarnessModels(args.id as string, {
+        search: args.search as string | undefined,
+        cwd: args.cwd as string | undefined,
+        timeoutSeconds: args.timeoutSeconds as number | undefined,
+      }),
+  },
+  {
     name: "harnesses_run",
     title: "Harnesses Run",
     description:
-      "Run one prompt through an AI coding harness's normalized non-interactive invocation and return its output. tools=false (default) selects native advisor without tools mode; tools=true selects the full agent.",
+      "Run one prompt through an AI coding harness's normalized non-interactive invocation and return its output. An optional model selects the harness-native model. tools=false (default) selects native advisor without tools mode; tools=true selects the full agent.",
     inputSchema: schemas.run,
     annotations: {
       readOnlyHint: false,
@@ -81,6 +103,7 @@ const tools: ToolDefinition[] = [
     execute: (args) =>
       runHarness(args.id as string, args.prompt as string, {
         cwd: args.cwd as string | undefined,
+        model: args.model as string | undefined,
         timeoutSeconds: args.timeoutSeconds as number | undefined,
         structured: args.structured as boolean | undefined,
         tools: args.tools as boolean | undefined,

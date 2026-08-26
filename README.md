@@ -23,6 +23,11 @@ console.log(claude.skills); // [{ path: ".claude/skills/", scope: "project", ...
 console.log(claude.hooks); // [{ path: ".claude/hooks/", scope: "project", ... }, ...]
 console.log(claude.invocationModes); // { advisor: true, advisorStructured: true, agent: true, agentStructured: true }
 
+const pi = getHarness("pi");
+const { models } = await pi.listModels({ search: "gpt-5.4" });
+console.log(models); // [{ provider: "openai-codex", id: "gpt-5.4", ... }]
+await pi.invoke("Review this patch", { model: "openai-codex/gpt-5.4" });
+
 // Resolve to absolute paths for current platform
 const paths = claude.resolve({ platform: "linux", homeDir: "/home/dev" });
 console.log(paths.config); // [{ path: "/home/dev/.claude/settings.json", ... }, ...]
@@ -60,7 +65,7 @@ import type { ClaudeSessionEntry, CodexThread, GeminiConversationRecord } from "
 | Pi Coding Agent | `pi`             | env + project | `.pi/skills/`         | -                        | JSON + JSONL   |
 | Freebuff        | `freebuff`       | project       | `.agents/skills/`     | -                        | JSON + JSONL   |
 
-Each agent is a concrete subclass of the abstract `Harness` class. Custom subclasses can be added with `registerHarness`. Every harness exposes config paths, session locations, instruction files, skills dirs, hooks, commands, persistence formats, capabilities (MCP, vision, tools, streaming), detection rules, a normalized non-interactive invocation (`harness.invoke(prompt)`) where the CLI has a headless mode, and its MCP server config files (`listMcpServers`/`addMcpServer`/`removeMcpServer` normalize the dialects; writes rewrite JSON and surgically edit TOML with comments preserved). `syncMcpServers` treats `~/.config/agntn/mcp.jsonc` (JSONC, XDG-aware) as the single source of truth and resets every harness's user-scope MCP config to exactly that list; a top-level `"excludes": ["codex"]` array opts individual harnesses out of the sync (their own servers stay, master-listed names are withdrawn), and `~`/`${HOME}` in commands, args, and env values expand to absolute paths at sync time (harnesses spawn MCP servers without a shell). `syncAgentsFiles` links every harness's global instructions file (CLAUDE.md/AGENTS.md/GEMINI.md) to one master file as symlinks, so an edit made through any harness lands in the single physical copy; `~/.config/agntn/agents.jsonc` sets the `source` and `excludes`, diverged regular files are backed up and relinked, and check mode reports without writing. All paths carry `scope` (user/project/system/data), `level` (official/community/inferred), and optional `platforms` tags.
+Each agent is a concrete subclass of the abstract `Harness` class. Custom subclasses can be added with `registerHarness`. Every harness exposes config paths, session locations, instruction files, skills dirs, hooks, commands, persistence formats, capabilities (MCP, vision, tools, streaming), detection rules, a normalized non-interactive invocation (`harness.invoke(prompt, { model })`) where the CLI has a headless mode, native model listing (`harness.listModels()`) where the CLI supports it, and its MCP server config files (`listMcpServers`/`addMcpServer`/`removeMcpServer` normalize the dialects; writes rewrite JSON and surgically edit TOML with comments preserved). `syncMcpServers` treats `~/.config/agntn/mcp.jsonc` (JSONC, XDG-aware) as the single source of truth and resets every harness's user-scope MCP config to exactly that list; a top-level `"excludes": ["codex"]` array opts individual harnesses out of the sync (their own servers stay, master-listed names are withdrawn), and `~`/`${HOME}` in commands, args, and env values expand to absolute paths at sync time (harnesses spawn MCP servers without a shell). `syncAgentsFiles` links every harness's global instructions file (CLAUDE.md/AGENTS.md/GEMINI.md) to one master file as symlinks, so an edit made through any harness lands in the single physical copy; `~/.config/agntn/agents.jsonc` sets the `source` and `excludes`, diverged regular files are backed up and relinked, and check mode reports without writing. All paths carry `scope` (user/project/system/data), `level` (official/community/inferred), and optional `platforms` tags.
 
 ## CLI
 
@@ -70,7 +75,10 @@ harnesses detect                # which ones are installed + versions
 harnesses info claude           # metadata, including supported invocation modes
 harnesses paths claude          # resolved paths for current platform
 harnesses info codex --json     # machine-readable output
+harnesses models pi             # models available to Pi
+harnesses models pi gpt-5.4 --json
 harnesses run claude "review this design"       # advisor without tools mode (default)
+harnesses run pi --model openai-codex/gpt-5.4 "review this design"
 harnesses run claude --tools "fix lint"         # full agent with tools enabled
 harnesses mcp-servers list      # MCP servers configured across all harnesses
 harnesses mcp-servers add omp probe --command node --args "srv.mjs mcp"

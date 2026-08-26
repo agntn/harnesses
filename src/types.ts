@@ -51,6 +51,8 @@ export interface HarnessInvocation {
   noToolsArgs?: string[];
   /** Structured advisor argument template without tools. */
   noToolsJsonArgs?: string[];
+  /** Arguments appended when a model is selected; every "{model}" is replaced. */
+  modelArgs?: string[];
   level: EvidenceLevel;
   note?: string;
 }
@@ -63,9 +65,40 @@ export interface HarnessInvocationModes {
   agentStructured: boolean;
 }
 
+/** How to ask one harness CLI for the models currently available to it. */
+export interface HarnessModelListing {
+  /** Arguments used when no search filter is supplied. */
+  args: string[];
+  /** Optional argument template for a search filter; every "{search}" is replaced. */
+  searchArgs?: string[];
+  level: EvidenceLevel;
+  note?: string;
+}
+
+/** One model normalized from a harness's native model-listing output. */
+export interface AvailableModel {
+  provider: string;
+  id: string;
+  contextWindow: number;
+  maxOutputTokens: number;
+  thinking: boolean;
+  images: boolean;
+}
+
+/** Options for querying the models available to one harness. */
+export interface ListModelsOptions {
+  search?: string;
+  cwd?: string;
+  env?: Record<string, string>;
+  /** Kill the model-listing command after this many milliseconds; unset means no timeout. */
+  timeoutMs?: number;
+}
+
 export interface InvokeOptions {
   cwd?: string;
   env?: Record<string, string>;
+  /** Harness-native model id or selector. */
+  model?: string;
   /** Enable the spawned harness's tools; defaults to advisor without tools mode. */
   tools?: boolean;
   /** Kill the harness after this many milliseconds; unset means no timeout. */
@@ -82,6 +115,12 @@ export interface InvokeResult {
   /** Process exit code; null when the run hit `timeoutMs` and was killed. */
   exitCode: number | null;
   timedOut: boolean;
+}
+
+/** Result of one native model-listing command. */
+export interface ListModelsResult extends InvokeResult {
+  /** Empty on a successful no-match response or when the command itself failed. */
+  models: AvailableModel[];
 }
 
 /** Normalized MCP server entry, shared across every harness dialect. */

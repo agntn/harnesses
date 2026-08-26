@@ -6,8 +6,12 @@ import type {
   HarnessId,
   HarnessInvocation,
   HarnessInvocationModes,
+  HarnessModelListing,
   InvokeOptions,
   InvokeResult,
+  ListModelsOptions,
+  ListModelsResult,
+  AvailableModel,
   McpConfigFile,
   PathCandidate,
   StorageDescriptor,
@@ -24,6 +28,45 @@ const SUPPORTED_PLATFORMS: Record<Platform, true> = {
   win32: true,
 };
 
+function executeCommand(
+  command: string,
+  args: string[],
+  options: { cwd?: string; env?: Record<string, string>; timeoutMs?: number },
+): Promise<InvokeResult> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd: options.cwd,
+      env: options.env ? { ...process.env, ...options.env } : process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
+    const timer = options.timeoutMs
+      ? setTimeout(() => {
+          timedOut = true;
+          child.kill("SIGTERM");
+        }, options.timeoutMs)
+      : undefined;
+
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString("utf8");
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString("utf8");
+    });
+    child.on("error", (error) => {
+      if (timer) clearTimeout(timer);
+      reject(error);
+    });
+    child.on("close", (code) => {
+      if (timer) clearTimeout(timer);
+      resolve({ command, args, stdout, stderr, exitCode: timedOut ? null : code, timedOut });
+    });
+  });
+}
+
 export abstract class Harness {
   abstract readonly id: HarnessId;
   abstract readonly name: string;
@@ -39,6 +82,8 @@ export abstract class Harness {
   abstract readonly detection: HarnessDetection;
   /** Non-interactive invocation recipe; null when the harness has no headless mode. */
   abstract readonly invocation: HarnessInvocation | null;
+  /** Native model-listing recipe; null when the harness cannot enumerate available models. */
+  readonly modelListing: HarnessModelListing | null = null;
   /** Config files that hold MCP server definitions; empty when unknown or unsupported. */
   readonly mcpConfigs: McpConfigFile[] = [];
   /**
@@ -103,11 +148,12 @@ export abstract class Harness {
    */
   buildInvocation(
     prompt: string,
-    options: { structured?: boolean; tools?: boolean } = {},
+    options: { model?: string; structured?: boolean; tools?: boolean } = {},
   ): { command: string; args: string[] } | null {
     if (!this.invocation) return null;
     const command = this.invocation.binary ?? this.binaries[0];
     if (!command) return null;
+    if (options.model !== undefined && !this.invocation.modelArgs) return null;
     const tools = options.tools ?? false;
     const template = tools
       ? options.structured
@@ -117,10 +163,34 @@ export abstract class Harness {
         ? this.invocation.noToolsJsonArgs
         : this.invocation.noToolsArgs;
     if (!template) return null;
-    return {
-      command,
-      args: template.map((arg) => arg.replaceAll("{prompt}", prompt)),
-    };
+    const args = template.map((arg) => arg.replaceAll("{prompt}", prompt));
+    const model = options.model;
+    if (model !== undefined && this.invocation.modelArgs) {
+      args.push(...this.invocation.modelArgs.map((arg) => arg.replaceAll("{model}", model)));
+    }
+    return { command, args };
+  }
+
+  /** Explains why an invocation option set cannot be built, or returns null when supported. */
+  invocationError(
+    options: { model?: string; structured?: boolean; tools?: boolean } = {},
+  ): string | null {
+    if (!this.invocation) return `Harness ${this.id} has no non-interactive invocation`;
+    if (options.model !== undefined && !this.invocation.modelArgs) {
+      return `Harness ${this.id} does not support model selection`;
+    }
+    const tools = options.tools ?? false;
+    const available = tools
+      ? options.structured
+        ? this.invocation.jsonArgs
+        : this.invocation.args
+      : options.structured
+        ? this.invocation.noToolsJsonArgs
+        : this.invocation.noToolsArgs;
+    if (available) return null;
+    return tools
+      ? `Harness ${this.id} has no${options.structured ? " structured (JSON)" : ""} full agent invocation`
+      : `Harness ${this.id} has no${options.structured ? " structured (JSON)" : ""} advisor without tools invocation`;
   }
 
   /**
@@ -129,61 +199,63 @@ export abstract class Harness {
    * exits instead of waiting forever.
    */
   invoke(prompt: string, options: InvokeOptions = {}): Promise<InvokeResult> {
-    const built = this.buildInvocation(prompt, {
+    const invocationOptions = {
+      model: options.model,
       structured: options.structured,
       tools: options.tools,
-    });
+    };
+    const built = this.buildInvocation(prompt, invocationOptions);
+    if (!built) {
+      return Promise.reject(
+        new Error(this.invocationError(invocationOptions) ?? "Invalid invocation"),
+      );
+    }
+
+    return executeCommand(built.command, built.args, options);
+  }
+
+  /** Expands the native model-listing recipe without spawning anything. */
+  buildModelListInvocation(search?: string): { command: string; args: string[] } | null {
+    if (!this.modelListing) return null;
+    const command = this.binaries[0];
+    if (!command) return null;
+    const template = search === undefined ? this.modelListing.args : this.modelListing.searchArgs;
+    if (!template) return null;
+    return {
+      command,
+      args: template.map((arg) => arg.replaceAll("{search}", search ?? "")),
+    };
+  }
+
+  /**
+   * Runs the harness's native model-listing command and normalizes its output.
+   * stdin is closed for the same reason as {@link invoke}.
+   */
+  async listModels(options: ListModelsOptions = {}): Promise<ListModelsResult> {
+    const built = this.buildModelListInvocation(options.search);
     if (!built) {
       return Promise.reject(
         new Error(
-          !this.invocation
-            ? `Harness ${this.id} has no non-interactive invocation`
-            : options.tools === true
-              ? `Harness ${this.id} has no${options.structured ? " structured (JSON)" : ""} full agent invocation`
-              : `Harness ${this.id} has no${options.structured ? " structured (JSON)" : ""} advisor without tools invocation`,
+          this.modelListing
+            ? `Harness ${this.id} does not support filtering its model listing`
+            : `Harness ${this.id} does not support model listing`,
         ),
       );
     }
 
-    return new Promise((resolve, reject) => {
-      const child = spawn(built.command, built.args, {
-        cwd: options.cwd,
-        env: options.env ? { ...process.env, ...options.env } : process.env,
-        stdio: ["ignore", "pipe", "pipe"],
-      });
+    const result = await executeCommand(built.command, built.args, options);
+    return {
+      ...result,
+      models:
+        !result.timedOut && result.exitCode === 0
+          ? this.parseModelListingOutput(result.stdout)
+          : [],
+    };
+  }
 
-      let stdout = "";
-      let stderr = "";
-      let timedOut = false;
-      const timer = options.timeoutMs
-        ? setTimeout(() => {
-            timedOut = true;
-            child.kill("SIGTERM");
-          }, options.timeoutMs)
-        : undefined;
-
-      child.stdout.on("data", (chunk: Buffer) => {
-        stdout += chunk.toString("utf8");
-      });
-      child.stderr.on("data", (chunk: Buffer) => {
-        stderr += chunk.toString("utf8");
-      });
-      child.on("error", (error) => {
-        if (timer) clearTimeout(timer);
-        reject(error);
-      });
-      child.on("close", (code) => {
-        if (timer) clearTimeout(timer);
-        resolve({
-          command: built.command,
-          args: built.args,
-          stdout,
-          stderr,
-          exitCode: timedOut ? null : code,
-          timedOut,
-        });
-      });
-    });
+  /** Converts a successful native model-listing response to the shared shape. */
+  protected parseModelListingOutput(_stdout: string): AvailableModel[] {
+    throw new Error(`Harness ${this.id} does not implement model-list output parsing`);
   }
 
   /**

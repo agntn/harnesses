@@ -128,6 +128,7 @@ export default class Omp extends Harness {
     jsonArgs: ["-p", "--mode", "json", "{prompt}"],
     noToolsArgs: ["-p", "--no-tools", "{prompt}"],
     noToolsJsonArgs: ["-p", "--no-tools", "--mode", "json", "{prompt}"],
+    modelArgs: ["--model={model}"],
     level: "official",
     note: "Add --mode json for structured event output.",
   };
