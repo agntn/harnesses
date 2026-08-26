@@ -14,6 +14,7 @@ import {
   mcpList,
   mcpRemove,
   mcpSync,
+  agentsSync,
   runHarness,
   type McpServerParams,
   type ToolResult,
@@ -115,6 +116,15 @@ const tools: ToolDefinition[] = [
     inputSchema: schemas.mcpSync,
     annotations: CONFIG_WRITE,
     execute: (args) => mcpSync(args.id as string | undefined),
+  },
+  {
+    name: "harnesses_agents_sync",
+    title: "Harnesses Agents Sync",
+    description:
+      "Link every harness's global instructions file (CLAUDE.md/AGENTS.md/GEMINI.md) to the master agents file, so edits made through any harness land in one place. Diverged copies are backed up and relinked. Pass check to only report.",
+    inputSchema: schemas.agentsSync,
+    annotations: CONFIG_WRITE,
+    execute: (args) => agentsSync(args.id as string | undefined, args.check === true),
   },
   {
     name: "harnesses_mcp_remove",

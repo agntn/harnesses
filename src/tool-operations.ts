@@ -15,6 +15,9 @@ import {
   syncMcpServers,
 } from "./mcp-servers.ts";
 import type { McpConfigListing, SyncReport } from "./mcp-servers.ts";
+import { readAgentsConfig, syncAgentsFiles } from "./agents-sync.ts";
+import type { AgentsSyncReport } from "./agents-sync.ts";
+export type { AgentsSyncReport } from "./agents-sync.ts";
 export type { SyncReport } from "./mcp-servers.ts";
 import type { Harness } from "./harness.ts";
 import type {
@@ -332,6 +335,32 @@ export function mcpSync(id?: string): ToolResult<SyncReport | RunFailure> {
     }
     const details = syncMcpServers(
       id !== undefined && isHarnessId(id) ? [getHarness(id)] : getAllHarnesses(),
+    );
+    return { content: text(details), details };
+  } catch (error) {
+    const details: RunFailure = { error: errorMessage(error) };
+    return { content: text(details), details, isError: true };
+  }
+}
+
+/** Links every harness's global instructions file to the master AGENTS.md. */
+export function agentsSync(id?: string, check = false): ToolResult<AgentsSyncReport | RunFailure> {
+  if (id !== undefined && !isHarnessId(id)) return unknownHarness(id);
+
+  try {
+    // Preflight before any write: a typo in excludes must fail the whole run,
+    // not silently adopt the harness it was meant to protect.
+    const unknown = readAgentsConfig().excludes.filter((entry) => !isHarnessId(entry));
+    if (unknown.length > 0) {
+      const details: RunFailure = {
+        error: `Agents config excludes unknown harnesses: ${unknown.join(", ")}`,
+        known: listHarnesses(),
+      };
+      return { content: text(details), details, isError: true };
+    }
+    const details = syncAgentsFiles(
+      id !== undefined && isHarnessId(id) ? [getHarness(id)] : getAllHarnesses(),
+      check,
     );
     return { content: text(details), details };
   } catch (error) {

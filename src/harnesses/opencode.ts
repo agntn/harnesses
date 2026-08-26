@@ -116,6 +116,7 @@ export default class OpenCode extends Harness {
       dialect: "opencode",
     },
   ];
+  override readonly agentsFile = "~/.config/opencode/AGENTS.md";
   readonly detection = {
     envVars: [],
     projectMarkers: [".opencode", "opencode.jsonc", "opencode.json"],

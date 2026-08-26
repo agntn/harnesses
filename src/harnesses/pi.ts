@@ -91,6 +91,7 @@ export default class Pi extends Harness {
     level: "official",
     note: "Add --mode json for structured event output.",
   };
+  override readonly agentsFile = "~/.pi/agent/AGENTS.md";
   readonly detection = {
     envVars: ["PI_CODING_AGENT", "PI_SESSION_ID", "PI_SESSION_FILE"],
     projectMarkers: [".pi"],

@@ -143,6 +143,7 @@ export default class Claude extends Harness {
       dialect: "standard",
     },
   ];
+  override readonly agentsFile = "~/.claude/CLAUDE.md";
   readonly detection = {
     envVars: ["CLAUDE_CODE", "CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CONFIG_DIR"],
     projectMarkers: [

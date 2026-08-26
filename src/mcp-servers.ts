@@ -13,6 +13,7 @@ import { homedir } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
 import { parse as parseToml } from "smol-toml";
 import type { Harness } from "./harness.ts";
+import { agntnConfigDir } from "./resolve.ts";
 import type { EvidenceLevel, McpConfigFile, McpServerConfig, ResolveOptions } from "./types.ts";
 
 /** One resolved config file together with the servers it declares. */
@@ -472,11 +473,7 @@ export function parseJsonc(text: string): unknown {
 
 /** Resolves the master sync file path: $XDG_CONFIG_HOME or ~/.config. */
 export function masterMcpPath(options: ResolveOptions = {}): string {
-  const configDir =
-    process.env.XDG_CONFIG_HOME && process.env.XDG_CONFIG_HOME !== ""
-      ? process.env.XDG_CONFIG_HOME
-      : join(options.homeDir ?? homedir(), ".config");
-  return join(configDir, "agntn", "mcp.jsonc");
+  return join(agntnConfigDir(options), "mcp.jsonc");
 }
 
 /** One harness's outcome of a sync run. */

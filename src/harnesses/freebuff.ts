@@ -96,6 +96,7 @@ export default class Freebuff extends Harness {
       note: "The parent directory's .agents/mcp.json is scanned too; agent templates can also embed their own mcpServers.",
     },
   ];
+  override readonly agentsFile = "~/.AGENTS.md";
   readonly detection = {
     envVars: [],
     projectMarkers: [".agents", "knowledge.md"],

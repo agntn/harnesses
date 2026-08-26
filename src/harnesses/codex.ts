@@ -114,6 +114,7 @@ export default class Codex extends Harness {
       dialect: "standard",
     },
   ];
+  override readonly agentsFile = "~/.codex/AGENTS.md";
   readonly detection = {
     envVars: [],
     projectMarkers: [".codex", "AGENTS.md", "AGENTS.override.md", ".agents/skills"],

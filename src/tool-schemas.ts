@@ -77,6 +77,12 @@ export function harnessToolSchemas<I, S>(Type: McpSchemaBuilder<I, S>) {
     mcpSync: Type.Object({
       id: Type.Optional(harnessId("Harness id; omit to sync every harness")),
     }),
+    agentsSync: Type.Object({
+      id: Type.Optional(harnessId("Harness id; omit to sync every harness")),
+      check: Type.Optional(
+        Type.Boolean({ description: "Report what would change without writing anything" }),
+      ),
+    }),
     mcpAdd: Type.Object({
       id: harnessId("Harness id"),
       name: Type.String({
@@ -141,6 +147,11 @@ export interface McpListParams {
 
 export interface McpSyncParams {
   id?: string;
+}
+
+export interface AgentsSyncParams {
+  id?: string;
+  check?: boolean;
 }
 
 export interface McpAddParams {

@@ -275,6 +275,37 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
   });
 
   pi.registerTool({
+    name: "harnesses_agents_sync",
+    label: "Harnesses Agents Sync",
+    description:
+      "Link every harness's global instructions file to the master agents file; diverged copies are backed up and relinked. Pass check to only report",
+    parameters: schemas.agentsSync,
+    approval: "write",
+    async execute(
+      _toolCallId,
+      params: HarnessSchemas.AgentsSyncParams,
+    ): Promise<AgentToolResult<HarnessTools.AgentsSyncReport | HarnessTools.RunFailure>> {
+      const { agentsSync } = await loadToolOperations();
+      const { content, details } = agentsSync(params.id, params.check === true);
+      return { content, details };
+    },
+    ...statusRenderers(
+      "Harnesses Agents Sync",
+      "write",
+      (args) => (prop(args, "check") === true ? "check" : undefined),
+      (details) => {
+        const outcome = details as
+          | HarnessTools.AgentsSyncReport
+          | HarnessTools.RunFailure
+          | undefined;
+        return outcome && "targets" in outcome
+          ? [`${outcome.targets.filter((t) => t.action !== "skipped").length} targets`]
+          : undefined;
+      },
+    ),
+  });
+
+  pi.registerTool({
     name: "harnesses_mcp_remove",
     label: "Harnesses MCP Remove",
     description:

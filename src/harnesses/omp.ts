@@ -147,6 +147,7 @@ export default class Omp extends Harness {
       dialect: "standard",
     },
   ];
+  override readonly agentsFile = "~/.omp/agent/AGENTS.md";
   readonly detection = {
     envVars: ["OMP_PROFILE", "PI_CODING_AGENT_DIR"],
     projectMarkers: [".omp"],

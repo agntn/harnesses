@@ -40,6 +40,12 @@ export abstract class Harness {
   abstract readonly invocation: HarnessInvocation | null;
   /** Config files that hold MCP server definitions; empty when unknown or unsupported. */
   readonly mcpConfigs: McpConfigFile[] = [];
+  /**
+   * The user-scope global instructions file this harness reads, as a path
+   * template; null when there is no stable file (or another harness's file
+   * covers it via vendor compatibility).
+   */
+  readonly agentsFile: string | null = null;
 
   isInstalled(): boolean {
     const cmd = process.platform === "win32" ? "where" : "which";

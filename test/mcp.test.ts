@@ -32,6 +32,7 @@ describe("harnesses MCP server", () => {
       "harnesses_mcp_list",
       "harnesses_mcp_add",
       "harnesses_mcp_sync",
+      "harnesses_agents_sync",
       "harnesses_mcp_remove",
     ]);
     const readOnlyTools = new Set(["harnesses_detect", "harnesses_info", "harnesses_mcp_list"]);

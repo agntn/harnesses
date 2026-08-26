@@ -116,6 +116,7 @@ export default class Gemini extends Harness {
       dialect: "standard",
     },
   ];
+  override readonly agentsFile = "~/.gemini/GEMINI.md";
   readonly detection = {
     envVars: ["GEMINI_CLI"],
     projectMarkers: [".gemini", "GEMINI.md"],
