@@ -5,6 +5,7 @@ import type {
   HarnessDetection,
   HarnessId,
   HarnessInvocation,
+  HarnessInvocationModes,
   InvokeOptions,
   InvokeResult,
   McpConfigFile,
@@ -83,6 +84,16 @@ export abstract class Harness {
       }
     }
     return null;
+  }
+
+  /** Invocation modes available without fallback or prompt-only restrictions. */
+  get invocationModes(): HarnessInvocationModes {
+    return {
+      advisor: this.invocation?.noToolsArgs !== undefined,
+      advisorStructured: this.invocation?.noToolsJsonArgs !== undefined,
+      agent: this.invocation?.args !== undefined,
+      agentStructured: this.invocation?.jsonArgs !== undefined,
+    };
   }
 
   /**

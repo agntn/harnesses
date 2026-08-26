@@ -8,6 +8,7 @@ export type {
   HarnessCapabilities,
   HarnessDetection,
   HarnessInvocation,
+  HarnessInvocationModes,
   InvokeOptions,
   InvokeResult,
   McpServerConfig,

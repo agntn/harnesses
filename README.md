@@ -21,6 +21,7 @@ import { getHarness, detectHarness, detectProjectHarnesses } from "@agntn/harnes
 const claude = getHarness("claude");
 console.log(claude.skills); // [{ path: ".claude/skills/", scope: "project", ... }, ...]
 console.log(claude.hooks); // [{ path: ".claude/hooks/", scope: "project", ... }, ...]
+console.log(claude.invocationModes); // { advisor: true, advisorStructured: true, agent: true, agentStructured: true }
 
 // Resolve to absolute paths for current platform
 const paths = claude.resolve({ platform: "linux", homeDir: "/home/dev" });

@@ -19,11 +19,13 @@ import { readAgentsConfig, syncAgentsFiles } from "./agents-sync.ts";
 import type { AgentsSyncReport } from "./agents-sync.ts";
 export type { AgentsSyncReport } from "./agents-sync.ts";
 export type { SyncReport } from "./mcp-servers.ts";
+export type { HarnessInvocationModes } from "./types.ts";
 import type { Harness } from "./harness.ts";
 import type {
   HarnessCapabilities,
   HarnessDetection,
   HarnessId,
+  HarnessInvocationModes,
   InvokeResult,
   McpServerConfig,
   PathCandidate,
@@ -50,14 +52,6 @@ export interface HarnessStatus {
 /** Every registered harness with its install state, as scanned by {@link detectHarnesses}. */
 export interface HarnessListing {
   harnesses: HarnessStatus[];
-}
-
-/** Invocation modes a harness can provide without guessing or falling back. */
-export interface HarnessInvocationModes {
-  advisor: boolean;
-  advisorStructured: boolean;
-  agent: boolean;
-  agentStructured: boolean;
 }
 
 /** Full metadata for one harness, including paths resolved for this platform. */
@@ -137,12 +131,7 @@ export function harnessInfo(id: string): ToolResult<HarnessMetadata | UnknownHar
     name: harness.name,
     binaries: harness.binaries,
     capabilities: harness.capabilities,
-    invocationModes: {
-      advisor: harness.invocation?.noToolsArgs !== undefined,
-      advisorStructured: harness.invocation?.noToolsJsonArgs !== undefined,
-      agent: harness.invocation?.args !== undefined,
-      agentStructured: harness.invocation?.jsonArgs !== undefined,
-    },
+    invocationModes: harness.invocationModes,
     config: harness.config,
     sessions: harness.sessions,
     instructions: harness.instructions,

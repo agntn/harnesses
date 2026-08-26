@@ -55,6 +55,14 @@ export interface HarnessInvocation {
   note?: string;
 }
 
+/** Invocation modes a harness supports without fallback or prompt-only restrictions. */
+export interface HarnessInvocationModes {
+  advisor: boolean;
+  advisorStructured: boolean;
+  agent: boolean;
+  agentStructured: boolean;
+}
+
 export interface InvokeOptions {
   cwd?: string;
   env?: Record<string, string>;

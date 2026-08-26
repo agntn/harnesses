@@ -133,6 +133,7 @@ const info = defineCommand({
           name: harness.name,
           binaries: harness.binaries,
           capabilities: harness.capabilities,
+          invocationModes: harness.invocationModes,
           config: harness.config,
           sessions: harness.sessions,
           instructions: harness.instructions,
@@ -157,6 +158,12 @@ const info = defineCommand({
       .map(([k, v]) => (v ? s.green(k) : s.dim(k)))
       .join(s.dim("  ·  "));
     consola.log(entry(caps));
+
+    consola.log(section("Invocation modes"));
+    const modes = Object.entries(harness.invocationModes)
+      .map(([k, v]) => (v ? s.green(k) : s.dim(k)))
+      .join(s.dim("  ·  "));
+    consola.log(entry(modes));
 
     renderPathSection("Config", harness.config);
     renderPathSection("Sessions", harness.sessions);

@@ -116,25 +116,36 @@ describe("normalized invocation", () => {
 });
 
 describe("harness metadata for agents", () => {
+  it("exposes invocation modes through the harness API", () => {
+    expect(getHarness("claude").invocationModes).toEqual({
+      advisor: true,
+      advisorStructured: true,
+      agent: true,
+      agentStructured: true,
+    });
+    expect(getHarness("codex").invocationModes).toEqual({
+      advisor: false,
+      advisorStructured: false,
+      agent: true,
+      agentStructured: true,
+    });
+    expect(getHarness("mastracode").invocationModes).toEqual({
+      advisor: false,
+      advisorStructured: false,
+      agent: false,
+      agentStructured: false,
+    });
+  });
+
   it("reports advisor and agent modes before invocation", () => {
     const claude = harnessInfo("claude").details;
     const codex = harnessInfo("codex").details;
 
     expect(claude).toMatchObject({
-      invocationModes: {
-        advisor: true,
-        advisorStructured: true,
-        agent: true,
-        agentStructured: true,
-      },
+      invocationModes: getHarness("claude").invocationModes,
     });
     expect(codex).toMatchObject({
-      invocationModes: {
-        advisor: false,
-        advisorStructured: false,
-        agent: true,
-        agentStructured: true,
-      },
+      invocationModes: getHarness("codex").invocationModes,
     });
   });
 });
