@@ -12,12 +12,11 @@ const formatArgs = {
 
 // MCP listings echo values read from project-controlled config files, so a
 // malicious server name could smuggle ANSI/OSC sequences into the terminal.
+// oxlint-disable-next-line no-control-regex -- Terminal control bytes are precisely what this boundary removes.
+const UNSAFE_TERMINAL_CONTROLS = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F]/g;
+
 function sanitize(text: string | undefined): string {
-  // oxlint-disable-next-line no-control-regex -- Terminal control bytes are precisely what this boundary removes.
-  return stripVTControlCharacters(text ?? "").replace(
-    /[\u0000-\u0008\u000B-\u001F\u007F-\u009F]/g,
-    " ",
-  );
+  return stripVTControlCharacters(text ?? "").replace(UNSAFE_TERMINAL_CONTROLS, " ");
 }
 
 /** Emits one tool result: machine format when asked, sanitized text otherwise. */
