@@ -52,12 +52,21 @@ export interface HarnessListing {
   harnesses: HarnessStatus[];
 }
 
+/** Invocation modes a harness can provide without guessing or falling back. */
+export interface HarnessInvocationModes {
+  advisor: boolean;
+  advisorStructured: boolean;
+  agent: boolean;
+  agentStructured: boolean;
+}
+
 /** Full metadata for one harness, including paths resolved for this platform. */
 export interface HarnessMetadata {
   id: HarnessId;
   name: string;
   binaries: string[];
   capabilities: HarnessCapabilities;
+  invocationModes: HarnessInvocationModes;
   config: PathCandidate[];
   sessions: PathCandidate[];
   instructions: PathCandidate[];
@@ -128,6 +137,12 @@ export function harnessInfo(id: string): ToolResult<HarnessMetadata | UnknownHar
     name: harness.name,
     binaries: harness.binaries,
     capabilities: harness.capabilities,
+    invocationModes: {
+      advisor: harness.invocation?.noToolsArgs !== undefined,
+      advisorStructured: harness.invocation?.noToolsJsonArgs !== undefined,
+      agent: harness.invocation?.args !== undefined,
+      agentStructured: harness.invocation?.jsonArgs !== undefined,
+    },
     config: harness.config,
     sessions: harness.sessions,
     instructions: harness.instructions,

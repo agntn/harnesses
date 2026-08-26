@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { getHarness, registerHarness } from "../src/index.ts";
 import { Harness } from "../src/harness.ts";
-import { runHarness, RUN_MAX_OUTPUT_CHARS } from "../src/tool-operations.ts";
+import { harnessInfo, runHarness, RUN_MAX_OUTPUT_CHARS } from "../src/tool-operations.ts";
 
 /**
  * Overrides the (locally absent) cursor harness with an invocation backed by
@@ -112,6 +112,30 @@ describe("normalized invocation", () => {
     await expect(getHarness("mastracode").invoke("x")).rejects.toThrow(
       "no non-interactive invocation",
     );
+  });
+});
+
+describe("harness metadata for agents", () => {
+  it("reports advisor and agent modes before invocation", () => {
+    const claude = harnessInfo("claude").details;
+    const codex = harnessInfo("codex").details;
+
+    expect(claude).toMatchObject({
+      invocationModes: {
+        advisor: true,
+        advisorStructured: true,
+        agent: true,
+        agentStructured: true,
+      },
+    });
+    expect(codex).toMatchObject({
+      invocationModes: {
+        advisor: false,
+        advisorStructured: false,
+        agent: true,
+        agentStructured: true,
+      },
+    });
   });
 });
 

@@ -66,7 +66,7 @@ Each agent is a concrete subclass of the abstract `Harness` class. Custom subcla
 ```bash
 harnesses list                  # all known harnesses
 harnesses detect                # which ones are installed + versions
-harnesses info claude           # full metadata for a harness
+harnesses info claude           # metadata, including supported invocation modes
 harnesses paths claude          # resolved paths for current platform
 harnesses info codex --json     # machine-readable output
 harnesses run claude "review this design"       # advisor without tools mode (default)

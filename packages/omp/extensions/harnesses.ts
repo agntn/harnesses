@@ -121,7 +121,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     name: "harnesses_info",
     label: "Harnesses Info",
     description:
-      "Full metadata for one AI coding harness: config, session, instruction, skill, command, and hook paths, plus paths resolved for this platform",
+      "Full metadata for one AI coding harness, including supported advisor and agent invocation modes, configuration, sessions, instructions, skills, commands, hooks, and resolved paths",
     parameters: schemas.info,
     approval: "read",
     async execute(

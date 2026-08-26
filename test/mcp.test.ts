@@ -58,6 +58,8 @@ describe("harnesses MCP server", () => {
     const [part] = response.content as Array<{ text: string }>;
     expect(part?.text).toContain("Anthropic Claude Code");
     expect(part?.text).toContain(".claude/skills/");
+    expect(part?.text).toContain("invocationModes");
+    expect(part?.text).toContain("advisor: true");
     expect(part?.text).toContain("resolved");
   });
 

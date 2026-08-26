@@ -47,7 +47,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     name: "harnesses_info",
     label: "Harnesses Info",
     description:
-      "Full metadata for one AI coding harness: config, session, instruction, skill, command, and hook paths, plus paths resolved for this platform",
+      "Full metadata for one AI coding harness, including supported advisor and agent invocation modes, configuration, sessions, instructions, skills, commands, hooks, and resolved paths",
     promptSnippet: "Use harnesses_info to look up where a coding harness stores its data.",
     promptGuidelines: [
       "Pass a harness id from harnesses_detect, e.g. claude, codex, or opencode.",
