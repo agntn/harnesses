@@ -128,7 +128,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     name: "harnesses_mcp_sync",
     label: "Harnesses MCP Sync",
     description:
-      "Reset every harness's user-scope MCP config to exactly the master list from ~/.config/agntn/mcp.jsonc; extras are removed",
+      "Reset every harness's user-scope MCP config to exactly the master list from ~/.config/agntn/mcp.jsonc; extras are removed and master-listed names are withdrawn from excluded harnesses",
     parameters: schemas.mcpSync,
     async execute(
       _toolCallId,

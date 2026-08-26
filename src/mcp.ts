@@ -111,7 +111,7 @@ const tools: ToolDefinition[] = [
     name: "harnesses_mcp_sync",
     title: "Harnesses MCP Sync",
     description:
-      "Reset every harness's user-scope MCP config to exactly the master list from ~/.config/agntn/mcp.jsonc: servers are added, replaced, and extras removed. The master file is the single source of truth.",
+      "Reset every harness's user-scope MCP config to exactly the master list from ~/.config/agntn/mcp.jsonc: servers are added, replaced, and extras removed. Excluded harnesses keep their own servers, but master-listed names are withdrawn from them.",
     inputSchema: schemas.mcpSync,
     annotations: CONFIG_WRITE,
     execute: (args) => mcpSync(args.id as string | undefined),
@@ -181,15 +181,13 @@ export function createMcpServer(): Server {
   const server = new Server({ name: "harnesses", version }, { capabilities: { tools: {} } });
 
   server.setRequestHandler(ListToolsRequestSchema, () => ({
-    tools: tools.map(
-      (tool): Tool => ({
-        name: tool.name,
-        title: tool.title,
-        description: tool.description,
-        inputSchema: tool.inputSchema as Tool["inputSchema"],
-        annotations: tool.annotations,
-      }),
-    ),
+    tools: tools.map((tool): Tool => ({
+      name: tool.name,
+      title: tool.title,
+      description: tool.description,
+      inputSchema: tool.inputSchema as Tool["inputSchema"],
+      annotations: tool.annotations,
+    })),
   }));
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {

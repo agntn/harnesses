@@ -485,6 +485,8 @@ export interface SyncTargetResult {
   path?: string;
   /** Reason this harness could not be targeted; `results` is empty then. */
   skipped?: string;
+  /** Set when the master list excludes this harness; master-listed names are withdrawn. */
+  excluded?: true;
   results: Array<{ name: string; action: "added" | "replaced" | "removed" | "unchanged" }>;
 }
 
@@ -577,10 +579,7 @@ export function syncMcpServers(harnesses: Harness[], options: ResolveOptions = {
   const targets: SyncTargetResult[] = [];
 
   for (const harness of harnesses) {
-    if (master.excludes.includes(harness.id)) {
-      targets.push({ id: harness.id, skipped: "excluded by the master list", results: [] });
-      continue;
-    }
+    const excluded = master.excludes.includes(harness.id);
     const entry = harness.mcpConfigs.find((candidate) => candidate.scope === "user");
     if (!entry) {
       targets.push({ id: harness.id, skipped: "no user-scope MCP config", results: [] });
@@ -601,6 +600,27 @@ export function syncMcpServers(harnesses: Harness[], options: ResolveOptions = {
     const existing = new Map((listing?.servers ?? []).map((s) => [s.name, canonical(s)]));
     const results: SyncTargetResult["results"] = [];
     let path = listing?.path;
+
+    if (excluded) {
+      // An excluded harness keeps its own servers, but the names the master
+      // list owns are withdrawn so an earlier sync leaves no orphans behind.
+      for (const name of existing.keys()) {
+        if (!masterNames.has(name)) continue;
+        const removed = removeMcpServer(harness, name, "user", options);
+        if (removed.removed) {
+          path = removed.path;
+          results.push({ name, action: "removed" });
+        }
+      }
+      targets.push({
+        id: harness.id,
+        ...(path === undefined ? {} : { path }),
+        excluded: true,
+        results,
+      });
+      continue;
+    }
+
     for (const server of master.servers) {
       if (existing.get(server.name) === canonical(server)) {
         results.push({ name: server.name, action: "unchanged" });

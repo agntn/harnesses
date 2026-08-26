@@ -350,7 +350,9 @@ describe("syncMcpServers", () => {
 
       const report = syncMcpServers([getHarness("claude"), getHarness("codex")], dirs);
 
-      expect(report.targets.find((t) => t.id === "codex")?.skipped).toContain("excluded");
+      const codex = report.targets.find((t) => t.id === "codex");
+      expect(codex?.excluded).toBe(true);
+      expect(codex?.results).toEqual([]);
       expect(report.targets.find((t) => t.id === "claude")?.results).toEqual([
         { name: "probe", action: "added" },
       ]);
@@ -388,6 +390,42 @@ describe("syncMcpServers", () => {
         ?.servers.find((s) => s.name === "probe");
       expect(server?.args).toEqual([join(dirs.homeDir, "proj", "cli.mjs"), "mcp"]);
       expect(server?.env).toEqual({ ROOT: join(dirs.homeDir, "data") });
+    } finally {
+      if (previousXdg !== undefined) process.env.XDG_CONFIG_HOME = previousXdg;
+    }
+  });
+
+  it("withdraws master-owned servers when a harness is excluded after a sync", () => {
+    const dirs = fixtureDirs();
+    const previousXdg = process.env.XDG_CONFIG_HOME;
+    delete process.env.XDG_CONFIG_HOME;
+    try {
+      const masterBody = (excludes: string[]) =>
+        JSON.stringify({
+          excludes,
+          mcpServers: { probe: { command: "node" }, cloud: { url: "https://example.com/mcp" } },
+        });
+      writeMaster(dirs.homeDir, masterBody([]));
+      syncMcpServers([getHarness("claude")], dirs);
+
+      addMcpServer(
+        getHarness("claude"),
+        { name: "mine", transport: "stdio", command: "own-server" },
+        "user",
+        dirs,
+      );
+      writeMaster(dirs.homeDir, masterBody(["claude"]));
+      const report = syncMcpServers([getHarness("claude")], dirs);
+
+      const claude = report.targets.find((t) => t.id === "claude");
+      expect(claude?.excluded).toBe(true);
+      expect(claude?.results.map((r) => r.name).sort()).toEqual(["cloud", "probe"]);
+      expect(claude?.results.every((r) => r.action === "removed")).toBe(true);
+
+      const servers = listMcpServers(getHarness("claude"), dirs).find(
+        (l) => l.scope === "user",
+      )?.servers;
+      expect(servers?.map((s) => s.name)).toEqual(["mine"]);
     } finally {
       if (previousXdg !== undefined) process.env.XDG_CONFIG_HOME = previousXdg;
     }
