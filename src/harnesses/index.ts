@@ -1,4 +1,5 @@
 import type { HarnessConstructor } from "../harness.ts";
+import Antigravity from "./antigravity.ts";
 import Claude from "./claude.ts";
 import Codex from "./codex.ts";
 import Cursor from "./cursor.ts";
@@ -12,6 +13,7 @@ import OpenCode from "./opencode.ts";
 import Pi from "./pi.ts";
 
 export const harnesses: HarnessConstructor[] = [
+  Antigravity,
   Claude,
   Codex,
   Cursor,

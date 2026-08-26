@@ -24,6 +24,7 @@ describe("@agntn/harnesses", () => {
 
   it("should expose stable harness ids", () => {
     expect([...harnessIds].sort()).toEqual([
+      "antigravity",
       "claude",
       "codex",
       "cursor",
@@ -37,6 +38,22 @@ describe("@agntn/harnesses", () => {
       "pi",
     ]);
     expect(listHarnesses().sort()).toEqual([...harnessIds].sort());
+  });
+
+  it("should expose Antigravity CLI metadata", () => {
+    const antigravity = getHarness("antigravity");
+
+    expect(antigravity.binaries).toEqual(["agy"]);
+    expect(antigravity.invocation?.args).toEqual(["--print", "{prompt}"]);
+    expect(antigravity.invocation?.jsonArgs).toEqual([
+      "--print",
+      "--output-format",
+      "json",
+      "{prompt}",
+    ]);
+    expect(
+      antigravity.mcpConfigs.some((entry) => entry.path === "~/.gemini/config/mcp_config.json"),
+    ).toBe(true);
   });
 
   it("should return a Harness instance for a known harness", () => {

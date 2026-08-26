@@ -99,6 +99,18 @@ function normalizeEntry(
 ): McpServerConfig {
   const enabled = typeof raw.enabled === "boolean" ? raw.enabled : undefined;
 
+  if (dialect === "antigravity") {
+    const url = typeof raw.serverUrl === "string" ? raw.serverUrl : undefined;
+    return compact({
+      name,
+      transport: url ? ("sse" as const) : ("stdio" as const),
+      command: typeof raw.command === "string" ? raw.command : undefined,
+      args: asStringArray(raw.args),
+      env: asStringRecord(raw.env),
+      url,
+    });
+  }
+
   if (dialect === "opencode") {
     const command = asStringArray(raw.command);
     const url = typeof raw.url === "string" ? raw.url : undefined;
@@ -144,6 +156,16 @@ function denormalizeEntry(
   server: McpServerConfig,
   dialect: McpConfigFile["dialect"],
 ): Record<string, unknown> {
+  if (dialect === "antigravity") {
+    return server.url
+      ? { serverUrl: server.url }
+      : compact({
+          command: server.command,
+          args: server.args?.length ? server.args : undefined,
+          env: server.env,
+        });
+  }
+
   if (dialect === "opencode") {
     return server.url
       ? compact({

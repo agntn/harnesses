@@ -3,6 +3,7 @@ import pkg from "../package.json" with { type: "json" };
 export const version: string = pkg.version;
 
 export type HarnessId =
+  | "antigravity"
   | "codex"
   | "gemini"
   | "grok"
@@ -91,7 +92,7 @@ export interface McpConfigFile extends PathCandidate {
   /** Object path to the server map inside the file, e.g. ["mcpServers"]. */
   key: string[];
   /** Shape of individual entries; "standard" is the {command, args, env, url} family. */
-  dialect: "standard" | "opencode" | "vscode";
+  dialect: "standard" | "antigravity" | "opencode" | "vscode";
 }
 
 export interface HarnessDetection {

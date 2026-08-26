@@ -49,6 +49,28 @@ describe("listMcpServers", () => {
     expect(listings.find((l) => l.scope === "project")?.exists).toBe(false);
   });
 
+  it("normalizes the Antigravity serverUrl dialect", () => {
+    const dirs = fixtureDirs();
+    const configDir = join(dirs.homeDir, ".gemini", "config");
+    mkdirSync(configDir, { recursive: true });
+    writeFileSync(
+      join(configDir, "mcp_config.json"),
+      JSON.stringify({
+        mcpServers: {
+          local: { command: "node", args: ["srv.mjs"], env: { K: "v" } },
+          remote: { serverUrl: "https://example.com/sse" },
+        },
+      }),
+    );
+
+    const [listing] = listMcpServers(getHarness("antigravity"), dirs);
+
+    expect(listing?.servers).toEqual([
+      { name: "local", transport: "stdio", command: "node", args: ["srv.mjs"], env: { K: "v" } },
+      { name: "remote", transport: "sse", url: "https://example.com/sse" },
+    ]);
+  });
+
   it("reads the TOML dialect of grok configs", () => {
     const dirs = fixtureDirs();
     mkdirSync(join(dirs.homeDir, ".grok"), { recursive: true });
@@ -142,6 +164,21 @@ describe("addMcpServer / removeMcpServer", () => {
     const raw = JSON.parse(readFileSync(join(dirs.homeDir, ".claude.json"), "utf8"));
     expect(raw.theme).toBe("dark");
     expect(Object.keys(raw.mcpServers).sort()).toEqual(["extra", "keep"]);
+  });
+
+  it("writes the Antigravity serverUrl dialect shape", () => {
+    const dirs = fixtureDirs();
+
+    addMcpServer(
+      getHarness("antigravity"),
+      { name: "remote", transport: "sse", url: "https://example.com/sse" },
+      "user",
+      dirs,
+    );
+
+    const path = join(dirs.homeDir, ".gemini", "config", "mcp_config.json");
+    const raw = JSON.parse(readFileSync(path, "utf8"));
+    expect(raw.mcpServers.remote).toEqual({ serverUrl: "https://example.com/sse" });
   });
 
   it("writes the opencode dialect shape", () => {

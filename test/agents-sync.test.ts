@@ -54,12 +54,14 @@ describe("syncAgentsFiles", () => {
       mkdirSync(join(homeDir, ".gemini"), { recursive: true });
       writeFileSync(join(homeDir, ".gemini", "GEMINI.md"), "");
 
-      const targets = ["claude", "codex", "omp", "pi", "gemini", "grok"].map((id) =>
+      const targets = ["antigravity", "claude", "codex", "omp", "pi", "gemini", "grok"].map((id) =>
         getHarness(id as never),
       );
       const report = syncAgentsFiles(targets, false, { homeDir });
       const byId = new Map(report.targets.map((t) => [t.id, t]));
 
+      expect(byId.get("antigravity")?.action).toBe("linked");
+      expect(byId.get("antigravity")?.path).toBe(join(homeDir, ".gemini", "config", "AGENTS.md"));
       expect(byId.get("claude")?.action).toBe("linked");
       expect(byId.get("codex")?.action).toBe("skipped");
       expect(byId.get("omp")?.action).toBe("relinked");
@@ -67,7 +69,7 @@ describe("syncAgentsFiles", () => {
       expect(byId.get("gemini")?.action).toBe("relinked");
       expect(byId.get("grok")?.action).toBe("skipped");
 
-      for (const id of ["claude", "omp", "pi", "gemini"]) {
+      for (const id of ["antigravity", "claude", "omp", "pi", "gemini"]) {
         const path = byId.get(id)?.path as string;
         expect(lstatSync(path).isSymbolicLink()).toBe(true);
         expect(realpathSync(path)).toBe(realpathSync(master));

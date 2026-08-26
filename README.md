@@ -46,6 +46,7 @@ import type { ClaudeSessionEntry, CodexThread, GeminiConversationRecord } from "
 
 | Agent           | ID               | Detection     | Skills                | Hooks                    | Sessions       |
 | --------------- | ---------------- | ------------- | --------------------- | ------------------------ | -------------- |
+| Antigravity CLI | `antigravity`    | project       | `.agents/skills/`     | -                        | JSONL + SQLite |
 | Claude Code     | `claude`         | env + project | `.claude/skills/`     | `.claude/hooks/`         | JSONL          |
 | Codex CLI       | `codex`          | project       | `.agents/skills/`     | -                        | SQLite + JSONL |
 | Gemini CLI      | `gemini`         | env + project | `.gemini/skills/`     | -                        | JSON           |
@@ -81,7 +82,7 @@ harnesses mcp                   # run the MCP server over stdio
 
 [unagent](https://github.com/onmax/unagent) covers similar ground but makes different tradeoffs.
 
-**harnesses is deep and narrow.** Each harness gets verified, platform-specific paths with scope, evidence level, and platform tags. Session formats are typed per harness. Eleven harnesses, each fully mapped.
+**harnesses is deep and narrow.** Each harness gets verified, platform-specific paths with scope, evidence level, and platform tags. Session formats are typed per harness. Twelve harnesses, each fully mapped.
 
 **unagent is wide and shallow.** 40+ agents detected by env vars, but each definition is just `configDir` + `rulesFile` + `skillsDir`. No platform-specific paths, no session schemas. In exchange, it ships runtime primitives harnesses doesn't touch yet: skill install/uninstall, vector stores, browser automation, sandboxes, queues, workflows.
 
