@@ -129,6 +129,8 @@ export interface RunOptions {
   timeoutSeconds?: number;
   /** Use the harness's structured (JSON) output mode instead of plain text. */
   structured?: boolean;
+  /** Optional AbortSignal to cancel the run. */
+  signal?: AbortSignal;
 }
 
 /** One completed (or failed) harness run, with output capped for the model. */
@@ -139,6 +141,7 @@ export interface RunOutcome {
   structured: boolean;
   exitCode: number | null;
   timedOut: boolean;
+  aborted?: boolean;
   stdout: string;
   stderr: string;
 }
@@ -188,6 +191,7 @@ export async function runHarness(
       cwd: options.cwd,
       timeoutMs: timeoutSeconds * 1000,
       structured,
+      signal: options.signal,
     });
   } catch (error) {
     const details: RunFailure = {
@@ -203,6 +207,7 @@ export async function runHarness(
     structured,
     exitCode: result.exitCode,
     timedOut: result.timedOut,
+    ...(result.aborted !== undefined ? { aborted: result.aborted } : {}),
     stdout: truncate(result.stdout),
     stderr: truncate(result.stderr),
   };
@@ -210,6 +215,6 @@ export async function runHarness(
   return {
     content: text(details),
     details,
-    ...(result.timedOut || result.exitCode !== 0 ? { isError: true } : {}),
+    ...(result.timedOut || result.aborted || result.exitCode !== 0 ? { isError: true } : {}),
   };
 }

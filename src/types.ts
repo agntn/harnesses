@@ -60,6 +60,8 @@ export interface InvokeOptions {
   timeoutMs?: number;
   /** Use the harness's structured (JSON) output mode instead of plain text. */
   structured?: boolean;
+  /** Optional AbortSignal to cancel execution before or during the run. */
+  signal?: AbortSignal;
 }
 
 export interface InvokeResult {
@@ -67,9 +69,10 @@ export interface InvokeResult {
   args: string[];
   stdout: string;
   stderr: string;
-  /** Process exit code; null when the run hit `timeoutMs` and was killed. */
+  /** Process exit code; null when the run hit `timeoutMs` or was aborted. */
   exitCode: number | null;
   timedOut: boolean;
+  aborted?: boolean;
 }
 
 export interface HarnessDetection {

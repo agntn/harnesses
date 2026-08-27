@@ -146,3 +146,72 @@ describe("runHarness tool operation", () => {
     expect(outcome.stdout).toContain("[truncated");
   });
 });
+
+describe("AbortSignal cancellation", () => {
+  it("resolves immediately with aborted: true when signal is already aborted", async () => {
+    const fake = registerHarness(FakeCursor);
+    const controller = new AbortController();
+    controller.abort();
+
+    const result = await fake.invoke("ping", { signal: controller.signal });
+
+    expect(result.aborted).toBe(true);
+    expect(result.exitCode).toBeNull();
+    expect(result.timedOut).toBe(false);
+    expect(result.stdout).toBe("");
+  });
+
+  it("aborts an in-flight invocation when signal aborts", async () => {
+    registerHarness(
+      class extends FakeCursor {
+        override readonly invocation: Harness["invocation"] = {
+          args: ["-e", "setTimeout(() => {}, 60000)"],
+          level: "inferred",
+        };
+      },
+    );
+
+    const controller = new AbortController();
+    const promise = getHarness("cursor").invoke("x", { signal: controller.signal });
+
+    setTimeout(() => controller.abort(), 100);
+    const result = await promise;
+
+    expect(result.aborted).toBe(true);
+    expect(result.exitCode).toBeNull();
+    expect(result.timedOut).toBe(false);
+  });
+
+  it("ignores signal aborted after completion", async () => {
+    const fake = registerHarness(FakeCursor);
+    const controller = new AbortController();
+
+    const result = await fake.invoke("done", { signal: controller.signal });
+    controller.abort();
+
+    expect(result.exitCode).toBe(0);
+    expect(result.aborted).toBe(false);
+    expect(result.stdout.trim()).toBe("echo:done");
+  });
+
+  it("flags an aborted runHarness call as an error", async () => {
+    registerHarness(
+      class extends FakeCursor {
+        override readonly invocation: Harness["invocation"] = {
+          args: ["-e", "setTimeout(() => {}, 60000)"],
+          level: "inferred",
+        };
+      },
+    );
+
+    const controller = new AbortController();
+    const promise = runHarness("cursor", "x", { signal: controller.signal });
+    setTimeout(() => controller.abort(), 100);
+    const result = await promise;
+
+    expect(result.isError).toBe(true);
+    const outcome = result.details as { aborted?: boolean; exitCode: number | null };
+    expect(outcome.aborted).toBe(true);
+    expect(outcome.exitCode).toBeNull();
+  });
+});

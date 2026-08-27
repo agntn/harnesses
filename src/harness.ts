@@ -113,6 +113,18 @@ export abstract class Harness {
       );
     }
 
+    if (options.signal?.aborted) {
+      return Promise.resolve({
+        command: built.command,
+        args: built.args,
+        stdout: "",
+        stderr: "",
+        exitCode: null,
+        timedOut: false,
+        aborted: true,
+      });
+    }
+
     return new Promise((resolve, reject) => {
       const child = spawn(built.command, built.args, {
         cwd: options.cwd,
@@ -123,12 +135,30 @@ export abstract class Harness {
       let stdout = "";
       let stderr = "";
       let timedOut = false;
+      let aborted = false;
+
       const timer = options.timeoutMs
         ? setTimeout(() => {
             timedOut = true;
             child.kill("SIGTERM");
           }, options.timeoutMs)
         : undefined;
+
+      const onAbort = () => {
+        aborted = true;
+        child.kill("SIGTERM");
+      };
+
+      if (options.signal) {
+        options.signal.addEventListener("abort", onAbort, { once: true });
+      }
+
+      const cleanup = () => {
+        if (timer) clearTimeout(timer);
+        if (options.signal) {
+          options.signal.removeEventListener("abort", onAbort);
+        }
+      };
 
       child.stdout.on("data", (chunk: Buffer) => {
         stdout += chunk.toString("utf8");
@@ -137,18 +167,19 @@ export abstract class Harness {
         stderr += chunk.toString("utf8");
       });
       child.on("error", (error) => {
-        if (timer) clearTimeout(timer);
+        cleanup();
         reject(error);
       });
       child.on("close", (code) => {
-        if (timer) clearTimeout(timer);
+        cleanup();
         resolve({
           command: built.command,
           args: built.args,
           stdout,
           stderr,
-          exitCode: timedOut ? null : code,
+          exitCode: timedOut || aborted ? null : code,
           timedOut,
+          aborted,
         });
       });
     });
