@@ -81,7 +81,7 @@ describe("normalized invocation", () => {
       },
     );
 
-    const result = await getHarness("cursor").invoke("x", { timeoutMs: 300 });
+    const result = await getHarness("cursor").invoke("x", { timeoutMs: 100 });
 
     expect(result.timedOut).toBe(true);
     expect(result.exitCode).toBeNull();
@@ -91,6 +91,136 @@ describe("normalized invocation", () => {
     await expect(getHarness("mastracode").invoke("x")).rejects.toThrow(
       "no non-interactive invocation",
     );
+  });
+});
+
+describe("process tree timeout termination", () => {
+  it("escalates to SIGKILL when process ignores SIGTERM", async () => {
+    registerHarness(
+      class extends FakeCursor {
+        override readonly invocation: Harness["invocation"] = {
+          args: [
+            "-e",
+            "process.on('SIGTERM', () => {}); setTimeout(() => process.exit(0), 10000);",
+          ],
+          level: "inferred",
+        };
+      },
+    );
+
+    const start = Date.now();
+    const result = await getHarness("cursor").invoke("x", {
+      timeoutMs: 50,
+      killGracePeriodMs: 50,
+    });
+    const duration = Date.now() - start;
+
+    expect(result.timedOut).toBe(true);
+    expect(result.exitCode).toBeNull();
+    expect(duration).toBeLessThan(2000);
+  });
+
+  it("terminates spawned descendant processes on timeout", async () => {
+    registerHarness(
+      class extends FakeCursor {
+        override readonly invocation: Harness["invocation"] = {
+          args: [
+            "-e",
+            "const { spawn } = require('child_process'); const sub = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)']); console.log('SUB_PID:' + sub.pid); setInterval(() => {}, 1000);",
+          ],
+          level: "inferred",
+        };
+      },
+    );
+
+    const result = await getHarness("cursor").invoke("x", {
+      timeoutMs: 100,
+      killGracePeriodMs: 50,
+    });
+
+    expect(result.timedOut).toBe(true);
+    const match = result.stdout.match(/SUB_PID:(\d+)/);
+    expect(match).not.toBeNull();
+    if (match?.[1]) {
+      const subPid = parseInt(match[1], 10);
+      let alive = false;
+      try {
+        process.kill(subPid, 0);
+        alive = true;
+      } catch {
+        alive = false;
+      }
+      expect(alive).toBe(false);
+    }
+  });
+});
+
+describe("AbortSignal cancellation", () => {
+  it("resolves immediately with aborted: true when signal is already aborted", async () => {
+    const fake = registerHarness(FakeCursor);
+    const controller = new AbortController();
+    controller.abort();
+
+    const result = await fake.invoke("ping", { signal: controller.signal });
+
+    expect(result.aborted).toBe(true);
+    expect(result.exitCode).toBeNull();
+    expect(result.timedOut).toBe(false);
+    expect(result.stdout).toBe("");
+  });
+
+  it("aborts an in-flight invocation when signal aborts", async () => {
+    registerHarness(
+      class extends FakeCursor {
+        override readonly invocation: Harness["invocation"] = {
+          args: ["-e", "setTimeout(() => {}, 60000)"],
+          level: "inferred",
+        };
+      },
+    );
+
+    const controller = new AbortController();
+    const promise = getHarness("cursor").invoke("x", { signal: controller.signal });
+
+    setTimeout(() => controller.abort(), 50);
+    const result = await promise;
+
+    expect(result.aborted).toBe(true);
+    expect(result.exitCode).toBeNull();
+    expect(result.timedOut).toBe(false);
+  });
+
+  it("ignores signal aborted after completion", async () => {
+    const fake = registerHarness(FakeCursor);
+    const controller = new AbortController();
+
+    const result = await fake.invoke("done", { signal: controller.signal });
+    controller.abort();
+
+    expect(result.exitCode).toBe(0);
+    expect(result.aborted).toBe(false);
+    expect(result.stdout.trim()).toBe("echo:done");
+  });
+
+  it("flags an aborted runHarness call as an error", async () => {
+    registerHarness(
+      class extends FakeCursor {
+        override readonly invocation: Harness["invocation"] = {
+          args: ["-e", "setTimeout(() => {}, 60000)"],
+          level: "inferred",
+        };
+      },
+    );
+
+    const controller = new AbortController();
+    const promise = runHarness("cursor", "x", { signal: controller.signal });
+    setTimeout(() => controller.abort(), 50);
+    const result = await promise;
+
+    expect(result.isError).toBe(true);
+    const outcome = result.details as { aborted?: boolean; exitCode: number | null };
+    expect(outcome.aborted).toBe(true);
+    expect(outcome.exitCode).toBeNull();
   });
 });
 

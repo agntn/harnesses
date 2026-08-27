@@ -58,8 +58,12 @@ export interface InvokeOptions {
   env?: Record<string, string>;
   /** Kill the harness after this many milliseconds; unset means no timeout. */
   timeoutMs?: number;
+  /** Grace period in milliseconds after SIGTERM before escalating to SIGKILL (default 500ms). */
+  killGracePeriodMs?: number;
   /** Use the harness's structured (JSON) output mode instead of plain text. */
   structured?: boolean;
+  /** Optional AbortSignal to cancel execution before or during the run. */
+  signal?: AbortSignal;
 }
 
 export interface InvokeResult {
@@ -67,9 +71,10 @@ export interface InvokeResult {
   args: string[];
   stdout: string;
   stderr: string;
-  /** Process exit code; null when the run hit `timeoutMs` and was killed. */
+  /** Process exit code; null when the run hit `timeoutMs` or was aborted and was killed. */
   exitCode: number | null;
   timedOut: boolean;
+  aborted?: boolean;
 }
 
 export interface HarnessDetection {

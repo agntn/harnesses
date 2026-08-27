@@ -22,6 +22,32 @@ const SUPPORTED_PLATFORMS: Record<Platform, true> = {
   win32: true,
 };
 
+/** Default grace period in milliseconds after SIGTERM before escalating to SIGKILL. */
+export const DEFAULT_KILL_GRACE_PERIOD_MS = 500;
+
+/** Terminates an entire process tree across supported platforms. */
+export function terminateProcessTree(pid: number, signal: NodeJS.Signals = "SIGTERM"): void {
+  if (process.platform === "win32") {
+    try {
+      execFileSync("taskkill", ["/pid", String(pid), "/T", "/F"], {
+        stdio: "ignore",
+      });
+    } catch {
+      try {
+        process.kill(pid, signal);
+      } catch {}
+    }
+  } else {
+    try {
+      process.kill(-pid, signal);
+    } catch {
+      try {
+        process.kill(pid, signal);
+      } catch {}
+    }
+  }
+}
+
 export abstract class Harness {
   abstract readonly id: HarnessId;
   abstract readonly name: string;
@@ -113,22 +139,69 @@ export abstract class Harness {
       );
     }
 
+    if (options.signal?.aborted) {
+      return Promise.resolve({
+        command: built.command,
+        args: built.args,
+        stdout: "",
+        stderr: "",
+        exitCode: null,
+        timedOut: false,
+        aborted: true,
+      });
+    }
+
     return new Promise((resolve, reject) => {
       const child = spawn(built.command, built.args, {
         cwd: options.cwd,
         env: options.env ? { ...process.env, ...options.env } : process.env,
         stdio: ["ignore", "pipe", "pipe"],
+        detached: process.platform !== "win32",
       });
 
       let stdout = "";
       let stderr = "";
       let timedOut = false;
+      let aborted = false;
+      let graceTimer: NodeJS.Timeout | undefined;
+
+      const terminate = () => {
+        if (!child.pid || child.killed) return;
+        terminateProcessTree(child.pid, "SIGTERM");
+        const graceMs = options.killGracePeriodMs ?? DEFAULT_KILL_GRACE_PERIOD_MS;
+        if (graceMs > 0) {
+          graceTimer = setTimeout(() => {
+            if (!child.pid || child.exitCode !== null) return;
+            terminateProcessTree(child.pid, "SIGKILL");
+          }, graceMs);
+        } else {
+          terminateProcessTree(child.pid, "SIGKILL");
+        }
+      };
+
       const timer = options.timeoutMs
         ? setTimeout(() => {
             timedOut = true;
-            child.kill("SIGTERM");
+            terminate();
           }, options.timeoutMs)
         : undefined;
+
+      const onAbort = () => {
+        aborted = true;
+        terminate();
+      };
+
+      if (options.signal) {
+        options.signal.addEventListener("abort", onAbort, { once: true });
+      }
+
+      const cleanup = () => {
+        if (timer) clearTimeout(timer);
+        if (graceTimer) clearTimeout(graceTimer);
+        if (options.signal) {
+          options.signal.removeEventListener("abort", onAbort);
+        }
+      };
 
       child.stdout.on("data", (chunk: Buffer) => {
         stdout += chunk.toString("utf8");
@@ -137,18 +210,19 @@ export abstract class Harness {
         stderr += chunk.toString("utf8");
       });
       child.on("error", (error) => {
-        if (timer) clearTimeout(timer);
+        cleanup();
         reject(error);
       });
       child.on("close", (code) => {
-        if (timer) clearTimeout(timer);
+        cleanup();
         resolve({
           command: built.command,
           args: built.args,
           stdout,
           stderr,
-          exitCode: timedOut ? null : code,
+          exitCode: timedOut || aborted ? null : code,
           timedOut,
+          aborted,
         });
       });
     });
