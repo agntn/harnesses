@@ -5,11 +5,20 @@ const plainTheme = {};
 
 describe("shared extension TUI", () => {
   it("sanitizes external values before terminal rendering", () => {
+    const escape = String.fromCodePoint(0x1b);
+    const bell = String.fromCodePoint(0x07);
+    const c1 = String.fromCodePoint(0x85);
+    const lineSeparator = String.fromCodePoint(0x2028);
+    const paragraphSeparator = String.fromCodePoint(0x2029);
+    const bidiOverride = String.fromCodePoint(0x202e);
     const text = sanitizeTerminalText(
-      "\u001B]8;;https://example.com\u0007open\u001B]8;;\u0007\nnext\u0000",
+      `${escape}]8;;https://example.com${bell}open${escape}]8;;${bell} a${c1}b c${lineSeparator}d e${paragraphSeparator}f g${bidiOverride}h`,
     );
 
-    expect(text).toBe("open next");
+    expect(text).toBe("open a b c d e f g h");
+    for (const control of [escape, bell, c1, lineSeparator, paragraphSeparator, bidiOverride]) {
+      expect(text).not.toContain(control);
+    }
   });
 
   it("keeps a harness prompt bounded in the call row", () => {
@@ -73,6 +82,22 @@ describe("shared extension TUI", () => {
 
     expect(collapsed).toBe("✓ (read) pi · Pi");
     expect(expanded).toBe("✓ (read) pi · Pi\n  first line\n  second line");
+  });
+
+  it("keeps expanded single-line output up to the body limit", () => {
+    const marker = "TAIL-MARKER";
+    const expanded = renderToolResult(
+      "harnesses_info",
+      {
+        content: [{ type: "text", text: `${"x".repeat(3000)}${marker}` }],
+        details: { id: "pi", name: "Pi" },
+      },
+      false,
+      { expanded: true },
+      plainTheme,
+    );
+
+    expect(expanded).toContain(marker);
   });
 
   it("marks no-op mutations as unsuccessful", () => {

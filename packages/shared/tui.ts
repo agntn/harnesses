@@ -1,6 +1,5 @@
 import { stripVTControlCharacters } from "node:util";
 
-/** Human labels shared by tool registration and terminal rendering. */
 export const HARNESS_TOOL_LABELS = {
   harnesses_detect: "Harnesses Detect",
   harnesses_info: "Harnesses Info",
@@ -13,10 +12,8 @@ export const HARNESS_TOOL_LABELS = {
   harnesses_mcp_remove: "Harnesses MCP Remove",
 } as const;
 
-/** Tool names whose calls and results have custom terminal summaries. */
 export type HarnessToolName = keyof typeof HARNESS_TOOL_LABELS;
 
-/** Approval badges shared by OMP registration and both result renderers. */
 export const HARNESS_TOOL_APPROVALS: Record<HarnessToolName, "read" | "exec" | "write"> = {
   harnesses_detect: "read",
   harnesses_info: "read",
@@ -29,13 +26,11 @@ export const HARNESS_TOOL_APPROVALS: Record<HarnessToolName, "read" | "exec" | "
   harnesses_mcp_remove: "write",
 };
 
-/** Theme methods used by the shared status renderer. */
 export interface StatusTheme {
   fg?(color: string, text: string): string;
   bold?(text: string): string;
 }
 
-/** Render state supplied by Pi or OMP while a tool call is active. */
 export interface RenderOptions {
   expanded?: boolean;
   isPartial?: boolean;
@@ -43,7 +38,6 @@ export interface RenderOptions {
   executionStarted?: boolean;
 }
 
-/** Structural result shape shared by both extension hosts. */
 export interface RenderedToolResult {
   content?: ReadonlyArray<unknown>;
   details?: unknown;
@@ -54,8 +48,7 @@ const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", 
 const SUBJECT_WIDTH = 72;
 const FIELD_SCAN_LIMIT = 2048;
 const RESULT_BODY_LIMIT = 16_000;
-// oxlint-disable-next-line no-control-regex
-const CONTROL_BYTES = /[\u0000-\u001F\u007F-\u009F]/g;
+const TERMINAL_UNSAFE = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu;
 
 function cutAt(text: string, end: number): string {
   const last = text.charCodeAt(end - 1);
@@ -66,15 +59,17 @@ function clip(text: string, max: number): string {
   return text.length <= max ? text : `${cutAt(text, max - 1)}…`;
 }
 
-/** Removes terminal controls, collapses whitespace, and bounds one status field. */
-export function sanitizeTerminalText(value: unknown, max = SUBJECT_WIDTH): string {
-  const text = String(value).toWellFormed();
-  const bounded = text.length > FIELD_SCAN_LIMIT ? `${cutAt(text, FIELD_SCAN_LIMIT - 1)}…` : text;
-  const clean = stripVTControlCharacters(bounded)
-    .replace(CONTROL_BYTES, " ")
-    .replace(/\s+/g, " ")
+function cleanTerminalText(text: string): string {
+  return stripVTControlCharacters(text.toWellFormed())
+    .replace(TERMINAL_UNSAFE, " ")
+    .replace(/\p{Zs}+/gu, " ")
     .trim();
-  return clip(clean, max);
+}
+
+export function sanitizeTerminalText(value: unknown, max = SUBJECT_WIDTH): string {
+  const text = String(value);
+  const bounded = text.length > FIELD_SCAN_LIMIT ? `${cutAt(text, FIELD_SCAN_LIMIT - 1)}…` : text;
+  return clip(cleanTerminalText(bounded), max);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -108,7 +103,7 @@ function expandedBody(result: RenderedToolResult, theme: StatusTheme): string[] 
   const bounded = truncated ? `${cutAt(body, RESULT_BODY_LIMIT - 1)}…` : body;
   return bounded
     .split(/\r?\n/)
-    .map((line) => `  ${paint(theme, "toolOutput", sanitizeTerminalText(line, FIELD_SCAN_LIMIT))}`);
+    .map((line) => `  ${paint(theme, "toolOutput", cleanTerminalText(line))}`);
 }
 
 function callDescription(tool: HarnessToolName, args: unknown): string | undefined {
@@ -149,7 +144,6 @@ function callIcon(options: RenderOptions | undefined): string {
   return options?.executionStarted === true ? "◌" : "·";
 }
 
-/** Renders one bounded tool call line for either extension host. */
 export function renderToolCall(
   tool: HarnessToolName,
   args: unknown,
@@ -231,7 +225,6 @@ function resultMeta(tool: HarnessToolName, details: Record<string, unknown>): st
   }
 }
 
-/** Renders one terminal-safe result summary without echoing model-facing output. */
 export function renderToolResult(
   tool: HarnessToolName,
   result: RenderedToolResult,
