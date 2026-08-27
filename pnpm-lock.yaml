@@ -30,6 +30,9 @@ importers:
       '@earendil-works/pi-coding-agent':
         specifier: 0.84.3
         version: 0.84.3(@modelcontextprotocol/sdk@1.30.0(zod@3.25.76))(ws@8.21.3)(zod@3.25.76)
+      '@earendil-works/pi-tui':
+        specifier: 0.84.3
+        version: 0.84.3
       '@oh-my-pi/omptype':
         specifier: 18.0.4
         version: 18.0.4

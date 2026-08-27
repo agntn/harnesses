@@ -2,9 +2,19 @@ import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import type { AgentToolResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
 import { Type, type TSchema } from "typebox";
 
 import type * as HarnessTools from "../../../dist/tool-operations.d.mts";
+import {
+  HARNESS_TOOL_LABELS,
+  type HarnessToolName,
+  type RenderedToolResult,
+  type RenderOptions,
+  renderToolCall,
+  renderToolResult,
+  type StatusTheme,
+} from "../../shared/tui.ts";
 // Schemas must exist synchronously at registration, so unlike the executors
 // below they load from dist; `pnpm build` keeps it current in the checkout.
 import { harnessToolSchemas } from "../../../dist/tool-schemas.mjs";
@@ -26,16 +36,37 @@ function loadToolOperations(): Promise<typeof HarnessTools> {
   return toolOperationsPromise;
 }
 
+function statusRenderers(tool: HarnessToolName) {
+  return {
+    renderCall(args: unknown, theme: StatusTheme, context: RenderOptions) {
+      return new Text(renderToolCall(tool, args, context, theme), 0, 0);
+    },
+    renderResult(
+      result: RenderedToolResult,
+      options: RenderOptions,
+      theme: StatusTheme,
+      context?: { isError?: boolean },
+    ) {
+      return new Text(
+        renderToolResult(tool, result, context?.isError === true, options, theme),
+        0,
+        0,
+      );
+    },
+  };
+}
+
 export default function harnessesExtension(pi: ExtensionAPI): void {
   const schemas = harnessToolSchemas<TSchema, TSchema>(Type);
 
   pi.registerTool({
     name: "harnesses_detect",
-    label: "Harnesses Detect",
+    label: HARNESS_TOOL_LABELS.harnesses_detect,
     description: "List every known AI coding harness with its install state and version",
     promptSnippet: "Use harnesses_detect to see which AI coding harnesses are installed.",
     promptGuidelines: ["The scan checks each harness's binaries on PATH and reads their versions."],
     parameters: schemas.detect,
+    ...statusRenderers("harnesses_detect"),
     async execute(_toolCallId, _params): Promise<AgentToolResult<HarnessTools.HarnessListing>> {
       const { detectHarnesses } = await loadToolOperations();
       const { content, details } = detectHarnesses();
@@ -45,7 +76,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
 
   pi.registerTool({
     name: "harnesses_info",
-    label: "Harnesses Info",
+    label: HARNESS_TOOL_LABELS.harnesses_info,
     description:
       "Full metadata for one AI coding harness, including supported invocation and model operations, configuration, sessions, instructions, skills, commands, hooks, and resolved paths",
     promptSnippet: "Use harnesses_info to look up where a coding harness stores its data.",
@@ -54,6 +85,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       "Resolved paths are absolute for the current platform and home directory.",
     ],
     parameters: schemas.info,
+    ...statusRenderers("harnesses_info"),
     async execute(
       _toolCallId,
       params: HarnessSchemas.InfoParams,
@@ -66,7 +98,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
 
   pi.registerTool({
     name: "harnesses_models",
-    label: "Harnesses Models",
+    label: HARNESS_TOOL_LABELS.harnesses_models,
     description:
       "List the models currently available to one AI coding harness through its native CLI",
     promptSnippet:
@@ -76,6 +108,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       "The harness command may load configuration and extensions from cwd.",
     ],
     parameters: schemas.models,
+    ...statusRenderers("harnesses_models"),
     async execute(
       _toolCallId,
       params: HarnessSchemas.ModelsParams,
@@ -101,7 +134,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
 
   pi.registerTool({
     name: "harnesses_run",
-    label: "Harnesses Run",
+    label: HARNESS_TOOL_LABELS.harnesses_run,
     description:
       "Run one prompt through an AI coding harness's normalized non-interactive invocation, optionally selecting a model, and return its output",
     promptSnippet: "Use harnesses_run to delegate one prompt to another installed coding harness.",
@@ -112,6 +145,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       "Output is capped for context; long runs stop at the timeout.",
     ],
     parameters: schemas.run,
+    ...statusRenderers("harnesses_run"),
     async execute(
       _toolCallId,
       params: HarnessSchemas.RunParams,
@@ -139,13 +173,14 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
 
   pi.registerTool({
     name: "harnesses_mcp_list",
-    label: "Harnesses MCP List",
+    label: HARNESS_TOOL_LABELS.harnesses_mcp_list,
     description:
       "List the MCP servers configured in each harness's config files, normalized across dialects",
     promptSnippet:
       "Use harnesses_mcp_list to see which MCP servers each coding harness has configured.",
     promptGuidelines: ["Omit id to scan every harness."],
     parameters: schemas.mcpList,
+    ...statusRenderers("harnesses_mcp_list"),
     async execute(
       _toolCallId,
       params: HarnessSchemas.McpListParams,
@@ -158,10 +193,11 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
 
   pi.registerTool({
     name: "harnesses_mcp_add",
-    label: "Harnesses MCP Add",
+    label: HARNESS_TOOL_LABELS.harnesses_mcp_add,
     description:
       "Add or replace one MCP server in a harness config; TOML configs get a surgical, comment-preserving edit",
     parameters: schemas.mcpAdd,
+    ...statusRenderers("harnesses_mcp_add"),
     async execute(
       _toolCallId,
       params: HarnessSchemas.McpAddParams,
@@ -174,10 +210,11 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
 
   pi.registerTool({
     name: "harnesses_mcp_sync",
-    label: "Harnesses MCP Sync",
+    label: HARNESS_TOOL_LABELS.harnesses_mcp_sync,
     description:
       "Reset every harness's user-scope MCP config to exactly the master list from ~/.config/agntn/mcp.jsonc; extras are removed and master-listed names are withdrawn from excluded harnesses",
     parameters: schemas.mcpSync,
+    ...statusRenderers("harnesses_mcp_sync"),
     async execute(
       _toolCallId,
       params: HarnessSchemas.McpSyncParams,
@@ -190,10 +227,11 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
 
   pi.registerTool({
     name: "harnesses_agents_sync",
-    label: "Harnesses Agents Sync",
+    label: HARNESS_TOOL_LABELS.harnesses_agents_sync,
     description:
       "Link every harness's global instructions file to the master agents file; diverged copies are backed up and relinked. Pass check to only report",
     parameters: schemas.agentsSync,
+    ...statusRenderers("harnesses_agents_sync"),
     async execute(
       _toolCallId,
       params: HarnessSchemas.AgentsSyncParams,
@@ -206,10 +244,11 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
 
   pi.registerTool({
     name: "harnesses_mcp_remove",
-    label: "Harnesses MCP Remove",
+    label: HARNESS_TOOL_LABELS.harnesses_mcp_remove,
     description:
       "Remove one MCP server from a harness config; TOML configs get a surgical, comment-preserving edit",
     parameters: schemas.mcpRemove,
+    ...statusRenderers("harnesses_mcp_remove"),
     async execute(
       _toolCallId,
       params: HarnessSchemas.McpRemoveParams,
