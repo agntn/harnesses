@@ -23,6 +23,7 @@ export interface McpSchemaBuilder<I, S> {
   Optional(schema: I): I;
 }
 
+export const HARNESS_INFO_MAX_ITEMS = 20;
 export const RUN_TIMEOUT_DEFAULT_SECONDS = 600;
 
 /** Builds the parameter schemas for all harness tools with the host's TypeBox. */
@@ -43,7 +44,18 @@ export function harnessToolSchemas<I, S>(Type: McpSchemaBuilder<I, S>) {
 
   return {
     detect: Type.Object({}),
-    info: Type.Object({ id: harnessId("Harness id") }),
+    info: Type.Object({
+      id: Type.Union(
+        [
+          harnessId("Harness id"),
+          Type.Array(harnessId("Harness id"), {
+            minItems: 1,
+            maxItems: HARNESS_INFO_MAX_ITEMS,
+          }),
+        ],
+        { description: "Harness id, or a list of ids to inspect in one call" },
+      ),
+    }),
     models: Type.Object({
       id: harnessId("Harness id"),
       search: Type.Optional(
@@ -165,7 +177,7 @@ export function harnessToolSchemas<I, S>(Type: McpSchemaBuilder<I, S>) {
  * these instead of TypeBox Static inference.
  */
 export interface InfoParams {
-  id: string;
+  id: string | string[];
 }
 
 export interface ModelsParams {

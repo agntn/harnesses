@@ -78,10 +78,10 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     name: "harnesses_info",
     label: HARNESS_TOOL_LABELS.harnesses_info,
     description:
-      "Full metadata for one AI coding harness, including supported invocation and model operations, configuration, sessions, instructions, skills, commands, hooks, and resolved paths",
-    promptSnippet: "Use harnesses_info to look up where a coding harness stores its data.",
+      "Full metadata for one or more AI coding harnesses, including supported invocation and model operations, configuration, sessions, instructions, skills, commands, hooks, and resolved paths",
+    promptSnippet: "Use harnesses_info to look up where coding harnesses store their data.",
     promptGuidelines: [
-      "Pass a harness id from harnesses_detect, e.g. claude, codex, or opencode.",
+      "Pass one harness id from harnesses_detect, or batch several ids in one call.",
       "Resolved paths are absolute for the current platform and home directory.",
     ],
     parameters: schemas.info,
@@ -89,7 +89,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     async execute(
       _toolCallId,
       params: HarnessSchemas.InfoParams,
-    ): Promise<AgentToolResult<HarnessTools.HarnessMetadata | HarnessTools.UnknownHarness>> {
+    ): Promise<AgentToolResult<HarnessTools.HarnessInfoDetails>> {
       const { harnessInfo } = await loadToolOperations();
       const { content, details } = harnessInfo(params.id);
       return { content, details };

@@ -80,13 +80,13 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     name: "harnesses_info",
     label: HARNESS_TOOL_LABELS.harnesses_info,
     description:
-      "Full metadata for one AI coding harness, including supported invocation and model operations, configuration, sessions, instructions, skills, commands, hooks, and resolved paths",
+      "Full metadata for one or more AI coding harnesses, including supported invocation and model operations, configuration, sessions, instructions, skills, commands, hooks, and resolved paths",
     parameters: schemas.info,
     approval: HARNESS_TOOL_APPROVALS.harnesses_info,
     async execute(
       _toolCallId,
       params: HarnessSchemas.InfoParams,
-    ): Promise<AgentToolResult<HarnessTools.HarnessMetadata | HarnessTools.UnknownHarness>> {
+    ): Promise<AgentToolResult<HarnessTools.HarnessInfoDetails>> {
       const { harnessInfo } = await loadToolOperations();
       const { content, details } = harnessInfo(params.id);
       return { content, details };
