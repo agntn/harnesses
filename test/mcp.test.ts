@@ -67,6 +67,22 @@ describe("harnesses MCP server", () => {
     expect(part?.text).toContain("resolved");
   });
 
+  it("returns metadata batches in input order", async () => {
+    const client = await connectTestClient();
+
+    const response = await client.callTool({
+      name: "harnesses_info",
+      arguments: { id: ["codex", "claude"] },
+    });
+
+    expect(response.isError).not.toBe(true);
+    const [part] = response.content as Array<{ text: string }>;
+    const codexIndex = part?.text.indexOf("OpenAI Codex CLI") ?? -1;
+    const claudeIndex = part?.text.indexOf("Anthropic Claude Code") ?? -1;
+    expect(codexIndex).toBeGreaterThanOrEqual(0);
+    expect(claudeIndex).toBeGreaterThan(codexIndex);
+  });
+
   it("flags an unknown harness id and lists the known ones", async () => {
     const client = await connectTestClient();
 
@@ -81,6 +97,20 @@ describe("harnesses MCP server", () => {
     for (const id of listHarnesses()) {
       expect(part?.text).toContain(id);
     }
+  });
+
+  it("rejects empty metadata batches", async () => {
+    const client = await connectTestClient();
+
+    const response = await client.callTool({
+      name: "harnesses_info",
+      arguments: { id: [] },
+    });
+
+    expect(response.isError).toBe(true);
+    expect(response.content).toEqual([
+      { type: "text", text: expect.stringContaining("Invalid arguments at /id") },
+    ]);
   });
 
   it("rejects an id the pattern forbids", async () => {

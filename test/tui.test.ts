@@ -54,6 +54,30 @@ describe("shared extension TUI", () => {
     expect(line).toBe("✓ (read) 2/3 installed");
   });
 
+  it("summarizes harness info batches", () => {
+    const call = renderToolCall(
+      "harnesses_info",
+      { id: ["pi", "omp"] },
+      { executionStarted: true },
+      plainTheme,
+    );
+    const result = renderToolResult(
+      "harnesses_info",
+      {
+        details: [
+          { id: "pi", name: "Pi" },
+          { id: "omp", name: "OMP" },
+        ],
+      },
+      false,
+      {},
+      plainTheme,
+    );
+
+    expect(call).toContain("Harnesses Info 2 harnesses");
+    expect(result).toBe("✓ (read) 2 harnesses");
+  });
+
   it("renders failures as terminal-safe status lines", () => {
     const line = renderToolResult(
       "harnesses_info",

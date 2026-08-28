@@ -109,6 +109,7 @@ function expandedBody(result: RenderedToolResult, theme: StatusTheme): string[] 
 function callDescription(tool: HarnessToolName, args: unknown): string | undefined {
   const record = isRecord(args) ? args : {};
   const id = scalar(record, "id");
+  const idCount = listLength(record, "id");
   const name = scalar(record, "name");
 
   switch (tool) {
@@ -128,7 +129,8 @@ function callDescription(tool: HarnessToolName, args: unknown): string | undefin
       if (record.check === true) return id ? `${sanitizeTerminalText(id)} check` : "check";
       return id ? sanitizeTerminalText(id) : undefined;
     default:
-      return id ? sanitizeTerminalText(id) : undefined;
+      if (id) return sanitizeTerminalText(id);
+      return idCount === undefined ? undefined : `${idCount} harnesses`;
   }
 }
 
@@ -233,6 +235,8 @@ export function renderToolResult(
   theme: StatusTheme,
 ): string {
   const details = isRecord(result.details) ? result.details : {};
+  const infoBatchSize =
+    tool === "harnesses_info" && Array.isArray(result.details) ? result.details.length : undefined;
   const noop = scalar(details, "action") === "noop";
   const failed =
     isError || result.isError === true || failureDescription(details) !== undefined || noop;
@@ -244,7 +248,8 @@ export function renderToolResult(
   const error = failureDescription(details);
   if (error) parts.push(paint(theme, "error", error));
   else if (!noop) {
-    const meta = resultMeta(tool, details);
+    const meta =
+      infoBatchSize === undefined ? resultMeta(tool, details) : [`${infoBatchSize} harnesses`];
     if (meta.length > 0) parts.push(paint(theme, "muted", meta.join(" · ")));
   }
 

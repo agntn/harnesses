@@ -82,7 +82,19 @@ export interface UnknownHarness {
   known: HarnessId[];
 }
 
-import { RUN_TIMEOUT_DEFAULT_SECONDS } from "./tool-schemas.ts";
+/** Returned when a direct batch call bypasses the tool schema limits. */
+export interface HarnessInfoInputError {
+  error: string;
+}
+
+/** One harness lookup result. */
+export type HarnessInfoResult = HarnessMetadata | UnknownHarness;
+
+/** Scalar, batch, or rejected batch details from {@link harnessInfo}. */
+export type HarnessInfoDetails = HarnessInfoResult | HarnessInfoResult[] | HarnessInfoInputError;
+
+import { HARNESS_INFO_MAX_ITEMS, RUN_TIMEOUT_DEFAULT_SECONDS } from "./tool-schemas.ts";
+export { HARNESS_INFO_MAX_ITEMS } from "./tool-schemas.ts";
 
 /** Default wall-clock budget for one harness run, in seconds. */
 export const RUN_DEFAULT_TIMEOUT_SECONDS = RUN_TIMEOUT_DEFAULT_SECONDS;
@@ -125,12 +137,11 @@ export function detectHarnesses(): ToolResult<HarnessListing> {
   return { content: text(details), details };
 }
 
-/** Full metadata for one harness, with paths resolved for the current platform. */
-export function harnessInfo(id: string): ToolResult<HarnessMetadata | UnknownHarness> {
-  if (!isHarnessId(id)) return unknownHarness(id);
+function harnessInfoResult(id: string): HarnessInfoResult {
+  if (!isHarnessId(id)) return unknownHarness(id).details;
 
   const harness = getHarness(id);
-  const details: HarnessMetadata = {
+  return {
     id: harness.id,
     name: harness.name,
     binaries: harness.binaries,
@@ -148,8 +159,34 @@ export function harnessInfo(id: string): ToolResult<HarnessMetadata | UnknownHar
     detection: harness.detection,
     resolved: harness.resolve(),
   };
+}
 
-  return { content: text(details), details };
+/** Full metadata for one harness, with paths resolved for the current platform. */
+export function harnessInfo(id: string): ToolResult<HarnessInfoResult>;
+/** Full metadata for several harnesses, preserving input order and errors for each item. */
+export function harnessInfo(
+  ids: readonly string[],
+): ToolResult<HarnessInfoResult[] | HarnessInfoInputError>;
+export function harnessInfo(input: string | readonly string[]): ToolResult<HarnessInfoDetails>;
+export function harnessInfo(input: string | readonly string[]): ToolResult<HarnessInfoDetails> {
+  if (typeof input === "string") {
+    const details = harnessInfoResult(input);
+    return { content: text(details), details, ...("error" in details ? { isError: true } : {}) };
+  }
+
+  if (input.length < 1 || input.length > HARNESS_INFO_MAX_ITEMS) {
+    const details: HarnessInfoInputError = {
+      error: `harnesses_info accepts between 1 and ${HARNESS_INFO_MAX_ITEMS} ids`,
+    };
+    return { content: text(details), details, isError: true };
+  }
+
+  const details = input.map(harnessInfoResult);
+  return {
+    content: text(details),
+    details,
+    ...(details.some((result) => "error" in result) ? { isError: true } : {}),
+  };
 }
 
 /** Options accepted by {@link listHarnessModels}. */
