@@ -27,6 +27,8 @@ let toolOperationsPromise: Promise<typeof HarnessTools> | undefined;
 /**
  * Loads the tool executors shared with the OMP extension, so the tool answers
  * stay identical across surfaces.
+ *
+ * @returns {Promise<typeof HarnessTools>} The shared executor module.
  */
 function loadToolOperations(): Promise<typeof HarnessTools> {
   toolOperationsPromise ??= import(
@@ -45,7 +47,7 @@ function statusRenderers(tool: HarnessToolName) {
       result: RenderedToolResult,
       options: RenderOptions,
       theme: StatusTheme,
-      context?: { isError?: boolean },
+      context?: Readonly<{ isError?: boolean }>,
     ) {
       return new Text(
         renderToolResult(tool, result, context?.isError === true, options, theme),

@@ -28,10 +28,79 @@ const SUPPORTED_PLATFORMS: Record<Platform, true> = {
   win32: true,
 };
 
+type CommandOptions = Readonly<{
+  cwd?: string;
+  env?: Readonly<Record<string, string>>;
+  timeoutMs?: number;
+}>;
+
+type InvocationOptions = Readonly<{
+  model?: string;
+  structured?: boolean;
+  tools?: boolean;
+}>;
+
+type InvocationMode = keyof HarnessInvocationModes;
+
+const ALTERNATE_INVOCATION_MODE: Record<InvocationMode, InvocationMode> = {
+  advisor: "agent",
+  advisorStructured: "agentStructured",
+  agent: "advisor",
+  agentStructured: "advisorStructured",
+};
+
+const INVOCATION_MODE_DESCRIPTION: Record<InvocationMode, string> = {
+  advisor: "advisor without tools",
+  advisorStructured: "structured (JSON) advisor without tools",
+  agent: "full agent",
+  agentStructured: "structured (JSON) full agent",
+};
+
+const INVOCATION_RETRY_HINT: Record<InvocationMode, string> = {
+  advisor: "; retry with tools: true to start its full agent",
+  advisorStructured: "; retry with tools: true to start its full agent",
+  agent: "; retry with tools: false to use its advisor without tools",
+  agentStructured: "; retry with tools: false to use its advisor without tools",
+};
+
+function requestedInvocationMode(options: InvocationOptions): InvocationMode {
+  if (options.tools === true) return options.structured === true ? "agentStructured" : "agent";
+  return options.structured === true ? "advisorStructured" : "advisor";
+}
+
+function invocationTemplate(
+  invocation: HarnessInvocation,
+  mode: InvocationMode,
+): readonly string[] | undefined {
+  switch (mode) {
+    case "advisor":
+      return invocation.noToolsArgs;
+    case "advisorStructured":
+      return invocation.noToolsJsonArgs;
+    case "agent":
+      return invocation.args;
+    case "agentStructured":
+      return invocation.jsonArgs;
+  }
+}
+
+function buildInvocationArgs(
+  template: readonly string[],
+  prompt: string,
+  modelArgs: readonly string[] | undefined,
+  model: string | undefined,
+): string[] {
+  const args = template.map((arg) => arg.replaceAll("{prompt}", prompt));
+  if (model !== undefined && modelArgs) {
+    args.push(...modelArgs.map((arg) => arg.replaceAll("{model}", model)));
+  }
+  return args;
+}
+
 function executeCommand(
   command: string,
-  args: string[],
-  options: { cwd?: string; env?: Record<string, string>; timeoutMs?: number },
+  args: readonly string[],
+  options: CommandOptions,
 ): Promise<InvokeResult> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
@@ -50,9 +119,11 @@ function executeCommand(
         }, options.timeoutMs)
       : undefined;
 
+    /* oxlint-disable-next-line typescript/prefer-readonly-parameter-types */
     child.stdout.on("data", (chunk: Buffer) => {
       stdout += chunk.toString("utf8");
     });
+    /* oxlint-disable-next-line typescript/prefer-readonly-parameter-types */
     child.stderr.on("data", (chunk: Buffer) => {
       stderr += chunk.toString("utf8");
     });
@@ -62,7 +133,14 @@ function executeCommand(
     });
     child.on("close", (code) => {
       if (timer) clearTimeout(timer);
-      resolve({ command, args, stdout, stderr, exitCode: timedOut ? null : code, timedOut });
+      resolve({
+        command,
+        args: [...args],
+        stdout,
+        stderr,
+        exitCode: timedOut ? null : code,
+        timedOut,
+      });
     });
   });
 }
@@ -131,7 +209,11 @@ export abstract class Harness {
     return null;
   }
 
-  /** Invocation modes available without fallback or prompt-only restrictions. */
+  /**
+   * Invocation modes available without fallback or prompt-only restrictions.
+   *
+   * @returns {HarnessInvocationModes} The exact supported invocation modes.
+   */
   get invocationModes(): HarnessInvocationModes {
     return {
       advisor: this.invocation?.noToolsArgs !== undefined,
@@ -145,72 +227,54 @@ export abstract class Harness {
    * Expands the invocation template for one prompt, without spawning anything.
    * Returns null when the harness has no headless mode, or no structured mode
    * when `structured` is requested.
+   *
+   * @param prompt - Prompt inserted into the invocation template.
+   * @param options - Requested model and execution mode.
+   * @returns {{ command: string, args: string[] } | null} The executable invocation, or null.
    */
   buildInvocation(
     prompt: string,
-    options: { model?: string; structured?: boolean; tools?: boolean } = {},
+    options: InvocationOptions = {},
   ): { command: string; args: string[] } | null {
     if (!this.invocation) return null;
     const command = this.invocation.binary ?? this.binaries[0];
     if (!command) return null;
     if (options.model !== undefined && !this.invocation.modelArgs) return null;
-    const tools = options.tools ?? false;
-    const template = tools
-      ? options.structured
-        ? this.invocation.jsonArgs
-        : this.invocation.args
-      : options.structured
-        ? this.invocation.noToolsJsonArgs
-        : this.invocation.noToolsArgs;
+    const template = invocationTemplate(this.invocation, requestedInvocationMode(options));
     if (!template) return null;
-    const args = template.map((arg) => arg.replaceAll("{prompt}", prompt));
-    const model = options.model;
-    if (model !== undefined && this.invocation.modelArgs) {
-      args.push(...this.invocation.modelArgs.map((arg) => arg.replaceAll("{model}", model)));
-    }
-    return { command, args };
+    return {
+      command,
+      args: buildInvocationArgs(template, prompt, this.invocation.modelArgs, options.model),
+    };
   }
 
-  /** Explains why an invocation option set cannot be built, or returns null when supported. */
-  invocationError(
-    options: { model?: string; structured?: boolean; tools?: boolean } = {},
-  ): string | null {
+  /**
+   * Explains why an invocation option set cannot be built, or returns null when supported.
+   *
+   * @param options - Requested model and execution mode.
+   * @returns {string | null} The incompatibility reason, or null when supported.
+   */
+  invocationError(options: InvocationOptions = {}): string | null {
     if (!this.invocation) return `Harness ${this.id} has no non-interactive invocation`;
     if (options.model !== undefined && !this.invocation.modelArgs) {
       return `Harness ${this.id} does not support model selection`;
     }
-    const tools = options.tools ?? false;
-    const available = tools
-      ? options.structured
-        ? this.invocation.jsonArgs
-        : this.invocation.args
-      : options.structured
-        ? this.invocation.noToolsJsonArgs
-        : this.invocation.noToolsArgs;
-    if (available) return null;
+    const mode = requestedInvocationMode(options);
+    if (invocationTemplate(this.invocation, mode)) return null;
 
-    const alternateAvailable = tools
-      ? options.structured
-        ? this.invocation.noToolsJsonArgs
-        : this.invocation.noToolsArgs
-      : options.structured
-        ? this.invocation.jsonArgs
-        : this.invocation.args;
-    const retry = alternateAvailable
-      ? tools
-        ? "; retry with tools: false to use its advisor without tools"
-        : "; retry with tools: true to start its full agent"
-      : "";
-
-    return tools
-      ? `Harness ${this.id} has no${options.structured ? " structured (JSON)" : ""} full agent invocation${retry}`
-      : `Harness ${this.id} has no${options.structured ? " structured (JSON)" : ""} advisor without tools invocation${retry}`;
+    const alternateAvailable = invocationTemplate(this.invocation, ALTERNATE_INVOCATION_MODE[mode]);
+    const retry = alternateAvailable ? INVOCATION_RETRY_HINT[mode] : "";
+    return `Harness ${this.id} has no ${INVOCATION_MODE_DESCRIPTION[mode]} invocation${retry}`;
   }
 
   /**
    * Runs one prompt through the harness non-interactively and collects the
    * output. stdin is closed so a harness that falls back to interactive mode
    * exits instead of waiting forever.
+   *
+   * @param prompt - Prompt sent to the harness.
+   * @param options - Invocation, environment, and timeout options.
+   * @returns {Promise<InvokeResult>} The completed process result.
    */
   invoke(prompt: string, options: InvokeOptions = {}): Promise<InvokeResult> {
     const invocationOptions = {
@@ -228,7 +292,12 @@ export abstract class Harness {
     return executeCommand(built.command, built.args, options);
   }
 
-  /** Expands the native model-listing recipe without spawning anything. */
+  /**
+   * Expands the native model-listing recipe without spawning anything.
+   *
+   * @param search - Optional native model search filter.
+   * @returns {{ command: string, args: string[] } | null} The command, or null when unsupported.
+   */
   buildModelListInvocation(search?: string): { command: string; args: string[] } | null {
     if (!this.modelListing) return null;
     const command = this.binaries[0];
@@ -244,16 +313,17 @@ export abstract class Harness {
   /**
    * Runs the harness's native model-listing command and normalizes its output.
    * stdin is closed for the same reason as {@link invoke}.
+   *
+   * @param options - Search, environment, and timeout options.
+   * @returns {Promise<ListModelsResult>} The normalized command and model result.
    */
   async listModels(options: ListModelsOptions = {}): Promise<ListModelsResult> {
     const built = this.buildModelListInvocation(options.search);
     if (!built) {
-      return Promise.reject(
-        new Error(
-          this.modelListing
-            ? `Harness ${this.id} does not support filtering its model listing`
-            : `Harness ${this.id} does not support model listing`,
-        ),
+      throw new Error(
+        this.modelListing
+          ? `Harness ${this.id} does not support filtering its model listing`
+          : `Harness ${this.id} does not support model listing`,
       );
     }
 
@@ -267,7 +337,11 @@ export abstract class Harness {
     };
   }
 
-  /** Converts a successful native model-listing response to the shared shape. */
+  /**
+   * Converts a successful native model-listing response to the shared shape.
+   *
+   * @param _stdout - Native command output to parse.
+   */
   protected parseModelListingOutput(_stdout: string): AvailableModel[] {
     throw new Error(`Harness ${this.id} does not implement model-list output parsing`);
   }
@@ -276,8 +350,15 @@ export abstract class Harness {
    * Filters one candidate list to the platform and expands its path
    * templates: the shared pipeline behind {@link resolve} and the MCP
    * config surface.
+   *
+   * @param entries - Candidate paths to filter and resolve.
+   * @param options - Platform and path-resolution overrides.
+   * @returns {T[]} Resolved candidates supported on the selected platform.
    */
-  resolveCandidates<T extends PathCandidate>(entries: T[], options: ResolveOptions = {}): T[] {
+  resolveCandidates<T extends PathCandidate>(
+    entries: readonly T[],
+    options: ResolveOptions = {},
+  ): T[] {
     const raw = options.platform ?? process.platform;
 
     if (!Object.hasOwn(SUPPORTED_PLATFORMS, raw)) {

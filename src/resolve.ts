@@ -10,10 +10,15 @@ export function resolvePathTemplate(template: string, options: ResolveOptions = 
     .replace(/^~(?=\/|$)/, homeDir)
     .replaceAll("${HOME}", homeDir)
     .replaceAll("${PROJECT_ROOT}", projectRoot)
-    .replace(/%([^%]+)%/g, (match, name) => process.env[name] ?? match);
+    .replaceAll(/%([^%]+)%/g, (match: string, name: string) => process.env[name] ?? match);
 }
 
-/** The agntn config directory: $XDG_CONFIG_HOME/agntn or ~/.config/agntn. */
+/**
+ * The agntn config directory: $XDG_CONFIG_HOME/agntn or ~/.config/agntn.
+ *
+ * @param options - Path-resolution overrides.
+ * @returns {string} The resolved agntn configuration directory.
+ */
 export function agntnConfigDir(options: ResolveOptions = {}): string {
   const base =
     process.env.XDG_CONFIG_HOME && process.env.XDG_CONFIG_HOME !== ""

@@ -59,7 +59,38 @@ function readIfExists(path: string): string | null {
   }
 }
 
-/** Reads agents.jsonc; missing file falls back to defaults. */
+function agentsConfigRecord(raw: string, configPath: string): Record<string, unknown> {
+  const parsed = parseJsonc(raw);
+  if (typeof parsed !== "object" || parsed === null) {
+    throw new Error(`Agents config at ${configPath} is not an object`);
+  }
+  return parsed as Record<string, unknown>;
+}
+
+function agentsSource(value: unknown, defaultSource: string, options: ResolveOptions): string {
+  if (typeof value !== "string") return defaultSource;
+  const expanded = resolvePathTemplate(value, options);
+  // A relative source would produce cwd-dependent, dangling links in every
+  // harness, so anchor it to the config directory it was declared in.
+  return isAbsolute(expanded) ? expanded : join(agntnConfigDir(options), expanded);
+}
+
+function agentsExcludes(value: unknown, configPath: string): string[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
+    throw new Error(
+      `Agents config at ${configPath} has an invalid excludes: expected an array of harness ids`,
+    );
+  }
+  return value as string[];
+}
+
+/**
+ * Reads agents.jsonc; missing file falls back to defaults.
+ *
+ * @param options - Path-resolution overrides.
+ * @returns {AgentsConfig} The normalized sync configuration.
+ */
 export function readAgentsConfig(options: ResolveOptions = {}): AgentsConfig {
   const configPath = join(agntnConfigDir(options), "agents.jsonc");
   const defaults: AgentsConfig = {
@@ -70,46 +101,27 @@ export function readAgentsConfig(options: ResolveOptions = {}): AgentsConfig {
   const raw = readIfExists(configPath);
   if (raw === null) return defaults;
 
-  const parsed = parseJsonc(raw);
-  if (typeof parsed !== "object" || parsed === null) {
-    throw new Error(`Agents config at ${configPath} is not an object`);
-  }
-  const record = parsed as Record<string, unknown>;
-
-  const expandedSource =
-    typeof record.source === "string" ? resolvePathTemplate(record.source, options) : undefined;
-  // A relative source would produce cwd-dependent, dangling links in every
-  // harness, so anchor it to the config directory it was declared in.
-  const source =
-    expandedSource === undefined
-      ? defaults.source
-      : isAbsolute(expandedSource)
-        ? expandedSource
-        : join(agntnConfigDir(options), expandedSource);
-
-  const rawExcludes = record.excludes;
-  if (
-    rawExcludes !== undefined &&
-    (!Array.isArray(rawExcludes) || rawExcludes.some((item) => typeof item !== "string"))
-  ) {
-    throw new Error(
-      `Agents config at ${configPath} has an invalid excludes: expected an array of harness ids`,
-    );
-  }
-
+  const record = agentsConfigRecord(raw, configPath);
   return {
-    source,
-    excludes: (rawExcludes as string[] | undefined) ?? [],
+    source: agentsSource(record.source, defaults.source, options),
+    excludes: agentsExcludes(record.excludes, configPath),
     configPath,
   };
 }
 
 type LinkState =
-  | { kind: "missing" }
-  | { kind: "correct-link" }
-  | { kind: "wrong-link" }
-  | { kind: "identical-file" }
-  | { kind: "diverged-file" };
+  | { readonly kind: "missing" }
+  | { readonly kind: "correct-link" }
+  | { readonly kind: "wrong-link" }
+  | { readonly kind: "identical-file" }
+  | { readonly kind: "diverged-file" };
+
+function inspectRegularFile(path: string, source: string): LinkState {
+  const content = readIfExists(path) ?? "";
+  const sourceContent = readIfExists(source) ?? "";
+  if (content.trim() === "" || content === sourceContent) return { kind: "identical-file" };
+  return { kind: "diverged-file" };
+}
 
 function inspectTarget(path: string, source: string): LinkState {
   let stats;
@@ -130,14 +142,15 @@ function inspectTarget(path: string, source: string): LinkState {
     return resolved === source ? { kind: "correct-link" } : { kind: "wrong-link" };
   }
 
-  const content = readIfExists(path) ?? "";
-  const sourceContent = readIfExists(source) ?? "";
-  return content.trim() === "" || content === sourceContent
-    ? { kind: "identical-file" }
-    : { kind: "diverged-file" };
+  return inspectRegularFile(path, source);
 }
 
-/** Replaces whatever sits at `path` with a symlink to `source`, atomically. */
+/**
+ * Replaces whatever sits at `path` with a symlink to `source`, atomically.
+ *
+ * @param path - Harness instructions path to replace.
+ * @param source - Master instructions path to link.
+ */
 function relink(path: string, source: string): void {
   mkdirSync(dirname(path), { recursive: true });
   const temp = join(dirname(path), `.${Date.now()}-${process.pid}.agents.tmp`);
@@ -145,12 +158,82 @@ function relink(path: string, source: string): void {
   renameSync(temp, path);
 }
 
+const CHECK_ACTION: Record<LinkState["kind"], AgentsTargetResult["action"]> = {
+  missing: "linked",
+  "correct-link": "unchanged",
+  "wrong-link": "relinked",
+  "identical-file": "relinked",
+  "diverged-file": "adopted",
+};
+
+function applyTarget(
+  harness: Harness,
+  path: string,
+  state: LinkState,
+  config: AgentsConfig,
+  options: ResolveOptions,
+): AgentsTargetResult {
+  if (state.kind === "diverged-file") {
+    const backupDir = join(agntnConfigDir(options), "diverged");
+    mkdirSync(backupDir, { recursive: true });
+    const backup = join(backupDir, `${harness.id}-${basename(path)}-${Date.now()}.md`);
+    renameSync(path, backup);
+    relink(path, config.source);
+    return { id: harness.id, path, action: "adopted", detail: backup };
+  }
+
+  if (state.kind === "wrong-link") unlinkSync(path);
+  if (state.kind === "wrong-link" || state.kind === "identical-file") {
+    relink(path, config.source);
+    return { id: harness.id, path, action: "relinked" };
+  }
+
+  relink(path, config.source);
+  return { id: harness.id, path, action: "linked" };
+}
+
+function syncTarget(
+  harness: Harness,
+  config: AgentsConfig,
+  check: boolean,
+  options: ResolveOptions,
+): AgentsTargetResult {
+  if (config.excludes.includes(harness.id)) {
+    return { id: harness.id, action: "skipped", detail: "excluded by the agents config" };
+  }
+  if (!harness.agentsFile) {
+    return {
+      id: harness.id,
+      action: "skipped",
+      detail: "no stable user-scope instructions file",
+    };
+  }
+
+  const path = resolvePathTemplate(harness.agentsFile, options);
+  const state = inspectTarget(path, config.source);
+  if (state.kind === "correct-link") return { id: harness.id, path, action: "unchanged" };
+  if (check) {
+    return {
+      id: harness.id,
+      path,
+      action: CHECK_ACTION[state.kind],
+      detail: "check mode: not applied",
+    };
+  }
+  return applyTarget(harness, path, state, config, options);
+}
+
 /**
  * Links every harness's user-scope instructions file to the master. In check
  * mode nothing is written; the report shows what a real run would do.
+ *
+ * @param harnesses - Harnesses to inspect or update.
+ * @param check - Report intended changes without writing them.
+ * @param options - Path-resolution overrides.
+ * @returns {AgentsSyncReport} Per-harness synchronization outcomes.
  */
 export function syncAgentsFiles(
-  harnesses: Harness[],
+  harnesses: readonly Harness[],
   check = false,
   options: ResolveOptions = {},
 ): AgentsSyncReport {
@@ -158,65 +241,9 @@ export function syncAgentsFiles(
   if (readIfExists(config.source) === null) {
     throw new Error(`No master agents file at ${config.source}`);
   }
-
-  const targets: AgentsTargetResult[] = [];
-  for (const harness of harnesses) {
-    if (config.excludes.includes(harness.id)) {
-      targets.push({ id: harness.id, action: "skipped", detail: "excluded by the agents config" });
-      continue;
-    }
-    if (!harness.agentsFile) {
-      targets.push({
-        id: harness.id,
-        action: "skipped",
-        detail: "no stable user-scope instructions file",
-      });
-      continue;
-    }
-
-    const path = resolvePathTemplate(harness.agentsFile, options);
-    const state = inspectTarget(path, config.source);
-
-    if (state.kind === "correct-link") {
-      targets.push({ id: harness.id, path, action: "unchanged" });
-      continue;
-    }
-
-    if (check) {
-      const action =
-        state.kind === "missing"
-          ? "linked"
-          : state.kind === "diverged-file"
-            ? "adopted"
-            : "relinked";
-      targets.push({ id: harness.id, path, action, detail: "check mode: not applied" });
-      continue;
-    }
-
-    if (state.kind === "diverged-file") {
-      const backupDir = join(agntnConfigDir(options), "diverged");
-      mkdirSync(backupDir, { recursive: true });
-      const backup = join(backupDir, `${harness.id}-${basename(path)}-${Date.now()}.md`);
-      renameSync(path, backup);
-      relink(path, config.source);
-      targets.push({ id: harness.id, path, action: "adopted", detail: backup });
-      continue;
-    }
-
-    if (state.kind === "wrong-link" || state.kind === "identical-file") {
-      if (state.kind === "wrong-link") {
-        // renameSync over a symlink replaces it, but remove explicitly so a
-        // dangling link never survives a partial failure.
-        unlinkSync(path);
-      }
-      relink(path, config.source);
-      targets.push({ id: harness.id, path, action: "relinked" });
-      continue;
-    }
-
-    relink(path, config.source);
-    targets.push({ id: harness.id, path, action: "linked" });
-  }
-
-  return { source: config.source, check, targets };
+  return {
+    source: config.source,
+    check,
+    targets: harnesses.map((harness) => syncTarget(harness, config, check, options)),
+  };
 }

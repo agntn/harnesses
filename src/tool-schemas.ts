@@ -12,13 +12,13 @@
  * that satisfy the host's stricter `TSchema`.
  */
 export interface McpSchemaBuilder<I, S> {
-  Object(properties: Record<string, I>, options?: object): S;
+  Object(properties: Readonly<Record<string, I>>, options?: object): S;
   String(options?: object): I;
   Integer(options?: object): I;
   Boolean(options?: object): I;
   Array(item: I, options?: object): I;
   Record(key: I, value: I, options?: object): I;
-  Union(schemas: I[], options?: object): I;
+  Union(schemas: readonly I[], options?: object): I;
   Literal(value: string, options?: object): I;
   Optional(schema: I): I;
 }
@@ -26,7 +26,12 @@ export interface McpSchemaBuilder<I, S> {
 export const HARNESS_INFO_MAX_ITEMS = 20;
 export const RUN_TIMEOUT_DEFAULT_SECONDS = 600;
 
-/** Builds the parameter schemas for all harness tools with the host's TypeBox. */
+/**
+ * Builds the parameter schemas for all harness tools with the host's TypeBox.
+ *
+ * @param Type - Host-provided TypeBox-compatible schema builder.
+ * @returns {Record<string, S>} Schemas keyed by harness tool operation.
+ */
 export function harnessToolSchemas<I, S>(Type: McpSchemaBuilder<I, S>) {
   const harnessId = (description: string) =>
     Type.String({ description, minLength: 1, maxLength: 50, pattern: "^[a-z][a-z0-9-]*$" });

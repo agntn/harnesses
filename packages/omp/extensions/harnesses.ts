@@ -30,6 +30,8 @@ let toolOperationsPromise: Promise<typeof HarnessTools> | undefined;
  * stay identical across surfaces. Both specifiers stay literal on purpose:
  * OMP's compiled loader rewrites bare dependencies only for imports it can
  * see statically.
+ *
+ * @returns {Promise<typeof HarnessTools>} The shared executor module.
  */
 function loadToolOperations(): Promise<typeof HarnessTools> {
   toolOperationsPromise ??= (

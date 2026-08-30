@@ -19,6 +19,25 @@ function fixtureDirs(): { homeDir: string; projectRoot: string } {
   return { homeDir, projectRoot };
 }
 
+function parseJsonRecord(path: string): Record<string, unknown> {
+  const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new TypeError(`Expected a JSON object at ${path}`);
+  }
+  return parsed as Record<string, unknown>;
+}
+
+function nestedRecord(
+  record: Readonly<Record<string, unknown>>,
+  key: string,
+): Record<string, unknown> {
+  const value = record[key];
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new TypeError(`Expected ${key} to be an object`);
+  }
+  return value as Record<string, unknown>;
+}
+
 describe("listMcpServers", () => {
   it("normalizes the standard JSON dialect", () => {
     const dirs = fixtureDirs();
@@ -161,9 +180,9 @@ describe("addMcpServer / removeMcpServer", () => {
       dirs,
     );
 
-    const raw = JSON.parse(readFileSync(join(dirs.homeDir, ".claude.json"), "utf8"));
+    const raw = parseJsonRecord(join(dirs.homeDir, ".claude.json"));
     expect(raw.theme).toBe("dark");
-    expect(Object.keys(raw.mcpServers).sort()).toEqual(["extra", "keep"]);
+    expect(Object.keys(nestedRecord(raw, "mcpServers")).sort()).toEqual(["extra", "keep"]);
   });
 
   it("writes the Antigravity serverUrl dialect shape", () => {
@@ -177,8 +196,10 @@ describe("addMcpServer / removeMcpServer", () => {
     );
 
     const path = join(dirs.homeDir, ".gemini", "config", "mcp_config.json");
-    const raw = JSON.parse(readFileSync(path, "utf8"));
-    expect(raw.mcpServers.remote).toEqual({ serverUrl: "https://example.com/sse" });
+    const raw = parseJsonRecord(path);
+    expect(nestedRecord(raw, "mcpServers").remote).toEqual({
+      serverUrl: "https://example.com/sse",
+    });
   });
 
   it("writes the opencode dialect shape", () => {
@@ -191,8 +212,8 @@ describe("addMcpServer / removeMcpServer", () => {
       dirs,
     );
 
-    const raw = JSON.parse(readFileSync(join(dirs.projectRoot, "opencode.json"), "utf8"));
-    expect(raw.mcp.srv).toEqual({
+    const raw = parseJsonRecord(join(dirs.projectRoot, "opencode.json"));
+    expect(nestedRecord(raw, "mcp").srv).toEqual({
       type: "local",
       command: ["bun", "x", "srv"],
       environment: { K: "v" },
@@ -437,7 +458,7 @@ describe("syncMcpServers", () => {
     const previousXdg = process.env.XDG_CONFIG_HOME;
     delete process.env.XDG_CONFIG_HOME;
     try {
-      const masterBody = (excludes: string[]) =>
+      const masterBody = (excludes: readonly string[]) =>
         JSON.stringify({
           excludes,
           mcpServers: { probe: { command: "node" }, cloud: { url: "https://example.com/mcp" } },

@@ -159,7 +159,7 @@ describe("@agntn/harnesses", () => {
   it("should reject inherited property names as platforms", () => {
     const codex = getHarness("codex");
 
-    expect(() => Reflect.apply(codex.resolve, codex, [{ platform: "toString" }])).toThrow(
+    expect(() => codex.resolve({ platform: "toString" as never })).toThrow(
       "Unsupported platform: toString",
     );
   });

@@ -3,18 +3,18 @@
 import { defineCommand, runMain } from "citty";
 import { consola } from "consola";
 import { encode as toToon } from "@toon-format/toon";
-import { version } from "./types.ts";
+import { version, type AvailableModel, type InvokeResult } from "./types.ts";
 import { getAllHarnesses, getHarness, isHarnessId, listHarnesses } from "./registry.ts";
-import { listHarnessModels } from "./tool-operations.ts";
+import { listHarnessModels, type ModelsOutcome, type RunFailure } from "./tool-operations.ts";
 
 const s = {
-  cyan: (t: string) => `\x1b[36m${t}\x1b[0m`,
-  hi: (t: string) => `\x1b[96m${t}\x1b[0m`,
-  green: (t: string) => `\x1b[32m${t}\x1b[0m`,
-  red: (t: string) => `\x1b[31m${t}\x1b[0m`,
-  dim: (t: string) => `\x1b[90m${t}\x1b[0m`,
-  bold: (t: string) => `\x1b[1m${t}\x1b[0m`,
-  white: (t: string) => `\x1b[97m${t}\x1b[0m`,
+  cyan: (t: string) => `\x1B[36m${t}\x1B[0m`,
+  hi: (t: string) => `\x1B[96m${t}\x1B[0m`,
+  green: (t: string) => `\x1B[32m${t}\x1B[0m`,
+  red: (t: string) => `\x1B[31m${t}\x1B[0m`,
+  dim: (t: string) => `\x1B[90m${t}\x1B[0m`,
+  bold: (t: string) => `\x1B[1m${t}\x1B[0m`,
+  white: (t: string) => `\x1B[97m${t}\x1B[0m`,
 };
 
 function header(title: string) {
@@ -31,7 +31,12 @@ function entry(content: string) {
 
 function renderPathSection(
   title: string,
-  entries: { path: string; scope: string; platforms?: string[]; note?: string }[],
+  entries: readonly {
+    readonly path: string;
+    readonly scope: string;
+    readonly platforms?: readonly string[];
+    readonly note?: string;
+  }[],
 ) {
   if (!entries.length) return;
   consola.log(section(title));
@@ -54,7 +59,7 @@ const harnessArg = {
   required: true,
 };
 
-function emit(data: unknown, args: { json?: boolean; toon?: boolean }) {
+function emit(data: unknown, args: Readonly<{ json?: boolean; toon?: boolean }>) {
   if (args.json) {
     console.log(JSON.stringify(data, null, 2));
     return true;
@@ -72,6 +77,55 @@ function resolveHarness(id: string): ReturnType<typeof getHarness> {
     process.exit(1);
   }
   return getHarness(id);
+}
+
+function renderResolvedPathSection(
+  title: string,
+  entries: readonly { readonly path: string }[],
+): void {
+  if (entries.length === 0) return;
+  consola.log(section(title));
+  for (const item of entries) consola.log(entry(s.hi(item.path)));
+}
+
+function parsePositiveTimeout(raw: string | undefined): number | null | undefined {
+  if (!raw) return undefined;
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function modelFailureMessage(details: ModelsOutcome | RunFailure): string {
+  return "error" in details ? details.error : "Failed to list models";
+}
+
+function modelDescription(model: Readonly<AvailableModel>): string {
+  const features: string[] = [];
+  if (model.thinking) features.push("thinking");
+  if (model.images) features.push("images");
+  const suffix = features.length > 0 ? ` · ${features.join(", ")}` : "";
+  return `${model.contextWindow} context · ${model.maxOutputTokens} max-out${suffix}`;
+}
+
+function renderModels(details: ModelsOutcome): void {
+  consola.log(header(`${details.id} models`));
+  consola.log("");
+  for (const model of details.models) {
+    consola.log(
+      entry(`${s.hi(`${model.provider}/${model.id}`)}  ${s.dim(modelDescription(model))}`),
+    );
+  }
+  if (details.models.length === 0) consola.log(entry(s.dim("No models found")));
+  consola.log("");
+}
+
+function finishInvocation(result: InvokeResult, timeoutSeconds: number | undefined): never {
+  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stderr) process.stderr.write(result.stderr);
+  if (result.timedOut) {
+    consola.error(`Timed out after ${timeoutSeconds}s`);
+    process.exit(124);
+  }
+  process.exit(result.exitCode ?? 1);
 }
 
 const list = defineCommand({
@@ -211,35 +265,12 @@ const paths = defineCommand({
 
     consola.log(header(`${harness.name}  ${s.dim(process.platform)}`));
 
-    if (resolved.config.length) {
-      consola.log(section("Config"));
-      for (const e of resolved.config) consola.log(entry(s.hi(e.path)));
-    }
-
-    if (resolved.sessions.length) {
-      consola.log(section("Sessions"));
-      for (const e of resolved.sessions) consola.log(entry(s.hi(e.path)));
-    }
-
-    if (resolved.instructions.length) {
-      consola.log(section("Instructions"));
-      for (const e of resolved.instructions) consola.log(entry(s.hi(e.path)));
-    }
-
-    if (resolved.skills.length) {
-      consola.log(section("Skills"));
-      for (const e of resolved.skills) consola.log(entry(s.hi(e.path)));
-    }
-
-    if (resolved.commands.length) {
-      consola.log(section("Commands"));
-      for (const e of resolved.commands) consola.log(entry(s.hi(e.path)));
-    }
-
-    if (resolved.hooks.length) {
-      consola.log(section("Hooks"));
-      for (const e of resolved.hooks) consola.log(entry(s.hi(e.path)));
-    }
+    renderResolvedPathSection("Config", resolved.config);
+    renderResolvedPathSection("Sessions", resolved.sessions);
+    renderResolvedPathSection("Instructions", resolved.instructions);
+    renderResolvedPathSection("Skills", resolved.skills);
+    renderResolvedPathSection("Commands", resolved.commands);
+    renderResolvedPathSection("Hooks", resolved.hooks);
 
     consola.log("");
   },
@@ -262,8 +293,8 @@ const models = defineCommand({
     ...formatArgs,
   },
   async run({ args }) {
-    const timeoutSeconds = args.timeout ? Number(args.timeout) : undefined;
-    if (timeoutSeconds !== undefined && !(Number.isFinite(timeoutSeconds) && timeoutSeconds > 0)) {
+    const timeoutSeconds = parsePositiveTimeout(args.timeout);
+    if (timeoutSeconds === null) {
       consola.error(`Invalid timeout: ${args.timeout}`);
       process.exitCode = 1;
       return;
@@ -279,28 +310,12 @@ const models = defineCommand({
       return;
     }
     if (result.isError || !("models" in result.details)) {
-      consola.error("error" in result.details ? result.details.error : `Failed to list models`);
+      consola.error(modelFailureMessage(result.details));
       process.exitCode = 1;
       return;
     }
 
-    consola.log(header(`${result.details.id} models`));
-    consola.log("");
-    for (const model of result.details.models) {
-      const features = [
-        model.thinking ? "thinking" : undefined,
-        model.images ? "images" : undefined,
-      ]
-        .filter(Boolean)
-        .join(", ");
-      consola.log(
-        entry(
-          `${s.hi(`${model.provider}/${model.id}`)}  ${s.dim(`${model.contextWindow} context · ${model.maxOutputTokens} max-out${features ? ` · ${features}` : ""}`)}`,
-        ),
-      );
-    }
-    if (result.details.models.length === 0) consola.log(entry(s.dim("No models found")));
-    consola.log("");
+    renderModels(result.details);
   },
 });
 
@@ -337,8 +352,8 @@ const run = defineCommand({
       process.exit(1);
     }
 
-    const timeoutSeconds = args.timeout ? Number(args.timeout) : undefined;
-    if (timeoutSeconds !== undefined && !(Number.isFinite(timeoutSeconds) && timeoutSeconds > 0)) {
+    const timeoutSeconds = parsePositiveTimeout(args.timeout);
+    if (timeoutSeconds === null) {
       consola.error(`Invalid timeout: ${args.timeout}`);
       process.exit(1);
     }
@@ -351,13 +366,7 @@ const run = defineCommand({
       tools,
     });
 
-    if (result.stdout) process.stdout.write(result.stdout);
-    if (result.stderr) process.stderr.write(result.stderr);
-    if (result.timedOut) {
-      consola.error(`Timed out after ${timeoutSeconds}s`);
-      process.exit(124);
-    }
-    process.exit(result.exitCode ?? 1);
+    finishInvocation(result, timeoutSeconds);
   },
 });
 
@@ -380,4 +389,4 @@ const main = defineCommand({
   },
 });
 
-runMain(main);
+await runMain(main);

@@ -15,6 +15,31 @@ async function connectTestClient(): Promise<Client> {
   return client;
 }
 
+type TextContent = Readonly<{ type: "text"; text: string }>;
+
+function isTextContent(value: unknown): value is TextContent {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "type" in value &&
+    value.type === "text" &&
+    "text" in value &&
+    typeof value.text === "string"
+  );
+}
+
+function onlyTextContent(content: unknown): string {
+  if (!Array.isArray(content) || content.length !== 1) {
+    throw new TypeError("Expected exactly one MCP content block");
+  }
+  const [part] = content as unknown[];
+  if (!isTextContent(part)) throw new TypeError("Expected an MCP text content block");
+  if (Object.keys(part).sort().join(",") !== "text,type") {
+    throw new TypeError("Expected only MCP text content fields");
+  }
+  return part.text;
+}
+
 afterEach(async () => {
   await Promise.all(openConnections.splice(0).map((connection) => connection.close()));
 });
@@ -108,9 +133,7 @@ describe("harnesses MCP server", () => {
     });
 
     expect(response.isError).toBe(true);
-    expect(response.content).toEqual([
-      { type: "text", text: expect.stringContaining("Invalid arguments at /id") },
-    ]);
+    expect(onlyTextContent(response.content)).toContain("Invalid arguments at /id");
   });
 
   it("rejects an id the pattern forbids", async () => {
@@ -122,9 +145,7 @@ describe("harnesses MCP server", () => {
     });
 
     expect(response.isError).toBe(true);
-    expect(response.content).toEqual([
-      { type: "text", text: expect.stringContaining("Invalid arguments at /id") },
-    ]);
+    expect(onlyTextContent(response.content)).toContain("Invalid arguments at /id");
   });
 
   it("rejects arguments that miss the schema", async () => {
@@ -136,8 +157,6 @@ describe("harnesses MCP server", () => {
     });
 
     expect(response.isError).toBe(true);
-    expect(response.content).toEqual([
-      { type: "text", text: expect.stringContaining("Invalid arguments") },
-    ]);
+    expect(onlyTextContent(response.content)).toContain("Invalid arguments");
   });
 });
