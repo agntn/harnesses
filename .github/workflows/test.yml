@@ -12,6 +12,9 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [24, 26]
     steps:
       - uses: actions/checkout@v6
 
@@ -19,7 +22,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: lts/*
+          node-version: ${{ matrix.node-version }}
           cache: pnpm
 
       - run: pnpm i --frozen-lockfile
@@ -34,4 +37,4 @@ jobs:
         run: pnpm build
 
       - name: Test
-        run: pnpm test:run
+        run: pnpm test
