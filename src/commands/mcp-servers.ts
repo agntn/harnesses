@@ -19,8 +19,16 @@ function sanitize(text: string | undefined): string {
   return stripVTControlCharacters(text ?? "").replace(UNSAFE_TERMINAL_CONTROLS, " ");
 }
 
-/** Emits one tool result: machine format when asked, sanitized text otherwise. */
-function report(result: ToolResult<unknown>, args: { json?: boolean; toon?: boolean }): void {
+/**
+ * Emits one tool result: machine format when asked, sanitized text otherwise.
+ *
+ * @param result - Tool result to emit.
+ * @param args - Selected output-format flags.
+ */
+function report(
+  result: ToolResult<unknown>,
+  args: Readonly<{ json?: boolean; toon?: boolean }>,
+): void {
   if (result.isError) {
     consola.error(sanitize(result.content[0]?.text));
     process.exit(1);

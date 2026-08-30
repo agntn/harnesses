@@ -14,7 +14,10 @@ const formatArgs = {
 // oxlint-disable-next-line no-control-regex -- Terminal control bytes are precisely what this boundary removes.
 const UNSAFE_TERMINAL_CONTROLS = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F]/g;
 
-function report(result: ToolResult<unknown>, args: { json?: boolean; toon?: boolean }): void {
+function report(
+  result: ToolResult<unknown>,
+  args: Readonly<{ json?: boolean; toon?: boolean }>,
+): void {
   const sanitize = (text: string | undefined) =>
     stripVTControlCharacters(text ?? "").replace(UNSAFE_TERMINAL_CONTROLS, " ");
   if (result.isError) {

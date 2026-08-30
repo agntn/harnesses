@@ -120,7 +120,86 @@ function truncate(output: string): string {
   return `${output.slice(0, RUN_MAX_OUTPUT_CHARS)}\n[truncated ${output.length - RUN_MAX_OUTPUT_CHARS} of ${output.length} characters]`;
 }
 
-/** Scans every registered harness for its binaries and version. */
+function modelListingUnavailable(harness: Harness, id: string): RunFailure {
+  return {
+    error: harness.modelListing
+      ? `Harness ${id} does not support filtering its model listing`
+      : `Harness ${id} does not support model listing`,
+  };
+}
+
+type RunInvocationOptions = Readonly<{
+  model?: string;
+  structured: boolean;
+  tools: boolean;
+}>;
+
+type InvocationMode = keyof HarnessInvocationModes;
+
+const ALTERNATE_INVOCATION_MODE: Record<InvocationMode, InvocationMode> = {
+  advisor: "agent",
+  advisorStructured: "agentStructured",
+  agent: "advisor",
+  agentStructured: "advisorStructured",
+};
+
+function selectedInvocationMode(structured: boolean, tools: boolean): InvocationMode {
+  if (tools) return structured ? "agentStructured" : "agent";
+  return structured ? "advisorStructured" : "advisor";
+}
+
+function completedRun(
+  harness: Harness,
+  result: InvokeResult,
+  options: RunInvocationOptions,
+): ToolResult<RunOutcome> {
+  const details: RunOutcome = {
+    id: harness.id,
+    command: result.command,
+    args: result.args,
+    ...(options.model === undefined ? {} : { model: options.model }),
+    structured: options.structured,
+    tools: options.tools,
+    exitCode: result.exitCode,
+    timedOut: result.timedOut,
+    stdout: truncate(result.stdout),
+    stderr: truncate(result.stderr),
+  };
+  if (result.timedOut || result.exitCode !== 0) {
+    return { content: text(details), details, isError: true };
+  }
+  return { content: text(details), details };
+}
+
+function unsupportedInvocation(
+  harness: Harness,
+  id: string,
+  options: RunInvocationOptions,
+): ToolResult<RunFailure> {
+  const error = harness.invocationError(options) ?? `Invalid ${id} invocation`;
+  const invocationModes = harness.invocationModes;
+  const mode = selectedInvocationMode(options.structured, options.tools);
+  const modelUnsupported =
+    options.model !== undefined && harness.invocation?.modelArgs === undefined;
+  if (invocationModes[mode] || harness.invocation === null || modelUnsupported) {
+    const details: RunFailure = { error };
+    return { content: text(details), details, isError: true };
+  }
+
+  const alternateAvailable = invocationModes[ALTERNATE_INVOCATION_MODE[mode]];
+  const details: RunFailure = {
+    error,
+    invocationModes,
+    ...(alternateAvailable ? { retry: { tools: !options.tools } } : {}),
+  };
+  return { content: text(details), details, isError: true };
+}
+
+/**
+ * Scans every registered harness for its binaries and version.
+ *
+ * @returns {ToolResult<HarnessListing>} The complete installation listing.
+ */
 export function detectHarnesses(): ToolResult<HarnessListing> {
   const details: HarnessListing = {
     harnesses: getAllHarnesses().map((harness) => {
@@ -209,7 +288,13 @@ export interface ModelsOutcome {
   stderr: string;
 }
 
-/** Lists the models currently available to one harness through its native CLI. */
+/**
+ * Lists the models currently available to one harness through its native CLI.
+ *
+ * @param id - Harness id to query.
+ * @param options - Search, working-directory, and timeout options.
+ * @returns {Promise<ToolResult<ModelsOutcome | RunFailure>>} The model listing or failure.
+ */
 export async function listHarnessModels(
   id: string,
   options: ModelsOptions = {},
@@ -219,11 +304,7 @@ export async function listHarnessModels(
   const harness = getHarness(id);
   const built = harness.buildModelListInvocation(options.search);
   if (!built) {
-    const details: RunFailure = {
-      error: harness.modelListing
-        ? `Harness ${id} does not support filtering its model listing`
-        : `Harness ${id} does not support model listing`,
-    };
+    const details = modelListingUnavailable(harness, id);
     return { content: text(details), details, isError: true };
   }
 
@@ -303,6 +384,11 @@ export interface RunFailure {
  * agent invocation. `model` is translated through the harness-specific recipe.
  * This layer also closes stdin, enforces the timeout, and
  * caps the echoed output.
+ *
+ * @param id - Harness id to run.
+ * @param prompt - Prompt sent to the selected harness.
+ * @param options - Model, mode, working-directory, and timeout options.
+ * @returns {Promise<ToolResult<RunOutcome | RunFailure>>} The capped run outcome or failure.
  */
 export async function runHarness(
   id: string,
@@ -316,31 +402,7 @@ export async function runHarness(
   const tools = options.tools ?? false;
   const invocationOptions = { model: options.model, structured, tools };
   if (!harness.buildInvocation(prompt, invocationOptions)) {
-    const invocationModes = harness.invocationModes;
-    const requestedModeExists = structured
-      ? tools
-        ? invocationModes.agentStructured
-        : invocationModes.advisorStructured
-      : tools
-        ? invocationModes.agent
-        : invocationModes.advisor;
-    const alternateModeExists = structured
-      ? tools
-        ? invocationModes.advisorStructured
-        : invocationModes.agentStructured
-      : tools
-        ? invocationModes.advisor
-        : invocationModes.agent;
-    const modeCausedFailure =
-      !requestedModeExists &&
-      harness.invocation !== null &&
-      (options.model === undefined || harness.invocation.modelArgs !== undefined);
-    const details: RunFailure = {
-      error: harness.invocationError(invocationOptions) ?? `Invalid ${id} invocation`,
-      ...(modeCausedFailure ? { invocationModes } : {}),
-      ...(modeCausedFailure && alternateModeExists ? { retry: { tools: !tools } } : {}),
-    };
-    return { content: text(details), details, isError: true };
+    return unsupportedInvocation(harness, id, invocationOptions);
   }
 
   const timeoutSeconds = options.timeoutSeconds ?? RUN_DEFAULT_TIMEOUT_SECONDS;
@@ -359,24 +421,7 @@ export async function runHarness(
     return { content: text(details), details, isError: true };
   }
 
-  const details: RunOutcome = {
-    id: harness.id,
-    command: result.command,
-    args: result.args,
-    ...(options.model === undefined ? {} : { model: options.model }),
-    structured,
-    tools,
-    exitCode: result.exitCode,
-    timedOut: result.timedOut,
-    stdout: truncate(result.stdout),
-    stderr: truncate(result.stderr),
-  };
-
-  return {
-    content: text(details),
-    details,
-    ...(result.timedOut || result.exitCode !== 0 ? { isError: true } : {}),
-  };
+  return completedRun(harness, result, invocationOptions);
 }
 
 /** MCP server listings for one harness or all of them. */
@@ -402,7 +447,12 @@ export interface McpServerParams {
   headers?: Record<string, string>;
 }
 
-/** Builds the normalized server shape from flat tool parameters. */
+/**
+ * Builds the normalized server shape from flat tool parameters.
+ *
+ * @param params - Flat MCP server parameters.
+ * @returns {McpServerConfig} The normalized server configuration.
+ */
 export function toMcpServerConfig(params: McpServerParams): McpServerConfig {
   const server: McpServerConfig = {
     name: params.name,
@@ -416,7 +466,12 @@ export function toMcpServerConfig(params: McpServerParams): McpServerConfig {
   return server;
 }
 
-/** Lists configured MCP servers, normalized across harness config dialects. */
+/**
+ * Lists configured MCP servers, normalized across harness config dialects.
+ *
+ * @param id - Optional harness id; omission lists every harness.
+ * @returns {ToolResult<McpListing | UnknownHarness>} The normalized listing or id error.
+ */
 export function mcpList(id?: string): ToolResult<McpListing | UnknownHarness> {
   if (id !== undefined && !isHarnessId(id)) return unknownHarness(id);
 
@@ -446,7 +501,14 @@ function mcpMutate(
   }
 }
 
-/** Adds or replaces one MCP server in a harness's config. */
+/**
+ * Adds or replaces one MCP server in a harness's config.
+ *
+ * @param id - Target harness id.
+ * @param params - Server parameters to normalize and write.
+ * @param scope - User or project config scope.
+ * @returns {ToolResult<McpMutation | RunFailure>} The mutation outcome or failure.
+ */
 export function mcpAdd(
   id: string,
   params: McpServerParams,
@@ -458,7 +520,14 @@ export function mcpAdd(
   });
 }
 
-/** Removes one MCP server from a harness's config. */
+/**
+ * Removes one MCP server from a harness's config.
+ *
+ * @param id - Target harness id.
+ * @param name - Server name to remove.
+ * @param scope - User or project config scope.
+ * @returns {ToolResult<McpMutation | RunFailure>} The mutation outcome or failure.
+ */
 export function mcpRemove(
   id: string,
   name: string,
@@ -470,7 +539,12 @@ export function mcpRemove(
   });
 }
 
-/** Pushes the master MCP list from ~/.config/agntn/mcp.jsonc into harness configs. */
+/**
+ * Pushes the master MCP list from ~/.config/agntn/mcp.jsonc into harness configs.
+ *
+ * @param id - Optional harness id; omission targets every harness.
+ * @returns {ToolResult<SyncReport | RunFailure>} The sync report or failure.
+ */
 export function mcpSync(id?: string): ToolResult<SyncReport | RunFailure> {
   if (id !== undefined && !isHarnessId(id)) return unknownHarness(id);
 
@@ -495,7 +569,13 @@ export function mcpSync(id?: string): ToolResult<SyncReport | RunFailure> {
   }
 }
 
-/** Links every harness's global instructions file to the master AGENTS.md. */
+/**
+ * Links every harness's global instructions file to the master AGENTS.md.
+ *
+ * @param id - Optional harness id; omission targets every harness.
+ * @param check - Report intended changes without writing them.
+ * @returns {ToolResult<AgentsSyncReport | RunFailure>} The sync report or failure.
+ */
 export function agentsSync(id?: string, check = false): ToolResult<AgentsSyncReport | RunFailure> {
   if (id !== undefined && !isHarnessId(id)) return unknownHarness(id);
 

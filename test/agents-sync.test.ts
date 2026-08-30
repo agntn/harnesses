@@ -30,6 +30,22 @@ function withoutXdg<T>(body: () => T): T {
   }
 }
 
+type AgentTarget = ReturnType<typeof syncAgentsFiles>["targets"][number];
+
+function requiredTarget(
+  targets: ReadonlyMap<string, Readonly<AgentTarget>>,
+  id: string,
+): Readonly<AgentTarget> {
+  const target = targets.get(id);
+  if (!target) throw new Error(`Missing sync target: ${id}`);
+  return target;
+}
+
+function requiredPath(target: Readonly<AgentTarget>): string {
+  if (!target.path) throw new Error(`Missing path for sync target: ${target.id}`);
+  return target.path;
+}
+
 describe("syncAgentsFiles", () => {
   it("links, repairs, adopts, and honors excludes", () => {
     withoutXdg(() => {
@@ -60,21 +76,23 @@ describe("syncAgentsFiles", () => {
       const report = syncAgentsFiles(targets, false, { homeDir });
       const byId = new Map(report.targets.map((t) => [t.id, t]));
 
-      expect(byId.get("antigravity")?.action).toBe("linked");
-      expect(byId.get("antigravity")?.path).toBe(join(homeDir, ".gemini", "config", "AGENTS.md"));
-      expect(byId.get("claude")?.action).toBe("linked");
-      expect(byId.get("codex")?.action).toBe("skipped");
-      expect(byId.get("omp")?.action).toBe("relinked");
-      expect(byId.get("pi")?.action).toBe("adopted");
-      expect(byId.get("gemini")?.action).toBe("relinked");
-      expect(byId.get("grok")?.action).toBe("skipped");
+      const antigravity = requiredTarget(byId, "antigravity");
+      expect(antigravity.action).toBe("linked");
+      expect(antigravity.path).toBe(join(homeDir, ".gemini", "config", "AGENTS.md"));
+      expect(requiredTarget(byId, "claude").action).toBe("linked");
+      expect(requiredTarget(byId, "codex").action).toBe("skipped");
+      expect(requiredTarget(byId, "omp").action).toBe("relinked");
+      expect(requiredTarget(byId, "pi").action).toBe("adopted");
+      expect(requiredTarget(byId, "gemini").action).toBe("relinked");
+      expect(requiredTarget(byId, "grok").action).toBe("skipped");
 
       for (const id of ["antigravity", "claude", "omp", "pi", "gemini"]) {
-        const path = byId.get(id)?.path as string;
+        const path = requiredPath(requiredTarget(byId, id));
         expect(lstatSync(path).isSymbolicLink()).toBe(true);
         expect(realpathSync(path)).toBe(realpathSync(master));
       }
-      const backup = byId.get("pi")?.detail as string;
+      const backup = requiredTarget(byId, "pi").detail;
+      if (!backup) throw new Error("Missing backup path for adopted Pi instructions");
       expect(readFileSync(backup, "utf8")).toBe("# local drift\n");
 
       const second = syncAgentsFiles(targets, false, { homeDir });

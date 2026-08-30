@@ -42,6 +42,8 @@ export function getAllHarnesses(): Harness[] {
 /**
  * Detect the active agent from environment variables.
  * Returns the first match since env detection is unambiguous.
+ *
+ * @returns {Harness | null} The detected harness, or null when none matches.
  */
 export function detectHarnessFromEnv(): Harness | null {
   for (const harness of getRegistry().values()) {
@@ -53,6 +55,9 @@ export function detectHarnessFromEnv(): Harness | null {
 /**
  * Detect which agents have project-level markers in the given directory.
  * Returns all matches (multiple agents can be configured in the same project).
+ *
+ * @param cwd - Directory to inspect; defaults to the current working directory.
+ * @returns {Harness[]} Every harness whose project markers match.
  */
 export function detectProjectHarnesses(cwd?: string): Harness[] {
   return [...getRegistry().values()].filter((harness) => harness.detectProject(cwd));
@@ -63,6 +68,9 @@ export function detectProjectHarnesses(cwd?: string): Harness[] {
  * 1. Env vars (running inside agent = unambiguous)
  * 2. Single project-level match
  * 3. null if ambiguous or no match
+ *
+ * @param cwd - Directory to inspect for project markers.
+ * @returns {Harness | null} The unambiguous active harness, or null.
  */
 export function detectHarness(cwd?: string): Harness | null {
   const fromEnv = detectHarnessFromEnv();

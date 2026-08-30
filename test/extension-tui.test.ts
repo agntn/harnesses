@@ -43,7 +43,7 @@ function registeredTools(
   return tools;
 }
 
-function tool(tools: unknown[], name: string): Record<string, unknown> {
+function tool(tools: readonly unknown[], name: string): Record<string, unknown> {
   const found = tools.find((candidate) => isRecord(candidate) && candidate.name === name);
   if (!isRecord(found)) throw new Error(`Tool not registered: ${name}`);
   return found;
@@ -53,14 +53,14 @@ function render(component: unknown): string {
   if (!isRecord(component) || typeof component.render !== "function") {
     throw new Error("Renderer did not return a component");
   }
-  const lines = Reflect.apply(component.render, component, [120]);
+  const lines: unknown = Reflect.apply(component.render, component, [120]);
   if (!Array.isArray(lines) || lines.some((line) => typeof line !== "string")) {
     throw new Error("Component returned invalid lines");
   }
   return lines.join("\n");
 }
 
-function renderCall(definition: Record<string, unknown>, omp: boolean): string {
+function renderCall(definition: Readonly<Record<string, unknown>>, omp: boolean): string {
   if (typeof definition.renderCall !== "function") throw new Error("Missing renderCall");
   const args = { id: "pi", prompt: `inspect\u001B]8;;https://example.com\u0007${"x".repeat(500)}` };
   const rendererArgs = omp
@@ -69,7 +69,7 @@ function renderCall(definition: Record<string, unknown>, omp: boolean): string {
   return render(Reflect.apply(definition.renderCall, definition, rendererArgs));
 }
 
-function renderResult(definition: Record<string, unknown>, omp: boolean): string {
+function renderResult(definition: Readonly<Record<string, unknown>>, omp: boolean): string {
   if (typeof definition.renderResult !== "function") throw new Error("Missing renderResult");
   const result = { details: { id: "pi", name: "Pi\u001B[31m Agent" } };
   const rendererArgs = omp
@@ -84,7 +84,7 @@ describe("Pi and OMP extension renderers", () => {
 
   it("registers custom renderers for every tool in both hosts", () => {
     const expected = Object.keys(HARNESS_TOOL_LABELS).sort();
-    const names = (tools: unknown[]) =>
+    const names = (tools: readonly unknown[]) =>
       tools.flatMap((definition) =>
         isRecord(definition) && typeof definition.name === "string" ? [definition.name] : [],
       );
