@@ -39,11 +39,19 @@ class FakeCursor extends Harness {
 }
 
 describe("normalized invocation", () => {
-  it("defaults to an advisor invocation without tools", () => {
+  it("keeps the Claude advisor prompt outside the variadic tools option", () => {
     const claude = getHarness("claude");
     expect(claude.buildInvocation("answer this")).toEqual({
       command: "claude",
-      args: ["-p", "--tools", "", "answer this"],
+      args: ["-p", "answer this", "--tools", ""],
+    });
+    expect(claude.buildInvocation("answer this", { structured: true })).toEqual({
+      command: "claude",
+      args: ["-p", "--output-format", "json", "answer this", "--tools", ""],
+    });
+    expect(claude.buildInvocation("answer this", { model: "sonnet" })).toEqual({
+      command: "claude",
+      args: ["-p", "answer this", "--tools", "", "--model", "sonnet"],
     });
   });
 
