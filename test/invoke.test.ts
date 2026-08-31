@@ -11,7 +11,14 @@ class FakeCursor extends Harness {
   readonly id = "cursor";
   readonly name = "Fake Cursor";
   readonly binaries = ["node"];
-  readonly capabilities = { mcp: false, vision: false, tools: false, streaming: false };
+  readonly capabilities = {
+    mcp: false,
+    vision: false,
+    audio: false,
+    video: false,
+    tools: false,
+    streaming: false,
+  };
   readonly config: Harness["config"] = [];
   readonly sessions: Harness["sessions"] = [];
   readonly persistence: Harness["persistence"] = [];
