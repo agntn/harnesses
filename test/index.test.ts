@@ -99,6 +99,15 @@ describe("@agntn/harnesses", () => {
     expect(resolved.sessions.length).toBeGreaterThan(0);
   });
 
+  it("should resolve Claude transcripts under encoded project directories", () => {
+    const claude = getHarness("claude");
+    const resolved = claude.resolve({ homeDir: "/home/test", platform: "linux" });
+
+    expect(resolved.sessions[0]?.path).toBe(
+      "/home/test/.claude/projects/<dash-encoded-cwd>/*.jsonl",
+    );
+  });
+
   it("should resolve %ENVVAR% placeholders", () => {
     vi.stubEnv("HARNESSES_TEST_DIR", "/test/appdata");
 
