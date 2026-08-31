@@ -7,6 +7,8 @@ export default class Gemini extends Harness {
   readonly capabilities = {
     mcp: true,
     vision: true,
+    audio: true,
+    video: false,
     tools: true,
     streaming: true,
   };

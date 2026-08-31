@@ -24,6 +24,8 @@ export default class Pi extends Harness {
   readonly capabilities = {
     mcp: true,
     vision: true,
+    audio: false,
+    video: false,
     tools: true,
     streaming: true,
   };

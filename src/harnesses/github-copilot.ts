@@ -7,6 +7,8 @@ export default class GitHubCopilot extends Harness {
   readonly capabilities = {
     mcp: true,
     vision: true,
+    audio: false,
+    video: false,
     tools: true,
     streaming: true,
   };

@@ -35,6 +35,10 @@ export interface StorageDescriptor {
 export interface HarnessCapabilities {
   mcp: boolean;
   vision: boolean;
+  /** Audio reaches the model without conversion or MCP. */
+  audio: boolean;
+  /** Video reaches the model without conversion or MCP. */
+  video: boolean;
   tools: boolean;
   streaming: boolean;
 }

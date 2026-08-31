@@ -231,9 +231,35 @@ describe("@agntn/harnesses", () => {
     for (const harness of all) {
       expect(typeof harness.capabilities.mcp).toBe("boolean");
       expect(typeof harness.capabilities.vision).toBe("boolean");
+      expect(typeof harness.capabilities.audio).toBe("boolean");
+      expect(typeof harness.capabilities.video).toBe("boolean");
       expect(typeof harness.capabilities.tools).toBe("boolean");
       expect(typeof harness.capabilities.streaming).toBe("boolean");
     }
+  });
+
+  it("should expose verified native audio and video support", () => {
+    const mediaCapabilities = Object.fromEntries(
+      getAllHarnesses().map((harness) => [
+        harness.id,
+        { audio: harness.capabilities.audio, video: harness.capabilities.video },
+      ]),
+    );
+
+    expect(mediaCapabilities).toEqual({
+      antigravity: { audio: true, video: true },
+      claude: { audio: false, video: false },
+      codex: { audio: false, video: false },
+      cursor: { audio: false, video: false },
+      freebuff: { audio: false, video: false },
+      gemini: { audio: true, video: false },
+      "github-copilot": { audio: false, video: false },
+      grok: { audio: false, video: false },
+      mastracode: { audio: false, video: false },
+      omp: { audio: false, video: false },
+      opencode: { audio: false, video: false },
+      pi: { audio: false, video: false },
+    });
   });
 
   it("should resolve instructions alongside config and sessions", () => {

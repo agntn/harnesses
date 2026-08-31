@@ -7,6 +7,8 @@ export default class Antigravity extends Harness {
   readonly capabilities = {
     mcp: true,
     vision: true,
+    audio: true,
+    video: true,
     tools: true,
     streaming: true,
   };
