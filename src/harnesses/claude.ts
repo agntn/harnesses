@@ -52,7 +52,7 @@ export default class Claude extends Harness {
   ];
   readonly sessions: Harness["sessions"] = [
     {
-      path: "~/.claude/projects/<project-path>/sessions/*.jsonl",
+      path: "~/.claude/projects/<dash-encoded-cwd>/*.jsonl",
       scope: "data",
       level: "official",
       note: "Per-project session transcripts in JSONL format.",
