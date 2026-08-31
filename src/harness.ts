@@ -38,11 +38,12 @@ type InvocationOptions = Readonly<{
   model?: string;
   structured?: boolean;
   tools?: boolean;
+  readOnly?: boolean;
 }>;
 
 type InvocationMode = keyof HarnessInvocationModes;
 
-const ALTERNATE_INVOCATION_MODE: Record<InvocationMode, InvocationMode> = {
+const ALTERNATE_INVOCATION_MODE: Partial<Record<InvocationMode, InvocationMode>> = {
   advisor: "agent",
   advisorStructured: "agentStructured",
   agent: "advisor",
@@ -52,11 +53,13 @@ const ALTERNATE_INVOCATION_MODE: Record<InvocationMode, InvocationMode> = {
 const INVOCATION_MODE_DESCRIPTION: Record<InvocationMode, string> = {
   advisor: "advisor without tools",
   advisorStructured: "structured (JSON) advisor without tools",
+  readOnly: "read-only full agent",
+  readOnlyStructured: "structured (JSON) read-only full agent",
   agent: "full agent",
   agentStructured: "structured (JSON) full agent",
 };
 
-const INVOCATION_RETRY_HINT: Record<InvocationMode, string> = {
+const INVOCATION_RETRY_HINT: Partial<Record<InvocationMode, string>> = {
   advisor: "; retry with tools: true to start its full agent",
   advisorStructured: "; retry with tools: true to start its full agent",
   agent: "; retry with tools: false to use its advisor without tools",
@@ -64,6 +67,9 @@ const INVOCATION_RETRY_HINT: Record<InvocationMode, string> = {
 };
 
 function requestedInvocationMode(options: InvocationOptions): InvocationMode {
+  if (options.readOnly === true) {
+    return options.structured === true ? "readOnlyStructured" : "readOnly";
+  }
   if (options.tools === true) return options.structured === true ? "agentStructured" : "agent";
   return options.structured === true ? "advisorStructured" : "advisor";
 }
@@ -77,6 +83,10 @@ function invocationTemplate(
       return invocation.noToolsArgs;
     case "advisorStructured":
       return invocation.noToolsJsonArgs;
+    case "readOnly":
+      return invocation.readOnlyArgs;
+    case "readOnlyStructured":
+      return invocation.readOnlyJsonArgs;
     case "agent":
       return invocation.args;
     case "agentStructured":
@@ -218,6 +228,8 @@ export abstract class Harness {
     return {
       advisor: this.invocation?.noToolsArgs !== undefined,
       advisorStructured: this.invocation?.noToolsJsonArgs !== undefined,
+      readOnly: this.invocation?.readOnlyArgs !== undefined,
+      readOnlyStructured: this.invocation?.readOnlyJsonArgs !== undefined,
       agent: this.invocation?.args !== undefined,
       agentStructured: this.invocation?.jsonArgs !== undefined,
     };
@@ -262,8 +274,10 @@ export abstract class Harness {
     const mode = requestedInvocationMode(options);
     if (invocationTemplate(this.invocation, mode)) return null;
 
-    const alternateAvailable = invocationTemplate(this.invocation, ALTERNATE_INVOCATION_MODE[mode]);
-    const retry = alternateAvailable ? INVOCATION_RETRY_HINT[mode] : "";
+    const alternateMode = ALTERNATE_INVOCATION_MODE[mode];
+    const alternateAvailable =
+      alternateMode === undefined ? undefined : invocationTemplate(this.invocation, alternateMode);
+    const retry = alternateAvailable ? (INVOCATION_RETRY_HINT[mode] ?? "") : "";
     return `Harness ${this.id} has no ${INVOCATION_MODE_DESCRIPTION[mode]} invocation${retry}`;
   }
 
@@ -281,6 +295,7 @@ export abstract class Harness {
       model: options.model,
       structured: options.structured,
       tools: options.tools,
+      readOnly: options.readOnly,
     };
     const built = this.buildInvocation(prompt, invocationOptions);
     if (!built) {

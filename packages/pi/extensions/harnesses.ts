@@ -142,7 +142,8 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     promptSnippet: "Use harnesses_run to delegate one prompt to another installed coding harness.",
     promptGuidelines: [
       "Always choose tools explicitly. Set true whenever the task needs harness tools, including Grok native X search.",
-      "Set false only for an advisor without tools. It never silently falls back to a full agent.",
+      "Add readOnly when tools is true to require native read-only enforcement. Unsupported harnesses reject it instead of widening access.",
+      "Set tools false only for an advisor without tools. It never silently falls back to a full agent.",
       "An unsupported mode returns an explicit retry when the alternate mode is available.",
       "Output is capped for context; long runs stop at the timeout.",
     ],
@@ -159,6 +160,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
         timeoutSeconds: params.timeoutSeconds,
         structured: params.structured,
         tools: params.tools,
+        readOnly: params.readOnly,
       });
       if (isError) {
         const message =

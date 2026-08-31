@@ -339,14 +339,18 @@ const run = defineCommand({
       type: "boolean" as const,
       description: "Enable tools; default false uses native advisor without tools mode",
     },
+    "read-only": {
+      type: "boolean" as const,
+      description: "Require native read-only tool enforcement; implies --tools",
+    },
   },
   async run({ args }) {
     const harness = resolveHarness(args.id as string);
     const structured = args.json === true;
+    const readOnly = args["read-only"] === true;
+    const tools = readOnly || args.tools === true;
 
-    const tools = args.tools === true;
-
-    const invocationOptions = { model: args.model, structured, tools };
+    const invocationOptions = { model: args.model, structured, tools, readOnly };
     if (!harness.buildInvocation("", invocationOptions)) {
       consola.error(harness.invocationError(invocationOptions) ?? "Invalid invocation");
       process.exit(1);
@@ -364,6 +368,7 @@ const run = defineCommand({
       timeoutMs: timeoutSeconds === undefined ? undefined : timeoutSeconds * 1000,
       structured,
       tools,
+      readOnly,
     });
 
     finishInvocation(result, timeoutSeconds);

@@ -122,6 +122,12 @@ export function harnessToolSchemas<I, S>(Type: McpSchemaBuilder<I, S>) {
         description:
           "Explicit execution mode. Set true when the task needs any harness tools, including Grok native X search. Set false only for an advisor without tools.",
       }),
+      readOnly: Type.Optional(
+        Type.Boolean({
+          description:
+            "Set with tools=true to require native read-only tool enforcement. Unsupported harnesses reject the run instead of widening access.",
+        }),
+      ),
     }),
     mcpList: Type.Object({
       id: Type.Optional(harnessId("Harness id; omit to list every harness")),
@@ -200,6 +206,7 @@ export interface RunParams {
   timeoutSeconds?: number;
   structured?: boolean;
   tools: boolean;
+  readOnly?: boolean;
 }
 
 export interface McpListParams {

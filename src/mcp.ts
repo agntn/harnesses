@@ -94,7 +94,7 @@ const tools: ToolDefinition[] = [
     name: "harnesses_run",
     title: "Harnesses Run",
     description:
-      "Run one prompt through an AI coding harness's normalized non-interactive invocation and return its output. Pass tools=true whenever the task needs harness tools, including Grok native X search. Pass tools=false only for an advisor without tools. The choice is required and never silently falls back to a full agent.",
+      "Run one prompt through an AI coding harness's normalized non-interactive invocation and return its output. Pass tools=true whenever the task needs harness tools, including Grok native X search. Add readOnly=true to require native read-only tool enforcement. Pass tools=false only for an advisor without tools. Unsupported modes never widen access.",
     inputSchema: schemas.run,
     annotations: {
       readOnlyHint: false,
@@ -109,6 +109,7 @@ const tools: ToolDefinition[] = [
         timeoutSeconds: args.timeoutSeconds as number | undefined,
         structured: args.structured as boolean | undefined,
         tools: args.tools as boolean | undefined,
+        readOnly: args.readOnly as boolean | undefined,
       }),
   },
   {
