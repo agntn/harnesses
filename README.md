@@ -21,7 +21,10 @@ import { getHarness, detectHarness, detectProjectHarnesses } from "@agntn/harnes
 const claude = getHarness("claude");
 console.log(claude.skills); // [{ path: ".claude/skills/", scope: "project", ... }, ...]
 console.log(claude.hooks); // [{ path: ".claude/hooks/", scope: "project", ... }, ...]
-console.log(claude.invocationModes); // { advisor: true, advisorStructured: true, agent: true, agentStructured: true }
+console.log(claude.invocationModes); // advisor and full agent modes, no read-only mode
+
+const codex = getHarness("codex");
+await codex.invoke("Review this patch", { readOnly: true });
 
 const pi = getHarness("pi");
 const { models } = await pi.listModels({ search: "gpt-5.4" });
@@ -82,6 +85,7 @@ harnesses models pi gpt-5.4 --json
 harnesses run claude "review this design"       # advisor without tools mode (default)
 harnesses run pi --model openai-codex/gpt-5.4 "review this design"
 harnesses run claude --tools "fix lint"         # full agent with tools enabled
+harnesses run codex --read-only "review this"   # tools inside a native read-only sandbox
 harnesses mcp-servers list      # MCP servers configured across all harnesses
 harnesses mcp-servers add omp probe --command node --args "srv.mjs mcp"
 harnesses mcp-servers remove omp probe
@@ -90,7 +94,7 @@ harnesses agents sync --check   # doctor: link global AGENTS.md files to one mas
 harnesses mcp                   # run the MCP server over stdio
 ```
 
-`tools` defaults to `false` in the library and CLI. The MCP, Pi, and OMP tools require agents to choose it explicitly. `false` must use a native CLI flag that removes tools from the model context; it is a lightweight advisor, not an agent constrained only by prompt wording. Set `tools: true` (or CLI `--tools`) whenever the task needs harness tools, including Grok's native X search. Harnesses whose CLI cannot disable tools reject advisor mode instead of silently running an agent and return an explicit `tools` retry when their full agent mode can handle the request.
+`tools` defaults to `false` in the library and CLI. The MCP, Pi, and OMP tools require agents to choose it explicitly. `false` must use a native CLI flag that removes tools from the model context; it is a lightweight advisor, not an agent constrained only by prompt wording. Set `tools: true` (or CLI `--tools`) whenever the task needs harness tools, including Grok's native X search. Add `readOnly: true` when those tools must stay inside a sandbox enforced by the harness CLI; the agent tools pass it beside `tools: true`, while the library and CLI let it imply tools. Read-only mode is rejected when a harness has no verified native recipe, so it never falls back to broader access. Harnesses whose CLI cannot disable tools reject advisor mode instead of silently running an agent and return an explicit `tools` retry when their full agent mode can handle the request.
 
 ## How harnesses compares to unagent
 

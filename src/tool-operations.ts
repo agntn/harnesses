@@ -132,18 +132,24 @@ type RunInvocationOptions = Readonly<{
   model?: string;
   structured: boolean;
   tools: boolean;
+  readOnly: boolean;
 }>;
 
 type InvocationMode = keyof HarnessInvocationModes;
 
-const ALTERNATE_INVOCATION_MODE: Record<InvocationMode, InvocationMode> = {
+const ALTERNATE_INVOCATION_MODE: Partial<Record<InvocationMode, InvocationMode>> = {
   advisor: "agent",
   advisorStructured: "agentStructured",
   agent: "advisor",
   agentStructured: "advisorStructured",
 };
 
-function selectedInvocationMode(structured: boolean, tools: boolean): InvocationMode {
+function selectedInvocationMode(
+  structured: boolean,
+  tools: boolean,
+  readOnly: boolean,
+): InvocationMode {
+  if (readOnly) return structured ? "readOnlyStructured" : "readOnly";
   if (tools) return structured ? "agentStructured" : "agent";
   return structured ? "advisorStructured" : "advisor";
 }
@@ -160,6 +166,7 @@ function completedRun(
     ...(options.model === undefined ? {} : { model: options.model }),
     structured: options.structured,
     tools: options.tools,
+    readOnly: options.readOnly,
     exitCode: result.exitCode,
     timedOut: result.timedOut,
     stdout: truncate(result.stdout),
@@ -178,7 +185,7 @@ function unsupportedInvocation(
 ): ToolResult<RunFailure> {
   const error = harness.invocationError(options) ?? `Invalid ${id} invocation`;
   const invocationModes = harness.invocationModes;
-  const mode = selectedInvocationMode(options.structured, options.tools);
+  const mode = selectedInvocationMode(options.structured, options.tools, options.readOnly);
   const modelUnsupported =
     options.model !== undefined && harness.invocation?.modelArgs === undefined;
   if (invocationModes[mode] || harness.invocation === null || modelUnsupported) {
@@ -186,7 +193,8 @@ function unsupportedInvocation(
     return { content: text(details), details, isError: true };
   }
 
-  const alternateAvailable = invocationModes[ALTERNATE_INVOCATION_MODE[mode]];
+  const alternateMode = ALTERNATE_INVOCATION_MODE[mode];
+  const alternateAvailable = alternateMode === undefined ? false : invocationModes[alternateMode];
   const details: RunFailure = {
     error,
     invocationModes,
@@ -350,6 +358,8 @@ export interface RunOptions {
   structured?: boolean;
   /** Enable tools; defaults to a native advisor without tools invocation. */
   tools?: boolean;
+  /** Require native enforcement of read-only tool access. Implies tools. */
+  readOnly?: boolean;
 }
 
 /** One completed (or failed) harness run, with output capped for the model. */
@@ -360,6 +370,7 @@ export interface RunOutcome {
   model?: string;
   structured: boolean;
   tools: boolean;
+  readOnly: boolean;
   exitCode: number | null;
   timedOut: boolean;
   stdout: string;
@@ -374,6 +385,14 @@ export interface RunFailure {
   invocationModes?: HarnessInvocationModes;
   /** Explicit mode change that makes the same invocation shape executable. */
   retry?: { tools: boolean };
+}
+
+function normalizedRunAccess(options: Readonly<RunOptions>): {
+  tools: boolean;
+  readOnly: boolean;
+} {
+  const readOnly = options.readOnly ?? false;
+  return { readOnly, tools: readOnly ? true : (options.tools ?? false) };
 }
 
 /**
@@ -399,8 +418,8 @@ export async function runHarness(
 
   const harness = getHarness(id);
   const structured = options.structured ?? false;
-  const tools = options.tools ?? false;
-  const invocationOptions = { model: options.model, structured, tools };
+  const { tools, readOnly } = normalizedRunAccess(options);
+  const invocationOptions = { model: options.model, structured, tools, readOnly };
   if (!harness.buildInvocation(prompt, invocationOptions)) {
     return unsupportedInvocation(harness, id, invocationOptions);
   }
@@ -415,6 +434,7 @@ export async function runHarness(
       timeoutMs: timeoutSeconds * 1000,
       structured,
       tools,
+      readOnly,
     });
   } catch (error) {
     const details: RunFailure = { error: `Failed to run ${id}: ${errorMessage(error)}` };

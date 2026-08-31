@@ -55,6 +55,25 @@ describe("normalized invocation", () => {
     });
   });
 
+  it("enforces Codex read-only tool access through the native sandbox", () => {
+    const codex = getHarness("codex");
+
+    expect(codex.buildInvocation("review this", { readOnly: true })).toEqual({
+      command: "codex",
+      args: ["exec", "--sandbox", "read-only", "review this"],
+    });
+    expect(codex.buildInvocation("review this", { readOnly: true, structured: true })).toEqual({
+      command: "codex",
+      args: ["exec", "--sandbox", "read-only", "--json", "review this"],
+    });
+  });
+
+  it("rejects read-only access when a harness cannot enforce it", () => {
+    expect(getHarness("claude").invocationError({ readOnly: true })).toContain(
+      "no read-only full agent invocation",
+    );
+  });
+
   it("returns null for a harness without a headless mode", () => {
     expect(getHarness("mastracode").buildInvocation("x")).toBeNull();
     expect(getHarness("freebuff").buildInvocation("x")).toBeNull();
@@ -120,18 +139,24 @@ describe("harness metadata for agents", () => {
     expect(getHarness("claude").invocationModes).toEqual({
       advisor: true,
       advisorStructured: true,
+      readOnly: false,
+      readOnlyStructured: false,
       agent: true,
       agentStructured: true,
     });
     expect(getHarness("codex").invocationModes).toEqual({
       advisor: false,
       advisorStructured: false,
+      readOnly: true,
+      readOnlyStructured: true,
       agent: true,
       agentStructured: true,
     });
     expect(getHarness("mastracode").invocationModes).toEqual({
       advisor: false,
       advisorStructured: false,
+      readOnly: false,
+      readOnlyStructured: false,
       agent: false,
       agentStructured: false,
     });
@@ -198,6 +223,35 @@ describe("runHarness tool operation", () => {
     expect(outcome.stdout.trim()).toBe("advisor:ping");
     expect(outcome.exitCode).toBe(0);
     expect(outcome.tools).toBe(false);
+  });
+
+  it("reports enforced read-only access in the run outcome", async () => {
+    registerHarness(
+      class extends FakeCursor {
+        override readonly invocation: Harness["invocation"] = {
+          args: ["-e", "console.log('write')"],
+          readOnlyArgs: ["-e", "console.log('read:' + process.argv[1])", "{prompt}"],
+          level: "inferred",
+        };
+      },
+    );
+
+    const result = await runHarness("cursor", "review", { tools: false, readOnly: true });
+
+    expect(result.isError).toBeUndefined();
+    expect(result.details).toMatchObject({
+      stdout: "read:review\n",
+      tools: true,
+      readOnly: true,
+    });
+  });
+
+  it("keeps unsupported read-only access from widening to a full agent", async () => {
+    const result = await runHarness("claude", "inspect", { tools: true, readOnly: true });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain("no read-only full agent invocation");
+    expect(result.details).not.toHaveProperty("retry");
   });
 
   it("marks a non-zero exit as an error and truncates long output", async () => {

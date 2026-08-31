@@ -131,7 +131,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     name: "harnesses_run",
     label: HARNESS_TOOL_LABELS.harnesses_run,
     description:
-      "Run one prompt through a harness. Always choose tools explicitly. Set true for any harness tools, including Grok native X search, or false for an advisor without tools.",
+      "Run one prompt through a harness. Always choose tools explicitly. Add readOnly when tools is true to require native read-only enforcement, or use tools false for an advisor without tools.",
     parameters: schemas.run,
     approval: HARNESS_TOOL_APPROVALS.harnesses_run,
     async execute(
@@ -145,6 +145,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
         timeoutSeconds: params.timeoutSeconds,
         structured: params.structured,
         tools: params.tools,
+        readOnly: params.readOnly,
       });
       if (isError) {
         const message =

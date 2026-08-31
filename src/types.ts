@@ -51,6 +51,10 @@ export interface HarnessInvocation {
   noToolsArgs?: string[];
   /** Structured advisor argument template without tools. */
   noToolsJsonArgs?: string[];
+  /** Agent argument template whose native sandbox enforces read-only tool access. */
+  readOnlyArgs?: string[];
+  /** Structured agent argument template with read-only tool access. */
+  readOnlyJsonArgs?: string[];
   /** Arguments appended when a model is selected; every "{model}" is replaced. */
   modelArgs?: string[];
   level: EvidenceLevel;
@@ -61,6 +65,8 @@ export interface HarnessInvocation {
 export interface HarnessInvocationModes {
   advisor: boolean;
   advisorStructured: boolean;
+  readOnly: boolean;
+  readOnlyStructured: boolean;
   agent: boolean;
   agentStructured: boolean;
 }
@@ -101,6 +107,8 @@ export interface InvokeOptions {
   model?: string;
   /** Enable the spawned harness's tools; defaults to advisor without tools mode. */
   tools?: boolean;
+  /** Require native enforcement of read-only tool access. Implies `tools: true`. */
+  readOnly?: boolean;
   /** Kill the harness after this many milliseconds; unset means no timeout. */
   timeoutMs?: number;
   /** Use the harness's structured (JSON) output mode instead of plain text. */
