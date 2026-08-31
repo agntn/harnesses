@@ -5,9 +5,10 @@
  * ~/.config/agntn/agents.jsonc) is the single physical copy; every harness's
  * user-scope instructions file becomes a symlink to it, so an edit made
  * through any harness lands in the master and is visible everywhere at once.
- * Sync is a doctor: it creates missing links, repairs wrong ones, adopts
- * diverged regular files (content moved to a backup, then relinked), and in
- * check mode only reports.
+ * Explicit companion files are linked beside each instructions target. Sync
+ * is a doctor: it creates missing links, repairs wrong ones, adopts diverged
+ * regular files (content moved to a backup, then relinked), and in check mode
+ * only reports.
  */
 import {
   lstatSync,
@@ -18,7 +19,7 @@ import {
   symlinkSync,
   unlinkSync,
 } from "node:fs";
-import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, normalize, resolve, sep } from "node:path";
 import type { Harness } from "./harness.ts";
 import { parseJsonc } from "./mcp-servers.ts";
 import { agntnConfigDir, resolvePathTemplate } from "./resolve.ts";
@@ -28,19 +29,34 @@ import type { ResolveOptions } from "./types.ts";
 export interface AgentsConfig {
   /** The master instructions file every harness links to. */
   source: string;
+  /** Relative files to link beside every harness instructions target. */
+  companions: string[];
   /** Harness ids the sync leaves untouched. */
   excludes: string[];
   /** Path the config was read from; absent when defaults were used. */
   configPath?: string;
 }
 
+export type AgentsSyncAction = "linked" | "relinked" | "adopted" | "unchanged" | "skipped";
+
+/** One companion file's outcome for a harness target. */
+export interface AgentsCompanionTargetResult {
+  readonly source: string;
+  readonly path: string;
+  readonly action: Exclude<AgentsSyncAction, "skipped">;
+  /** Backup path for an adopted file, or a check-mode note. */
+  readonly detail?: string;
+}
+
 /** One harness's outcome of an agents sync run. */
 export interface AgentsTargetResult {
   id: string;
   path?: string;
-  action: "linked" | "relinked" | "adopted" | "unchanged" | "skipped";
+  action: AgentsSyncAction;
   /** Reason for a skip, or the backup path for an adopted diverged file. */
   detail?: string;
+  /** Companion outcomes, present when companions are configured. */
+  companions?: readonly AgentsCompanionTargetResult[];
 }
 
 /** Outcome of one agents sync/doctor run. */
@@ -85,6 +101,44 @@ function agentsExcludes(value: unknown, configPath: string): string[] {
   return value as string[];
 }
 
+function companionPath(value: string, configPath: string): string {
+  const normalized = normalize(value);
+  if (
+    normalized === "." ||
+    normalized === ".." ||
+    normalized.startsWith(`..${sep}`) ||
+    isAbsolute(normalized)
+  ) {
+    throw new Error(
+      `Agents config at ${configPath} has an unsafe companion path: ${JSON.stringify(normalized)}`,
+    );
+  }
+  return normalized.endsWith(sep) ? normalized.slice(0, -sep.length) : normalized;
+}
+
+function comparablePath(path: string): string {
+  // Reject lexical and case-only aliases on every platform so one config
+  // remains portable to the case-insensitive filesystems common on Windows
+  // and macOS.
+  return resolve(path).toLowerCase();
+}
+
+function agentsCompanions(value: unknown, configPath: string): string[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
+    throw new Error(
+      `Agents config at ${configPath} has invalid companions: expected an array of relative paths`,
+    );
+  }
+
+  const companions = (value as string[]).map((path) => companionPath(path, configPath));
+  const comparable = companions.map(comparablePath);
+  if (new Set(comparable).size !== comparable.length) {
+    throw new Error(`Agents config at ${configPath} has duplicate companion paths`);
+  }
+  return companions;
+}
+
 /**
  * Reads agents.jsonc; missing file falls back to defaults.
  *
@@ -95,6 +149,7 @@ export function readAgentsConfig(options: ResolveOptions = {}): AgentsConfig {
   const configPath = join(agntnConfigDir(options), "agents.jsonc");
   const defaults: AgentsConfig = {
     source: join(agntnConfigDir(options), "AGENTS.md"),
+    companions: [],
     excludes: [],
   };
 
@@ -104,6 +159,7 @@ export function readAgentsConfig(options: ResolveOptions = {}): AgentsConfig {
   const record = agentsConfigRecord(raw, configPath);
   return {
     source: agentsSource(record.source, defaults.source, options),
+    companions: agentsCompanions(record.companions, configPath),
     excludes: agentsExcludes(record.excludes, configPath),
     configPath,
   };
@@ -158,7 +214,9 @@ function relink(path: string, source: string): void {
   renameSync(temp, path);
 }
 
-const CHECK_ACTION: Record<LinkState["kind"], AgentsTargetResult["action"]> = {
+type AgentsFileResult = Omit<AgentsCompanionTargetResult, "source">;
+
+const CHECK_ACTION: Record<LinkState["kind"], AgentsFileResult["action"]> = {
   missing: "linked",
   "correct-link": "unchanged",
   "wrong-link": "relinked",
@@ -166,30 +224,49 @@ const CHECK_ACTION: Record<LinkState["kind"], AgentsTargetResult["action"]> = {
   "diverged-file": "adopted",
 };
 
-function applyTarget(
-  harness: Harness,
+function applyFileTarget(
+  id: string,
   path: string,
+  source: string,
   state: LinkState,
-  config: AgentsConfig,
   options: ResolveOptions,
-): AgentsTargetResult {
+): AgentsFileResult {
   if (state.kind === "diverged-file") {
     const backupDir = join(agntnConfigDir(options), "diverged");
     mkdirSync(backupDir, { recursive: true });
-    const backup = join(backupDir, `${harness.id}-${basename(path)}-${Date.now()}.md`);
+    const backup = join(backupDir, `${id}-${basename(path)}-${Date.now()}.md`);
     renameSync(path, backup);
-    relink(path, config.source);
-    return { id: harness.id, path, action: "adopted", detail: backup };
+    relink(path, source);
+    return { path, action: "adopted", detail: backup };
   }
 
   if (state.kind === "wrong-link") unlinkSync(path);
   if (state.kind === "wrong-link" || state.kind === "identical-file") {
-    relink(path, config.source);
-    return { id: harness.id, path, action: "relinked" };
+    relink(path, source);
+    return { path, action: "relinked" };
   }
 
-  relink(path, config.source);
-  return { id: harness.id, path, action: "linked" };
+  relink(path, source);
+  return { path, action: "linked" };
+}
+
+function syncFileTarget(
+  id: string,
+  path: string,
+  source: string,
+  check: boolean,
+  options: ResolveOptions,
+): AgentsFileResult {
+  const state = inspectTarget(path, source);
+  if (state.kind === "correct-link") return { path, action: "unchanged" };
+  if (check) {
+    return {
+      path,
+      action: CHECK_ACTION[state.kind],
+      detail: "check mode: not applied",
+    };
+  }
+  return applyFileTarget(id, path, source, state, options);
 }
 
 function syncTarget(
@@ -210,17 +287,46 @@ function syncTarget(
   }
 
   const path = resolvePathTemplate(harness.agentsFile, options);
-  const state = inspectTarget(path, config.source);
-  if (state.kind === "correct-link") return { id: harness.id, path, action: "unchanged" };
-  if (check) {
+  const target = syncFileTarget(harness.id, path, config.source, check, options);
+  if (config.companions.length === 0) return { id: harness.id, ...target };
+
+  const companions = config.companions.map((relativePath) => {
+    const source = resolve(dirname(config.source), relativePath);
+    const companionPath = resolve(dirname(path), relativePath);
     return {
-      id: harness.id,
-      path,
-      action: CHECK_ACTION[state.kind],
-      detail: "check mode: not applied",
+      source,
+      ...syncFileTarget(harness.id, companionPath, source, check, options),
     };
+  });
+  return { id: harness.id, ...target, companions };
+}
+
+function preflightCompanions(
+  harnesses: readonly Harness[],
+  config: AgentsConfig,
+  options: ResolveOptions,
+): void {
+  for (const relativePath of config.companions) {
+    const source = resolve(dirname(config.source), relativePath);
+    if (comparablePath(source) === comparablePath(config.source)) {
+      throw new Error(`Companion path resolves to the master agents file: ${relativePath}`);
+    }
+    if (readIfExists(source) === null) {
+      throw new Error(`No companion agents file at ${source}`);
+    }
   }
-  return applyTarget(harness, path, state, config, options);
+
+  for (const harness of harnesses) {
+    if (config.excludes.includes(harness.id) || !harness.agentsFile) continue;
+    const path = resolvePathTemplate(harness.agentsFile, options);
+    const collision = config.companions.find(
+      (relativePath) =>
+        comparablePath(resolve(dirname(path), relativePath)) === comparablePath(path),
+    );
+    if (collision !== undefined) {
+      throw new Error(`Companion path collides with ${harness.id} instructions: ${collision}`);
+    }
+  }
 }
 
 /**
@@ -241,6 +347,7 @@ export function syncAgentsFiles(
   if (readIfExists(config.source) === null) {
     throw new Error(`No master agents file at ${config.source}`);
   }
+  preflightCompanions(harnesses, config, options);
   return {
     source: config.source,
     check,

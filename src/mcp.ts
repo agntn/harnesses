@@ -148,7 +148,7 @@ const tools: ToolDefinition[] = [
     name: "harnesses_agents_sync",
     title: "Harnesses Agents Sync",
     description:
-      "Link every harness's global instructions file (CLAUDE.md/AGENTS.md/GEMINI.md) to the master agents file, so edits made through any harness land in one place. Diverged copies are backed up and relinked. Pass check to only report.",
+      "Link every harness's global instructions file and declared companions to the master bundle, so edits made through any harness land in one place. Diverged copies are backed up and relinked. Pass check to only report.",
     inputSchema: schemas.agentsSync,
     annotations: CONFIG_WRITE,
     execute: (args) => agentsSync(args.id as string | undefined, args.check === true),

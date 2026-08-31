@@ -45,7 +45,13 @@ export {
 } from "./mcp-servers.ts";
 export type { McpConfigListing, SyncReport, SyncTargetResult } from "./mcp-servers.ts";
 export { syncAgentsFiles, readAgentsConfig } from "./agents-sync.ts";
-export type { AgentsConfig, AgentsSyncReport, AgentsTargetResult } from "./agents-sync.ts";
+export type {
+  AgentsConfig,
+  AgentsSyncAction,
+  AgentsCompanionTargetResult,
+  AgentsSyncReport,
+  AgentsTargetResult,
+} from "./agents-sync.ts";
 
 export type {
   ClaudeContentBlock,
