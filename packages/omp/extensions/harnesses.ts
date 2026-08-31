@@ -219,7 +219,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     name: "harnesses_agents_sync",
     label: HARNESS_TOOL_LABELS.harnesses_agents_sync,
     description:
-      "Link every harness's global instructions file to the master agents file; diverged copies are backed up and relinked. Pass check to only report",
+      "Link every harness's global instructions file and declared companions to the master bundle; diverged copies are backed up and relinked. Pass check to only report",
     parameters: schemas.agentsSync,
     approval: HARNESS_TOOL_APPROVALS.harnesses_agents_sync,
     async execute(

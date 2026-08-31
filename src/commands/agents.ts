@@ -41,7 +41,7 @@ export default defineCommand({
     sync: defineCommand({
       meta: {
         description:
-          "Link every harness's global instructions file to the master (agents.jsonc: source, excludes)",
+          "Link global instructions and declared companions (agents.jsonc: source, companions, excludes)",
       },
       args: {
         id: { type: "positional" as const, description: "Harness id", required: false },

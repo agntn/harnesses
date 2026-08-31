@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 import { getHarness, syncAgentsFiles } from "../src/index.ts";
 
@@ -156,11 +156,125 @@ describe("syncAgentsFiles", () => {
     });
   });
 
+  it("links declared companion files beside each harness target", () => {
+    withoutXdg(() => {
+      const { homeDir } = fixture();
+      const bundleDir = join(homeDir, ".config", "agntn", "bundle");
+      mkdirSync(bundleDir);
+      const master = join(bundleDir, "AGENTS.md");
+      const rules = join(bundleDir, "RULES.md");
+      writeFileSync(master, "# master\n");
+      writeFileSync(rules, "# rules\n");
+      writeFileSync(
+        join(homeDir, ".config", "agntn", "agents.jsonc"),
+        JSON.stringify({ source: "bundle/AGENTS.md", companions: ["RULES.md"] }),
+      );
+      mkdirSync(join(homeDir, ".claude"));
+      const wrongRules = join(homeDir, "other-rules.md");
+      writeFileSync(wrongRules, "# wrong rules\n");
+      symlinkSync(wrongRules, join(homeDir, ".claude", "RULES.md"));
+
+      const report = syncAgentsFiles([getHarness("claude")], false, { homeDir });
+      const target = report.targets[0];
+      if (!target) throw new Error("Missing Claude sync target");
+
+      expect(readlinkSync(join(homeDir, ".claude", "CLAUDE.md"))).toBe(master);
+      expect(readlinkSync(join(homeDir, ".claude", "RULES.md"))).toBe(rules);
+      expect(target.companions).toEqual([
+        {
+          source: rules,
+          path: join(homeDir, ".claude", "RULES.md"),
+          action: "relinked",
+        },
+      ]);
+    });
+  });
+
+  it("check mode reports a missing companion without touching the filesystem", () => {
+    withoutXdg(() => {
+      const { homeDir } = fixture();
+      const master = join(homeDir, ".config", "agntn", "AGENTS.md");
+      const rules = join(homeDir, ".config", "agntn", "RULES.md");
+      writeFileSync(master, "# master\n");
+      writeFileSync(rules, "# rules\n");
+      writeFileSync(
+        join(homeDir, ".config", "agntn", "agents.jsonc"),
+        JSON.stringify({ companions: ["RULES.md"] }),
+      );
+      mkdirSync(join(homeDir, ".claude"));
+      symlinkSync(master, join(homeDir, ".claude", "CLAUDE.md"));
+
+      const report = syncAgentsFiles([getHarness("claude")], true, { homeDir });
+      const target = report.targets[0];
+      if (!target) throw new Error("Missing Claude sync target");
+
+      expect(target.action).toBe("unchanged");
+      expect(target.companions).toEqual([
+        {
+          source: rules,
+          path: join(homeDir, ".claude", "RULES.md"),
+          action: "linked",
+          detail: "check mode: not applied",
+        },
+      ]);
+      expect(() => readlinkSync(join(homeDir, ".claude", "RULES.md"))).toThrow();
+    });
+  });
+
   it("fails clearly when the master file is missing", () => {
     withoutXdg(() => {
       const { homeDir } = fixture();
       expect(() => syncAgentsFiles([getHarness("claude")], false, { homeDir })).toThrow(
         /No master agents file/,
+      );
+    });
+  });
+
+  it("preflights companion sources before linking the master", () => {
+    withoutXdg(() => {
+      const { homeDir } = fixture();
+      writeFileSync(join(homeDir, ".config", "agntn", "AGENTS.md"), "# master\n");
+      writeFileSync(
+        join(homeDir, ".config", "agntn", "agents.jsonc"),
+        JSON.stringify({ companions: ["MISSING.md"] }),
+      );
+
+      expect(() => syncAgentsFiles([getHarness("claude")], false, { homeDir })).toThrow(
+        /No companion agents file/,
+      );
+      expect(() => readlinkSync(join(homeDir, ".claude", "CLAUDE.md"))).toThrow();
+    });
+  });
+
+  it("rejects companion paths that escape the source and target directories", () => {
+    withoutXdg(() => {
+      const { homeDir } = fixture();
+      writeFileSync(join(homeDir, ".config", "agntn", "AGENTS.md"), "# master\n");
+      writeFileSync(
+        join(homeDir, ".config", "agntn", "agents.jsonc"),
+        JSON.stringify({ companions: ["../RULES.md"] }),
+      );
+
+      expect(() => syncAgentsFiles([getHarness("claude")], false, { homeDir })).toThrow(
+        /unsafe companion path/,
+      );
+    });
+  });
+
+  it.each([
+    ["case-only aliases", ["RULES.md", "rules.md"]],
+    ["trailing-separator aliases", ["RULES.md", `RULES.md${sep}`]],
+  ])("rejects duplicate companion %s", (_label, companions) => {
+    withoutXdg(() => {
+      const { homeDir } = fixture();
+      writeFileSync(join(homeDir, ".config", "agntn", "AGENTS.md"), "# master\n");
+      writeFileSync(
+        join(homeDir, ".config", "agntn", "agents.jsonc"),
+        JSON.stringify({ companions }),
+      );
+
+      expect(() => syncAgentsFiles([getHarness("claude")], false, { homeDir })).toThrow(
+        /duplicate companion paths/,
       );
     });
   });
