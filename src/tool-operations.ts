@@ -154,6 +154,20 @@ function selectedInvocationMode(
   return structured ? "advisorStructured" : "advisor";
 }
 
+function invocationRetry(
+  invocationModes: Readonly<HarnessInvocationModes>,
+  mode: InvocationMode,
+  options: RunInvocationOptions,
+): RunFailure["retry"] {
+  const withoutStructured = selectedInvocationMode(false, options.tools, options.readOnly);
+  if (options.structured && invocationModes[withoutStructured]) return { structured: false };
+
+  const alternateMode = ALTERNATE_INVOCATION_MODE[mode];
+  return alternateMode !== undefined && invocationModes[alternateMode]
+    ? { tools: !options.tools }
+    : undefined;
+}
+
 function completedRun(
   harness: Harness,
   result: InvokeResult,
@@ -193,12 +207,11 @@ function unsupportedInvocation(
     return { content: text(details), details, isError: true };
   }
 
-  const alternateMode = ALTERNATE_INVOCATION_MODE[mode];
-  const alternateAvailable = alternateMode === undefined ? false : invocationModes[alternateMode];
+  const retry = invocationRetry(invocationModes, mode, options);
   const details: RunFailure = {
     error,
     invocationModes,
-    ...(alternateAvailable ? { retry: { tools: !options.tools } } : {}),
+    ...(retry === undefined ? {} : { retry }),
   };
   return { content: text(details), details, isError: true };
 }
@@ -384,7 +397,7 @@ export interface RunFailure {
   /** Modes accepted by the selected harness when invocation mode caused the failure. */
   invocationModes?: HarnessInvocationModes;
   /** Explicit mode change that makes the same invocation shape executable. */
-  retry?: { tools: boolean };
+  retry?: { structured: false } | { tools: boolean };
 }
 
 function normalizedRunAccess(options: Readonly<RunOptions>): {

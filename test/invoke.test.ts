@@ -221,11 +221,12 @@ describe("runHarness tool operation", () => {
     });
   });
 
-  it("flags a structured request on a harness without a JSON mode", async () => {
+  it("returns an actionable retry without JSON when JSON mode is unavailable", async () => {
     const result = await runHarness("github-copilot", "x", { structured: true, tools: true });
 
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("no structured (JSON) full agent invocation");
+    expect(result.details).toMatchObject({ retry: { structured: false } });
   });
 
   it("returns the outcome of a successful run", async () => {
