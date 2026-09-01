@@ -83,8 +83,16 @@ function agentsConfigRecord(raw: string, configPath: string): Record<string, unk
   return parsed as Record<string, unknown>;
 }
 
-function agentsSource(value: unknown, defaultSource: string, options: ResolveOptions): string {
-  if (typeof value !== "string") return defaultSource;
+function agentsSource(
+  value: unknown,
+  defaultSource: string,
+  options: ResolveOptions,
+  configPath: string,
+): string {
+  if (value === undefined) return defaultSource;
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`Agents config at ${configPath} has an invalid source: expected a path string`);
+  }
   const expanded = resolvePathTemplate(value, options);
   // A relative source would produce cwd-dependent, dangling links in every
   // harness, so anchor it to the config directory it was declared in.
@@ -159,7 +167,7 @@ export function readAgentsConfig(options: ResolveOptions = {}): AgentsConfig {
 
   const record = agentsConfigRecord(raw, configPath);
   return {
-    source: agentsSource(record.source, defaults.source, options),
+    source: agentsSource(record.source, defaults.source, options, configPath),
     companions: agentsCompanions(record.companions, configPath),
     excludes: agentsExcludes(record.excludes, configPath),
     configPath,

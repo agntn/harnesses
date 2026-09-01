@@ -230,6 +230,22 @@ describe("syncAgentsFiles", () => {
     });
   });
 
+  it("rejects an invalid source before linking any target", () => {
+    withoutXdg(() => {
+      const { homeDir } = fixture();
+      writeFileSync(join(homeDir, ".config", "agntn", "AGENTS.md"), "# master\n");
+      writeFileSync(
+        join(homeDir, ".config", "agntn", "agents.jsonc"),
+        JSON.stringify({ source: ["bundle/AGENTS.md"] }),
+      );
+
+      expect(() => syncAgentsFiles([getHarness("claude")], false, { homeDir })).toThrow(
+        /invalid source/,
+      );
+      expect(() => lstatSync(join(homeDir, ".claude", "CLAUDE.md"))).toThrow();
+    });
+  });
+
   it("preflights companion sources before linking the master", () => {
     withoutXdg(() => {
       const { homeDir } = fixture();
