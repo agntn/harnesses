@@ -70,8 +70,7 @@ describe("@agntn/harnesses", () => {
 
     expect(all).toHaveLength(harnessIds.length);
     expect(all.every((harness) => harness instanceof Harness)).toBe(true);
-    const cliHarnesses = all.filter((c) => c.id !== "github-copilot");
-    expect(cliHarnesses.every((harness) => harness.binaries.length > 0)).toBe(true);
+    expect(all.every((harness) => harness.binaries.length > 0)).toBe(true);
   });
 
   it("should instantiate a concrete subclass for every harness", () => {
