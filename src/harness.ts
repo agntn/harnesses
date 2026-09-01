@@ -100,8 +100,17 @@ function invocationRetryHint(
   options: InvocationOptions,
 ): string {
   const withoutStructured = requestedInvocationMode({ ...options, structured: false });
-  if (options.structured === true && invocationTemplate(invocation, withoutStructured)) {
-    return "; retry with structured: false";
+  if (options.structured === true) {
+    if (invocationTemplate(invocation, withoutStructured)) {
+      return "; retry with structured: false";
+    }
+    const alternateWithoutStructured = ALTERNATE_INVOCATION_MODE[withoutStructured];
+    if (
+      alternateWithoutStructured !== undefined &&
+      invocationTemplate(invocation, alternateWithoutStructured)
+    ) {
+      return `; retry with structured: false and tools: ${!options.tools}`;
+    }
   }
 
   const alternateMode = ALTERNATE_INVOCATION_MODE[mode];

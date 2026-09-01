@@ -160,7 +160,13 @@ function invocationRetry(
   options: RunInvocationOptions,
 ): RunFailure["retry"] {
   const withoutStructured = selectedInvocationMode(false, options.tools, options.readOnly);
-  if (options.structured && invocationModes[withoutStructured]) return { structured: false };
+  if (options.structured) {
+    if (invocationModes[withoutStructured]) return { structured: false };
+    const alternateWithoutStructured = ALTERNATE_INVOCATION_MODE[withoutStructured];
+    if (alternateWithoutStructured && invocationModes[alternateWithoutStructured]) {
+      return { structured: false, tools: !options.tools };
+    }
+  }
 
   const alternateMode = ALTERNATE_INVOCATION_MODE[mode];
   return alternateMode !== undefined && invocationModes[alternateMode]
@@ -397,7 +403,7 @@ export interface RunFailure {
   /** Modes accepted by the selected harness when invocation mode caused the failure. */
   invocationModes?: HarnessInvocationModes;
   /** Explicit mode change that makes the same invocation shape executable. */
-  retry?: { structured: false } | { tools: boolean };
+  retry?: { structured: false; tools?: boolean } | { tools: boolean };
 }
 
 function normalizedRunAccess(options: Readonly<RunOptions>): {

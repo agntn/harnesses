@@ -103,9 +103,9 @@ describe("Pi and OMP extension renderers", () => {
       if (typeof definition.execute !== "function") throw new Error("Missing execute");
       const result: unknown = Reflect.apply(definition.execute, definition, [
         "call",
-        { id: "github-copilot", prompt: "inspect", structured: true, tools: true },
+        { id: "github-copilot", prompt: "inspect", structured: true, tools: false },
       ]);
-      await expect(result).rejects.toThrow("retry with structured: false");
+      await expect(result).rejects.toThrow("retry with structured: false and tools: true");
     }
   });
 

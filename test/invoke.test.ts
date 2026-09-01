@@ -229,6 +229,13 @@ describe("runHarness tool operation", () => {
     expect(result.details).toMatchObject({ retry: { structured: false } });
   });
 
+  it("returns every option needed for an executable retry", async () => {
+    const result = await runHarness("github-copilot", "x", { structured: true, tools: false });
+
+    expect(result.isError).toBe(true);
+    expect(result.details).toMatchObject({ retry: { structured: false, tools: true } });
+  });
+
   it("returns the outcome of a successful run", async () => {
     registerHarness(FakeCursor);
 

@@ -125,6 +125,20 @@ describe("harnesses MCP server", () => {
     }
   });
 
+  it("returns executable retry guidance for unsupported run modes", async () => {
+    const client = await connectTestClient();
+
+    const response = await client.callTool({
+      name: "harnesses_run",
+      arguments: { id: "github-copilot", prompt: "inspect", structured: true, tools: false },
+    });
+
+    expect(response.isError).toBe(true);
+    const content = onlyTextContent(response.content);
+    expect(content).toContain("structured: false");
+    expect(content).toContain("tools: true");
+  });
+
   it("rejects empty metadata batches", async () => {
     const client = await connectTestClient();
 
