@@ -96,6 +96,21 @@ describe("normalized invocation", () => {
     });
   });
 
+  it("rejects OMP advisor mode because --no-tools only disables bundled tools", () => {
+    const omp = getHarness("omp");
+
+    expect(omp.buildInvocation("review this")).toBeNull();
+    expect(omp.invocationError()).toContain("no advisor without tools invocation");
+    expect(omp.buildInvocation("review this", { tools: true })).toEqual({
+      command: "omp",
+      args: ["-p", "review this"],
+    });
+    expect(omp.buildInvocation("review this", { tools: true, structured: true })).toEqual({
+      command: "omp",
+      args: ["-p", "--mode", "json", "review this"],
+    });
+  });
+
   it("rejects read-only access when a harness cannot enforce it", () => {
     expect(getHarness("claude").invocationError({ readOnly: true })).toContain(
       "no read-only full agent invocation",
