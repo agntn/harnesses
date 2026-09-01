@@ -3,7 +3,7 @@ import { Harness } from "../harness.ts";
 export default class GitHubCopilot extends Harness {
   readonly id = "github-copilot";
   readonly name = "GitHub Copilot";
-  readonly binaries = [];
+  readonly binaries = ["copilot"];
   readonly capabilities = {
     mcp: true,
     vision: true,
