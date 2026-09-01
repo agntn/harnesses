@@ -109,6 +109,8 @@ export default class Pi extends Harness {
     jsonArgs: ["-p", "--mode", "json", "{prompt}"],
     noToolsArgs: ["-p", "--no-tools", "{prompt}"],
     noToolsJsonArgs: ["-p", "--no-tools", "--mode", "json", "{prompt}"],
+    readOnlyArgs: ["-p", "--tools", "read,grep,find,ls", "{prompt}"],
+    readOnlyJsonArgs: ["-p", "--tools", "read,grep,find,ls", "--mode", "json", "{prompt}"],
     modelArgs: ["--model", "{model}"],
     level: "official",
     note: "Add --mode json for structured event output.",
