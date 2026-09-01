@@ -128,11 +128,9 @@ export default class Omp extends Harness {
   readonly invocation: Harness["invocation"] = {
     args: ["-p", "{prompt}"],
     jsonArgs: ["-p", "--mode", "json", "{prompt}"],
-    noToolsArgs: ["-p", "--no-tools", "{prompt}"],
-    noToolsJsonArgs: ["-p", "--no-tools", "--mode", "json", "{prompt}"],
     modelArgs: ["--model={model}"],
     level: "official",
-    note: "Add --mode json for structured event output.",
+    note: "Add --mode json for structured event output. --no-tools disables only built-in tools, so it cannot provide a tool-free advisor mode.",
   };
   override readonly mcpConfigs: Harness["mcpConfigs"] = [
     {
