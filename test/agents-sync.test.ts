@@ -246,23 +246,27 @@ describe("syncAgentsFiles", () => {
     });
   });
 
-  it("rejects companion paths that escape the source and target directories", () => {
-    withoutXdg(() => {
-      const { homeDir } = fixture();
-      writeFileSync(join(homeDir, ".config", "agntn", "AGENTS.md"), "# master\n");
-      writeFileSync(
-        join(homeDir, ".config", "agntn", "agents.jsonc"),
-        JSON.stringify({ companions: ["../RULES.md"] }),
-      );
+  it.each(["../RULES.md", "..\\RULES.md", "C:RULES.md", "C:\\RULES.md"])(
+    "rejects unsafe companion path %s",
+    (companion) => {
+      withoutXdg(() => {
+        const { homeDir } = fixture();
+        writeFileSync(join(homeDir, ".config", "agntn", "AGENTS.md"), "# master\n");
+        writeFileSync(
+          join(homeDir, ".config", "agntn", "agents.jsonc"),
+          JSON.stringify({ companions: [companion] }),
+        );
 
-      expect(() => syncAgentsFiles([getHarness("claude")], false, { homeDir })).toThrow(
-        /unsafe companion path/,
-      );
-    });
-  });
+        expect(() => syncAgentsFiles([getHarness("claude")], false, { homeDir })).toThrow(
+          /unsafe companion path/,
+        );
+      });
+    },
+  );
 
   it.each([
     ["case-only aliases", ["RULES.md", "rules.md"]],
+    ["separator aliases", ["bundle/RULES.md", "bundle\\RULES.md"]],
     ["trailing-separator aliases", ["RULES.md", `RULES.md${sep}`]],
   ])("rejects duplicate companion %s", (_label, companions) => {
     withoutXdg(() => {
