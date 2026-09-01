@@ -96,7 +96,7 @@ describe("normalized invocation", () => {
     });
   });
 
-  it("rejects OMP advisor mode because --no-tools only disables built-in tools", () => {
+  it("rejects OMP advisor mode because --no-tools only disables bundled tools", () => {
     const omp = getHarness("omp");
 
     expect(omp.buildInvocation("review this")).toBeNull();
