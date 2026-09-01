@@ -29,7 +29,7 @@ await codex.invoke("Review this patch", { readOnly: true });
 const pi = getHarness("pi");
 const { models } = await pi.listModels({ search: "gpt-5.4" });
 console.log(models); // [{ provider: "openai-codex", id: "gpt-5.4", ... }]
-await pi.invoke("Review this patch", { model: "openai-codex/gpt-5.4" });
+await pi.invoke("Review this patch", { model: "openai-codex/gpt-5.4", readOnly: true });
 
 // Resolve to absolute paths for current platform
 const paths = claude.resolve({ platform: "linux", homeDir: "/home/dev" });

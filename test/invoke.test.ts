@@ -83,6 +83,19 @@ describe("normalized invocation", () => {
     });
   });
 
+  it("limits Pi read-only runs to its native inspection tools", () => {
+    const pi = getHarness("pi");
+
+    expect(pi.buildInvocation("review this", { readOnly: true })).toEqual({
+      command: "pi",
+      args: ["-p", "--tools", "read,grep,find,ls", "review this"],
+    });
+    expect(pi.buildInvocation("review this", { readOnly: true, structured: true })).toEqual({
+      command: "pi",
+      args: ["-p", "--tools", "read,grep,find,ls", "--mode", "json", "review this"],
+    });
+  });
+
   it("rejects read-only access when a harness cannot enforce it", () => {
     expect(getHarness("claude").invocationError({ readOnly: true })).toContain(
       "no read-only full agent invocation",
