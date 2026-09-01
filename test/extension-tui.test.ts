@@ -98,6 +98,17 @@ describe("Pi and OMP extension renderers", () => {
     }
   });
 
+  it("returns retry guidance through both host adapters", async () => {
+    for (const definition of [tool(piTools, "harnesses_run"), tool(ompTools, "harnesses_run")]) {
+      if (typeof definition.execute !== "function") throw new Error("Missing execute");
+      const result: unknown = Reflect.apply(definition.execute, definition, [
+        "call",
+        { id: "github-copilot", prompt: "inspect", structured: true, tools: true },
+      ]);
+      await expect(result).rejects.toThrow("retry with structured: false");
+    }
+  });
+
   it("renders bounded terminal-safe call rows in both hosts", () => {
     const piLine = renderCall(tool(piTools, "harnesses_run"), false);
     const ompLine = renderCall(tool(ompTools, "harnesses_run"), true);

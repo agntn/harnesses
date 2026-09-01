@@ -94,6 +94,22 @@ function invocationTemplate(
   }
 }
 
+function invocationRetryHint(
+  invocation: HarnessInvocation,
+  mode: InvocationMode,
+  options: InvocationOptions,
+): string {
+  const withoutStructured = requestedInvocationMode({ ...options, structured: false });
+  if (options.structured === true && invocationTemplate(invocation, withoutStructured)) {
+    return "; retry with structured: false";
+  }
+
+  const alternateMode = ALTERNATE_INVOCATION_MODE[mode];
+  const alternateAvailable =
+    alternateMode === undefined ? undefined : invocationTemplate(invocation, alternateMode);
+  return alternateAvailable ? (INVOCATION_RETRY_HINT[mode] ?? "") : "";
+}
+
 function buildInvocationArgs(
   template: readonly string[],
   prompt: string,
@@ -274,11 +290,8 @@ export abstract class Harness {
     const mode = requestedInvocationMode(options);
     if (invocationTemplate(this.invocation, mode)) return null;
 
-    const alternateMode = ALTERNATE_INVOCATION_MODE[mode];
-    const alternateAvailable =
-      alternateMode === undefined ? undefined : invocationTemplate(this.invocation, alternateMode);
-    const retry = alternateAvailable ? (INVOCATION_RETRY_HINT[mode] ?? "") : "";
-    return `Harness ${this.id} has no ${INVOCATION_MODE_DESCRIPTION[mode]} invocation${retry}`;
+    const error = `Harness ${this.id} has no ${INVOCATION_MODE_DESCRIPTION[mode]} invocation`;
+    return `${error}${invocationRetryHint(this.invocation, mode, options)}`;
   }
 
   /**
