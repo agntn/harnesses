@@ -19,7 +19,7 @@ import {
   symlinkSync,
   unlinkSync,
 } from "node:fs";
-import { basename, dirname, isAbsolute, join, normalize, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, posix, resolve, win32 } from "node:path";
 import type { Harness } from "./harness.ts";
 import { parseJsonc } from "./mcp-servers.ts";
 import { agntnConfigDir, resolvePathTemplate } from "./resolve.ts";
@@ -102,18 +102,19 @@ function agentsExcludes(value: unknown, configPath: string): string[] {
 }
 
 function companionPath(value: string, configPath: string): string {
-  const normalized = normalize(value);
+  const normalized = posix.normalize(value.replaceAll("\\", "/"));
   if (
     normalized === "." ||
     normalized === ".." ||
-    normalized.startsWith(`..${sep}`) ||
-    isAbsolute(normalized)
+    normalized.startsWith("../") ||
+    posix.isAbsolute(normalized) ||
+    win32.parse(value).root !== ""
   ) {
     throw new Error(
       `Agents config at ${configPath} has an unsafe companion path: ${JSON.stringify(normalized)}`,
     );
   }
-  return normalized.endsWith(sep) ? normalized.slice(0, -sep.length) : normalized;
+  return normalized.endsWith("/") ? normalized.slice(0, -1) : normalized;
 }
 
 function comparablePath(path: string): string {
