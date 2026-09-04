@@ -93,10 +93,17 @@ export default class Codex extends Harness {
   readonly commands: Harness["commands"] = [];
   readonly hooks: Harness["hooks"] = [];
   readonly invocation: Harness["invocation"] = {
-    args: ["exec", "{prompt}"],
-    jsonArgs: ["exec", "--json", "{prompt}"],
-    readOnlyArgs: ["exec", "--sandbox", "read-only", "{prompt}"],
-    readOnlyJsonArgs: ["exec", "--sandbox", "read-only", "--json", "{prompt}"],
+    args: ["exec", "--skip-git-repo-check", "{prompt}"],
+    jsonArgs: ["exec", "--skip-git-repo-check", "--json", "{prompt}"],
+    readOnlyArgs: ["exec", "--skip-git-repo-check", "--sandbox", "read-only", "{prompt}"],
+    readOnlyJsonArgs: [
+      "exec",
+      "--skip-git-repo-check",
+      "--sandbox",
+      "read-only",
+      "--json",
+      "{prompt}",
+    ],
     modelArgs: ["--model", "{model}"],
     level: "official",
     note: "Non-interactive exec subcommand; add --json for structured output.",
