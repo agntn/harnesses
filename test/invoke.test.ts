@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { getHarness, registerHarness } from "../src/index.ts";
 import { Harness } from "../src/harness.ts";
+import Cursor from "../src/harnesses/cursor.ts";
 import { harnessInfo, runHarness, RUN_MAX_OUTPUT_CHARS } from "../src/tool-operations.ts";
 
 /**
@@ -291,6 +292,48 @@ describe("runHarness tool operation", () => {
     expect(outcome.tools).toBe(false);
   });
 
+  it("keeps successful stderr out of content sent to the model", async () => {
+    registerHarness(
+      class extends FakeCursor {
+        override readonly invocation: Harness["invocation"] = {
+          args: ["-e", "console.log('answer'); console.error(['trace', 'noise'].join('-'))"],
+          level: "inferred",
+        };
+      },
+    );
+
+    try {
+      const result = await runHarness("cursor", "x", { tools: true });
+
+      expect(result.isError).toBeUndefined();
+      expect(result.details).toMatchObject({ stdout: "answer\n", stderr: "trace-noise\n" });
+      expect(result.content[0]?.text).toContain("answer");
+      expect(result.content[0]?.text).not.toContain("trace-noise");
+    } finally {
+      registerHarness(Cursor);
+    }
+  });
+
+  it("uses successful stderr when the harness returns no stdout", async () => {
+    registerHarness(
+      class extends FakeCursor {
+        override readonly invocation: Harness["invocation"] = {
+          args: ["-e", "console.error(['only', 'stderr'].join('-'))"],
+          level: "inferred",
+        };
+      },
+    );
+
+    try {
+      const result = await runHarness("cursor", "x", { tools: true });
+
+      expect(result.isError).toBeUndefined();
+      expect(result.content[0]?.text).toContain("only-stderr");
+    } finally {
+      registerHarness(Cursor);
+    }
+  });
+
   it("reports enforced read-only access in the run outcome", async () => {
     registerHarness(
       class extends FakeCursor {
@@ -324,7 +367,10 @@ describe("runHarness tool operation", () => {
     registerHarness(
       class extends FakeCursor {
         override readonly invocation: Harness["invocation"] = {
-          args: ["-e", "console.log('x'.repeat(20000)); process.exit(3)"],
+          args: [
+            "-e",
+            "console.log('x'.repeat(20000)); console.error(['failure', 'trace'].join('-')); process.exit(3)",
+          ],
           level: "inferred",
         };
       },
@@ -337,5 +383,6 @@ describe("runHarness tool operation", () => {
     expect(outcome.exitCode).toBe(3);
     expect(outcome.stdout.length).toBeLessThan(RUN_MAX_OUTPUT_CHARS + 100);
     expect(outcome.stdout).toContain("[truncated");
+    expect(result.content[0]?.text).toContain("failure-trace");
   });
 });
