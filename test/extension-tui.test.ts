@@ -20,6 +20,9 @@ vi.mock("@oh-my-pi/pi-coding-agent", () => ({
 import ompExtension from "../packages/omp/extensions/harnesses.ts";
 import piExtension from "../packages/pi/extensions/harnesses.ts";
 import { HARNESS_TOOL_LABELS } from "../packages/shared/tui.ts";
+import { registerHarness } from "../src/index.ts";
+import { Harness } from "../src/harness.ts";
+import Cursor from "../src/harnesses/cursor.ts";
 
 const plainTheme = {
   fg: (_color: string, text: string) => text,
@@ -108,6 +111,31 @@ describe("Pi and OMP extension renderers", () => {
         { id: "github-copilot", prompt: "inspect", structured: true, tools: false },
       ]);
       await expect(result).rejects.toThrow("retry with structured: false and tools: true");
+    }
+  });
+
+  it("keeps failed run output in both host errors", async () => {
+    registerHarness(
+      class extends Cursor {
+        override readonly binaries = ["node"];
+        override readonly invocation: Harness["invocation"] = {
+          args: ["-e", "console.log('partial-result'); process.exit(3)"],
+          level: "inferred",
+        };
+      },
+    );
+
+    try {
+      for (const definition of [tool(piTools, "harnesses_run"), tool(ompTools, "harnesses_run")]) {
+        if (typeof definition.execute !== "function") throw new Error("Missing execute");
+        const result: unknown = Reflect.apply(definition.execute, definition, [
+          "call",
+          { id: "cursor", prompt: "inspect", tools: true },
+        ]);
+        await expect(result).rejects.toThrow("partial-result");
+      }
+    } finally {
+      registerHarness(Cursor);
     }
   });
 
