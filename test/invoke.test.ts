@@ -70,17 +70,32 @@ describe("normalized invocation", () => {
     });
   });
 
-  it("enforces Codex read-only tool access through the native sandbox", () => {
+  it("allows Codex to run outside Git without widening read-only access", () => {
     const codex = getHarness("codex");
 
-    expect(codex.buildInvocation("review this", { readOnly: true })).toEqual({
-      command: "codex",
-      args: ["exec", "--sandbox", "read-only", "review this"],
-    });
-    expect(codex.buildInvocation("review this", { readOnly: true, structured: true })).toEqual({
-      command: "codex",
-      args: ["exec", "--sandbox", "read-only", "--json", "review this"],
-    });
+    expect([
+      codex.buildInvocation("review this", { tools: true }),
+      codex.buildInvocation("review this", { tools: true, structured: true }),
+      codex.buildInvocation("review this", { readOnly: true }),
+      codex.buildInvocation("review this", { readOnly: true, structured: true }),
+    ]).toEqual([
+      {
+        command: "codex",
+        args: ["exec", "--skip-git-repo-check", "review this"],
+      },
+      {
+        command: "codex",
+        args: ["exec", "--skip-git-repo-check", "--json", "review this"],
+      },
+      {
+        command: "codex",
+        args: ["exec", "--skip-git-repo-check", "--sandbox", "read-only", "review this"],
+      },
+      {
+        command: "codex",
+        args: ["exec", "--skip-git-repo-check", "--sandbox", "read-only", "--json", "review this"],
+      },
+    ]);
   });
 
   it("limits Pi read-only runs to its native inspection tools", () => {
