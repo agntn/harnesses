@@ -179,7 +179,7 @@ function completedRun(
   result: InvokeResult,
   options: RunInvocationOptions,
 ): ToolResult<RunOutcome> {
-  const details: RunOutcome = {
+  const contentOutcome: Omit<RunOutcome, "stderr"> = {
     id: harness.id,
     command: result.command,
     args: result.args,
@@ -190,12 +190,12 @@ function completedRun(
     exitCode: result.exitCode,
     timedOut: result.timedOut,
     stdout: truncate(result.stdout),
-    stderr: truncate(result.stderr),
   };
+  const details: RunOutcome = { ...contentOutcome, stderr: truncate(result.stderr) };
   if (result.timedOut || result.exitCode !== 0) {
     return { content: text(details), details, isError: true };
   }
-  return { content: text(details), details };
+  return { content: text(result.stdout.length > 0 ? contentOutcome : details), details };
 }
 
 function unsupportedInvocation(
