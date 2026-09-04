@@ -179,12 +179,12 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
         readOnly: params.readOnly,
       });
       if (isError) {
+        if ("error" in details) throw new Error(details.error);
         const message =
-          "error" in details
-            ? details.error
-            : details.timedOut
-              ? `Harness ${details.id} timed out`
-              : details.stderr || `Harness ${details.id} exited with code ${details.exitCode}`;
+          content[0]?.text ??
+          (details.timedOut
+            ? `Harness ${details.id} timed out`
+            : details.stderr || `Harness ${details.id} exited with code ${details.exitCode}`);
         throw new Error(message);
       }
       return { content, details };
