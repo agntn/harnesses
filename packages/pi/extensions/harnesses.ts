@@ -38,6 +38,21 @@ function loadToolOperations(): Promise<typeof HarnessTools> {
   return toolOperationsPromise;
 }
 
+function prepareInfoArguments(args: unknown): unknown {
+  if (typeof args !== "object" || args === null || !("id" in args) || typeof args.id !== "string") {
+    return args;
+  }
+
+  try {
+    const id: unknown = JSON.parse(args.id);
+    return Array.isArray(id) && id.every((value) => typeof value === "string")
+      ? { ...args, id }
+      : args;
+  } catch {
+    return args;
+  }
+}
+
 function statusRenderers(tool: HarnessToolName) {
   return {
     renderCall(args: unknown, theme: StatusTheme, context: RenderOptions) {
@@ -87,6 +102,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       "Resolved paths are absolute for the current platform and home directory.",
     ],
     parameters: schemas.info,
+    prepareArguments: prepareInfoArguments,
     ...statusRenderers("harnesses_info"),
     async execute(
       _toolCallId,
