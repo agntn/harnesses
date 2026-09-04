@@ -468,6 +468,14 @@ export interface McpListing {
   harnesses: Array<{ id: HarnessId; configs: McpConfigListing[] }>;
 }
 
+/** Marker used only at the tool and CLI boundary, leaving config reads lossless for edits. */
+const MCP_REDACTED_VALUE = "<redacted>";
+const MCP_CONFIG_ERROR = "Unable to read or parse MCP config";
+
+function redactMcpValues(values: Readonly<Record<string, string>>): Record<string, string> {
+  return Object.fromEntries(Object.keys(values).map((key) => [key, MCP_REDACTED_VALUE]));
+}
+
 /** Result of one MCP config mutation. */
 export interface McpMutation {
   id: HarnessId;
@@ -517,7 +525,18 @@ export function mcpList(id?: string): ToolResult<McpListing | UnknownHarness> {
   const targets = id !== undefined && isHarnessId(id) ? [getHarness(id)] : getAllHarnesses();
   const details: McpListing = {
     harnesses: targets
-      .map((harness) => ({ id: harness.id, configs: listMcpServers(harness) }))
+      .map((harness) => ({
+        id: harness.id,
+        configs: listMcpServers(harness).map((listing) => ({
+          ...listing,
+          ...(listing.error === undefined ? {} : { error: MCP_CONFIG_ERROR }),
+          servers: listing.servers.map((server) => ({
+            ...server,
+            ...(server.env === undefined ? {} : { env: redactMcpValues(server.env) }),
+            ...(server.headers === undefined ? {} : { headers: redactMcpValues(server.headers) }),
+          })),
+        })),
+      }))
       .filter((entry) => entry.configs.length > 0),
   };
 

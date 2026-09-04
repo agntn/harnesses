@@ -1,14 +1,32 @@
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   addMcpServer,
   getHarness,
   listMcpServers,
+  registerHarness,
   removeMcpServer,
   syncMcpServers,
 } from "../src/index.ts";
+import Cursor from "../src/harnesses/cursor.ts";
+import { mcpList } from "../src/tool-operations.ts";
+
+let mcpListFixturePath = "";
+
+class McpListFixtureHarness extends Cursor {
+  override readonly mcpConfigs = [
+    {
+      path: mcpListFixturePath,
+      scope: "project" as const,
+      level: "official" as const,
+      format: "json" as const,
+      key: ["mcpServers"],
+      dialect: "standard" as const,
+    },
+  ];
+}
 
 function fixtureDirs(): { homeDir: string; projectRoot: string } {
   const root = mkdtempSync(join(tmpdir(), "harnesses-mcp-"));
@@ -17,6 +35,20 @@ function fixtureDirs(): { homeDir: string; projectRoot: string } {
   mkdirSync(homeDir, { recursive: true });
   mkdirSync(projectRoot, { recursive: true });
   return { homeDir, projectRoot };
+}
+
+function withMcpListFixture(run: () => void): void {
+  const dirs = fixtureDirs();
+  mcpListFixturePath = join(dirs.projectRoot, ".mcp.json");
+
+  try {
+    registerHarness(McpListFixtureHarness);
+    run();
+  } finally {
+    registerHarness(Cursor);
+    mcpListFixturePath = "";
+    rmSync(dirname(dirs.projectRoot), { recursive: true, force: true });
+  }
 }
 
 function parseJsonRecord(path: string): Record<string, unknown> {
@@ -135,6 +167,57 @@ describe("listMcpServers", () => {
     expect(user?.exists).toBe(true);
     expect(user?.error).toBeTruthy();
     expect(user?.servers).toEqual([]);
+  });
+});
+
+describe("mcpList", () => {
+  it("redacts credentials at the tool boundary without changing config reads", () => {
+    withMcpListFixture(() => {
+      const secret = "issue-1-secret-sentinel";
+      writeFileSync(
+        mcpListFixturePath,
+        JSON.stringify({
+          mcpServers: {
+            probe: {
+              command: "node",
+              env: { API_TOKEN: secret },
+              headers: { Authorization: `Bearer ${secret}` },
+            },
+          },
+        }),
+      );
+
+      const raw = listMcpServers(getHarness("cursor"));
+      expect(raw[0]?.servers[0]).toMatchObject({
+        env: { API_TOKEN: secret },
+        headers: { Authorization: `Bearer ${secret}` },
+      });
+
+      const result = mcpList("cursor");
+      if (!("harnesses" in result.details)) throw new Error("Expected an MCP listing");
+      expect(result.details.harnesses[0]?.configs[0]?.servers[0]).toMatchObject({
+        env: { API_TOKEN: "<redacted>" },
+        headers: { Authorization: "<redacted>" },
+      });
+      expect(result.content[0]?.text).not.toContain(secret);
+    });
+  });
+
+  it("does not echo malformed config contents", () => {
+    withMcpListFixture(() => {
+      const secret = "LEAKME";
+      writeFileSync(
+        mcpListFixturePath,
+        `{"mcpServers":{"probe":{"headers":{"Authorization":${secret}}}}`,
+      );
+
+      const result = mcpList("cursor");
+      if (!("harnesses" in result.details)) throw new Error("Expected an MCP listing");
+      expect(result.details.harnesses[0]?.configs[0]?.error).toBe(
+        "Unable to read or parse MCP config",
+      );
+      expect(result.content[0]?.text).not.toContain(secret);
+    });
   });
 });
 
