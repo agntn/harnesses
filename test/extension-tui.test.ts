@@ -1,4 +1,6 @@
 import { Type as OmpType } from "@oh-my-pi/omptype/typebox";
+import { IsSchema } from "typebox";
+import { Value } from "typebox/value";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@oh-my-pi/pi-coding-agent", () => ({
@@ -106,6 +108,40 @@ describe("Pi and OMP extension renderers", () => {
         { id: "github-copilot", prompt: "inspect", structured: true, tools: false },
       ]);
       await expect(result).rejects.toThrow("retry with structured: false and tools: true");
+    }
+  });
+
+  it("prepares serialized Pi metadata batches before validation", () => {
+    const definition = tool(piTools, "harnesses_info");
+    if (typeof definition.prepareArguments !== "function") {
+      throw new TypeError("Missing argument preparation");
+    }
+    if (!IsSchema(definition.parameters)) throw new TypeError("Missing parameter schema");
+
+    const raw = { id: '["pi","omp"]' };
+    expect(Value.Check(definition.parameters, raw)).toBe(false);
+    const prepared: unknown = Reflect.apply(definition.prepareArguments, definition, [raw]);
+    expect(prepared).toEqual({ id: ["pi", "omp"] });
+    expect(Value.Check(definition.parameters, prepared)).toBe(true);
+
+    for (const [input, valid] of [
+      [{ id: "pi" }, true],
+      [{ id: ["pi", "omp"] }, true],
+      [{ id: '["pi",1]' }, false],
+      [{ id: "[broken" }, false],
+    ] as const) {
+      const unchanged: unknown = Reflect.apply(definition.prepareArguments, definition, [input]);
+      expect(unchanged).toEqual(input);
+      expect(Value.Check(definition.parameters, unchanged)).toBe(valid);
+    }
+
+    for (const input of [
+      { id: "[]" },
+      { id: JSON.stringify(Array.from({ length: 21 }, () => "pi")) },
+      { id: '["Nope!"]' },
+    ]) {
+      const invalid: unknown = Reflect.apply(definition.prepareArguments, definition, [input]);
+      expect(Value.Check(definition.parameters, invalid)).toBe(false);
     }
   });
 
