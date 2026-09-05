@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
-import { execFileSync, spawn } from "node:child_process";
+import { execFile, execFileSync, spawn } from "node:child_process";
+import { setTimeout as delay } from "node:timers/promises";
 import { join } from "node:path";
 import type {
   HarnessDetection,
@@ -132,6 +133,36 @@ function buildInvocationArgs(
   return args;
 }
 
+function signalProcessGroup(pid: number, signal: NodeJS.Signals): void {
+  try {
+    process.kill(-pid, signal);
+  } catch (error) {
+    if (!(error instanceof Error && "code" in error && error.code === "ESRCH")) throw error;
+  }
+}
+
+/**
+ * Keep escalation alive even when the root exits before its descendants.
+ * @param pid - Root of the command's process group or Windows tree.
+ */
+async function terminateCommand(pid: number): Promise<void> {
+  if (process.platform === "win32") {
+    await new Promise<void>((resolve, reject) => {
+      execFile(
+        join(process.env.SystemRoot ?? "C:\\Windows", "System32", "taskkill.exe"),
+        ["/PID", String(pid), "/T", "/F"],
+        { windowsHide: true, timeout: 2000, killSignal: "SIGKILL" },
+        (error) => (error ? reject(error) : resolve()),
+      );
+    });
+    return;
+  }
+
+  signalProcessGroup(pid, "SIGTERM");
+  await delay(500);
+  signalProcessGroup(pid, "SIGKILL");
+}
+
 function executeCommand(
   command: string,
   args: readonly string[],
@@ -142,6 +173,7 @@ function executeCommand(
       cwd: options.cwd,
       env: options.env ? { ...process.env, ...options.env } : process.env,
       stdio: ["ignore", "pipe", "pipe"],
+      detached: process.platform !== "win32" && Boolean(options.timeoutMs),
     });
 
     let stdout = "";
@@ -150,7 +182,19 @@ function executeCommand(
     const timer = options.timeoutMs
       ? setTimeout(() => {
           timedOut = true;
-          child.kill("SIGTERM");
+          if (child.pid === undefined) return;
+          void terminateCommand(child.pid).then(
+            () => {
+              child.stdout.destroy();
+              child.stderr.destroy();
+              finish(null);
+            },
+            (error: unknown) => {
+              child.stdout.destroy();
+              child.stderr.destroy();
+              reject(error);
+            },
+          );
         }, options.timeoutMs)
       : undefined;
 
@@ -168,6 +212,10 @@ function executeCommand(
     });
     child.on("close", (code) => {
       if (timer) clearTimeout(timer);
+      if (!timedOut) finish(code);
+    });
+
+    function finish(code: number | null): void {
       resolve({
         command,
         args: [...args],
@@ -176,7 +224,7 @@ function executeCommand(
         exitCode: timedOut ? null : code,
         timedOut,
       });
-    });
+    }
   });
 }
 
