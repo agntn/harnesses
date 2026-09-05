@@ -49,6 +49,7 @@ src/
 test/
   index.test.ts         # all tests in one file, covers registry + detection + resolution
 build.config.ts         # obuild entries: src/index + src/cli
+docs/                   # Docus site for harnesses.agntn.dev; own AGENTS.md, reads a snapshot of dist/
 ```
 
 ## Adding a new harness

@@ -39,6 +39,7 @@
   "scripts": {
     "build": "obuild",
     "dev": "obuild --stub",
+    "docs": "pnpm --dir docs dev",
     "lint": "pnpm build && oxlint . && oxfmt --check .",
     "lint:fix": "pnpm build && oxlint . --fix && oxfmt . && pnpm build",
     "typecheck": "tsgo --noEmit --skipLibCheck && pnpm build && tsgo --noEmit --skipLibCheck -p tsconfig.extensions.json",
