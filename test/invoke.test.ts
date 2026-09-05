@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
+import { getEventListeners } from "node:events";
 import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getHarness, registerHarness } from "../src/index.ts";
 import { Harness } from "../src/harness.ts";
 import Cursor from "../src/harnesses/cursor.ts";
-import { harnessInfo, runHarness, RUN_MAX_OUTPUT_CHARS } from "../src/tool-operations.ts";
+import {
+  harnessInfo,
+  listHarnessModels,
+  runHarness,
+  RUN_MAX_OUTPUT_CHARS,
+} from "../src/tool-operations.ts";
 
 /**
  * Overrides the (locally absent) cursor harness with an invocation backed by
@@ -196,7 +202,102 @@ describe("normalized invocation", () => {
   });
 });
 
-describe.each(["invoke", "listModels"] as const)("%s deadline cleanup", (operation) => {
+describe.each(["invoke", "listModels"] as const)("%s cancellation cleanup", (operation) => {
+  it("does not spawn a command when the signal is already aborted", async () => {
+    const fake = new (class extends FakeCursor {
+      override readonly binaries = [join(tmpdir(), "agntn-missing-harness-binary")];
+      override readonly modelListing: Harness["modelListing"] = { args: [], level: "inferred" };
+    })();
+    const options = { signal: AbortSignal.abort() };
+    const result = await (operation === "invoke"
+      ? fake.invoke("x", options)
+      : fake.listModels(options));
+    expect(result).toMatchObject({
+      stdout: "",
+      stderr: "",
+      exitCode: null,
+      timedOut: false,
+      aborted: true,
+    });
+    if (operation === "listModels") expect(result).toHaveProperty("models", []);
+  });
+
+  it("removes listeners after completion and ignores a later abort", async () => {
+    const args = ["-e", "console.log('done')"];
+    const fake = new (class extends FakeCursor {
+      override readonly binaries = [process.execPath];
+      override readonly invocation: Harness["invocation"] = { args, level: "inferred" };
+      override readonly modelListing: Harness["modelListing"] = { args, level: "inferred" };
+      override parseModelListingOutput(): [] {
+        return [];
+      }
+    })();
+    const controller = new AbortController();
+    const options = { signal: controller.signal, tools: true };
+    const result = await (operation === "invoke"
+      ? fake.invoke("x", options)
+      : fake.listModels(options));
+    expect(getEventListeners(controller.signal, "abort")).toHaveLength(0);
+    controller.abort();
+    expect(result).toMatchObject({
+      stdout: "done\n",
+      exitCode: 0,
+      timedOut: false,
+      aborted: false,
+    });
+  });
+
+  it("removes listeners after a spawn error", async () => {
+    const fake = new (class extends FakeCursor {
+      override readonly binaries = [join(tmpdir(), "agntn-missing-harness-binary")];
+      override readonly modelListing: Harness["modelListing"] = { args: [], level: "inferred" };
+    })();
+    const controller = new AbortController();
+    const options = { signal: controller.signal, timeoutMs: 1000 };
+    await expect(
+      operation === "invoke" ? fake.invoke("x", options) : fake.listModels(options),
+    ).rejects.toMatchObject({ code: "ENOENT" });
+    expect(getEventListeners(controller.signal, "abort")).toHaveLength(0);
+    controller.abort();
+  });
+
+  it.each(["abort", "timeout"] as const)("keeps %s as the first stop reason", async (first) => {
+    const args = ["-e", "process.on('SIGTERM', () => {}); setTimeout(() => {}, 3000)"];
+    const fake = new (class extends FakeCursor {
+      override readonly binaries = [process.execPath];
+      override readonly invocation: Harness["invocation"] = { args, level: "inferred" };
+      override readonly modelListing: Harness["modelListing"] = { args, level: "inferred" };
+    })();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), first === "abort" ? 100 : 200);
+    try {
+      const options = {
+        signal: controller.signal,
+        timeoutMs: first === "timeout" ? 100 : 200,
+        tools: true,
+      };
+      const result = await (operation === "invoke"
+        ? fake.invoke("x", options)
+        : fake.listModels(options));
+      expect(result).toMatchObject({
+        exitCode: null,
+        aborted: first === "abort",
+        timedOut: first === "timeout",
+      });
+      expect(getEventListeners(controller.signal, "abort")).toHaveLength(0);
+    } finally {
+      clearTimeout(timer);
+    }
+  });
+});
+
+describe.each([
+  ["invoke", "deadline"],
+  ["listModels", "deadline"],
+  ["invoke", "cancellation"],
+  ["listModels", "cancellation"],
+] as const)("%s %s cleanup", (operation, cause) => {
+  const timeoutMs = cause === "deadline" ? 1000 : 0;
   it("preserves output and exit status when the command finishes before its deadline", async () => {
     const args = ["-e", "console.log('out'); console.error('err'); process.exitCode = 3"];
     const fake = new (class extends FakeCursor {
@@ -204,7 +305,7 @@ describe.each(["invoke", "listModels"] as const)("%s deadline cleanup", (operati
       override readonly invocation: Harness["invocation"] = { args, level: "inferred" };
       override readonly modelListing: Harness["modelListing"] = { args, level: "inferred" };
     })();
-    const options = { timeoutMs: 1000, tools: true };
+    const options = { timeoutMs, signal: new AbortController().signal, tools: true };
     const result = await (operation === "invoke"
       ? fake.invoke("x", options)
       : fake.listModels(options));
@@ -221,7 +322,7 @@ describe.each(["invoke", "listModels"] as const)("%s deadline cleanup", (operati
       override readonly binaries = [join(tmpdir(), "agntn-missing-harness-binary")];
       override readonly modelListing: Harness["modelListing"] = { args: [], level: "inferred" };
     })();
-    const options = { timeoutMs: 1000 };
+    const options = { timeoutMs, signal: new AbortController().signal };
     await expect(
       operation === "invoke" ? fake.invoke("x", options) : fake.listModels(options),
     ).rejects.toMatchObject({ code: "ENOENT" });
@@ -265,12 +366,20 @@ describe.each(["invoke", "listModels"] as const)("%s deadline cleanup", (operati
 
       try {
         const start = performance.now();
-        const options = { timeoutMs: 1000, tools: true };
-        const result = await (operation === "invoke"
-          ? fake.invoke("x", options)
-          : fake.listModels(options));
+        const controller = new AbortController();
+        const options = {
+          timeoutMs,
+          signal: cause === "cancellation" ? controller.signal : undefined,
+          tools: true,
+        };
+        const abortTimer = setTimeout(() => controller.abort(), 1000);
+        const result = await (
+          operation === "invoke" ? fake.invoke("x", options) : fake.listModels(options)
+        ).finally(() => clearTimeout(abortTimer));
 
-        expect(result.timedOut).toBe(true);
+        expect(result.timedOut).toBe(cause === "deadline");
+        expect(result.aborted).toBe(cause === "cancellation");
+        expect(getEventListeners(controller.signal, "abort")).toHaveLength(0);
         expect(result.exitCode).toBeNull();
         expect(performance.now() - start).toBeLessThan(3000);
         const rootOnly = mode === "ignore" || mode === "grace";
@@ -372,6 +481,27 @@ describe("harness metadata for agents", () => {
 });
 
 describe("runHarness tool operation", () => {
+  it("reports cancellation through both shared tool operations", async () => {
+    registerHarness(
+      class extends FakeCursor {
+        override readonly binaries = [join(tmpdir(), "agntn-missing-harness-binary")];
+        override readonly modelListing: Harness["modelListing"] = { args: [], level: "inferred" };
+      },
+    );
+    try {
+      const options = { signal: AbortSignal.abort() };
+      for (const result of [
+        await runHarness("cursor", "x", options),
+        await listHarnessModels("cursor", options),
+      ]) {
+        expect(result.isError).toBe(true);
+        expect(result.details).toMatchObject({ aborted: true, timedOut: false, exitCode: null });
+        expect(result.content[0]?.text).toContain("aborted: true");
+      }
+    } finally {
+      registerHarness(Cursor);
+    }
+  });
   it("flags an unknown harness id", async () => {
     const result = await runHarness("nope", "x");
 

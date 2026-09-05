@@ -189,6 +189,7 @@ function completedRun(
     readOnly: options.readOnly,
     exitCode: result.exitCode,
     timedOut: result.timedOut,
+    aborted: result.aborted,
     stdout: truncate(result.stdout),
   };
   const details: RunOutcome = { ...contentOutcome, stderr: truncate(result.stderr) };
@@ -301,6 +302,8 @@ export interface ModelsOptions {
   cwd?: string;
   /** Wall-clock budget in seconds; defaults to {@link RUN_DEFAULT_TIMEOUT_SECONDS}. */
   timeoutSeconds?: number;
+  /** Cancel the owned command through the host request signal. */
+  signal?: AbortSignal;
 }
 
 /** One completed native model-listing query. */
@@ -312,6 +315,7 @@ export interface ModelsOutcome {
   models: AvailableModel[];
   exitCode: number | null;
   timedOut: boolean;
+  aborted: boolean;
   stderr: string;
 }
 
@@ -342,6 +346,7 @@ export async function listHarnessModels(
       search: options.search,
       cwd: options.cwd,
       timeoutMs: timeoutSeconds * 1000,
+      signal: options.signal,
     });
   } catch (error) {
     const details: RunFailure = { error: `Failed to list ${id} models: ${errorMessage(error)}` };
@@ -356,6 +361,7 @@ export async function listHarnessModels(
     models: result.models,
     exitCode: result.exitCode,
     timedOut: result.timedOut,
+    aborted: result.aborted,
     stderr: truncate(result.stderr),
   };
 
@@ -373,6 +379,8 @@ export interface RunOptions {
   model?: string;
   /** Wall-clock budget in seconds; defaults to {@link RUN_DEFAULT_TIMEOUT_SECONDS}. */
   timeoutSeconds?: number;
+  /** Cancel the owned command through the host request signal. */
+  signal?: AbortSignal;
   /** Use the harness's structured (JSON) output mode instead of plain text. */
   structured?: boolean;
   /** Enable tools; defaults to a native advisor without tools invocation. */
@@ -392,6 +400,7 @@ export interface RunOutcome {
   readOnly: boolean;
   exitCode: number | null;
   timedOut: boolean;
+  aborted: boolean;
   stdout: string;
   stderr: string;
 }
@@ -451,6 +460,7 @@ export async function runHarness(
       cwd: options.cwd,
       model: options.model,
       timeoutMs: timeoutSeconds * 1000,
+      signal: options.signal,
       structured,
       tools,
       readOnly,

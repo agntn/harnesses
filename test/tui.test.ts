@@ -4,6 +4,18 @@ import { renderToolCall, renderToolResult, sanitizeTerminalText } from "../packa
 const plainTheme = {};
 
 describe("shared extension TUI", () => {
+  it.each(["harnesses_run", "harnesses_models"] as const)("shows cancellation in %s", (name) => {
+    const line = renderToolResult(
+      name,
+      { details: { id: "pi", aborted: true, timedOut: false, exitCode: null, models: [] } },
+      true,
+      {},
+      plainTheme,
+    );
+    expect(line).toContain("aborted");
+    expect(line).not.toContain("timed out");
+  });
+
   it("sanitizes external values before terminal rendering", () => {
     const escape = String.fromCodePoint(0x1b);
     const bell = String.fromCodePoint(0x07);

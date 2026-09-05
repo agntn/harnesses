@@ -114,6 +114,32 @@ describe("Pi and OMP extension renderers", () => {
     }
   });
 
+  it("forwards cancellation from both hosts to runs and model listings", async () => {
+    registerHarness(
+      class extends Cursor {
+        override readonly binaries = ["agntn-missing-harness-binary"];
+        override readonly invocation: Harness["invocation"] = { args: [], level: "inferred" };
+        override readonly modelListing: Harness["modelListing"] = { args: [], level: "inferred" };
+      },
+    );
+    try {
+      for (const definitions of [piTools, ompTools]) {
+        for (const name of ["harnesses_run", "harnesses_models"]) {
+          const definition = tool(definitions, name);
+          if (typeof definition.execute !== "function") throw new Error("Missing execute");
+          const result: unknown = Reflect.apply(definition.execute, definition, [
+            "call",
+            { id: "cursor", prompt: "x", tools: true },
+            AbortSignal.abort(),
+          ]);
+          await expect(result).rejects.toThrow(/aborted/);
+        }
+      }
+    } finally {
+      registerHarness(Cursor);
+    }
+  });
+
   it("keeps failed run output in both host errors", async () => {
     registerHarness(
       class extends Cursor {

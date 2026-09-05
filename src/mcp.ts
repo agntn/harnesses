@@ -31,6 +31,7 @@ interface ToolDefinition {
   annotations: Tool["annotations"];
   execute(
     args: Readonly<Record<string, unknown>>,
+    signal: AbortSignal,
   ): ToolResult<unknown> | Promise<ToolResult<unknown>>;
 }
 
@@ -83,11 +84,12 @@ const tools: ToolDefinition[] = [
       "List the models currently available to one AI coding harness through its native CLI, normalized across providers. An optional search filter is passed to harnesses that support it. The command may load project configuration and extensions.",
     inputSchema: schemas.models,
     annotations: EXEC_READ,
-    execute: (args) =>
+    execute: (args, signal) =>
       listHarnessModels(args.id as string, {
         search: args.search as string | undefined,
         cwd: args.cwd as string | undefined,
         timeoutSeconds: args.timeoutSeconds as number | undefined,
+        signal,
       }),
   },
   {
@@ -102,11 +104,12 @@ const tools: ToolDefinition[] = [
       idempotentHint: false,
       openWorldHint: true,
     },
-    execute: (args) =>
+    execute: (args, signal) =>
       runHarness(args.id as string, args.prompt as string, {
         cwd: args.cwd as string | undefined,
         model: args.model as string | undefined,
         timeoutSeconds: args.timeoutSeconds as number | undefined,
+        signal,
         structured: args.structured as boolean | undefined,
         tools: args.tools as boolean | undefined,
         readOnly: args.readOnly as boolean | undefined,
@@ -241,7 +244,7 @@ export function createMcpServer(): Server {
     })),
   }));
 
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
     const tool = toolsByName.get(request.params.name);
     if (!tool) {
       return errorResult(`Unknown harnesses tool: ${JSON.stringify(request.params.name)}`);
@@ -253,7 +256,7 @@ export function createMcpServer(): Server {
     }
 
     try {
-      return toCallToolResult(await tool.execute(args));
+      return toCallToolResult(await tool.execute(args, extra.signal));
     } catch (error) {
       return errorResult(
         `${tool.name} failed: ${error instanceof Error ? error.message : String(error)}`,

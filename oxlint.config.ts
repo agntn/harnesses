@@ -43,7 +43,7 @@ export default defineConfig({
               "ToolResult",
             ],
           },
-          { from: "lib", name: ["ReadonlyMap", "ReadonlySet"] },
+          { from: "lib", name: ["AbortSignal", "ReadonlyMap", "ReadonlySet"] },
           {
             from: "package",
             name: "ExtensionAPI",

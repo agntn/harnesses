@@ -2,7 +2,9 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, describe, expect, it } from "vitest";
 import { createMcpServer } from "../src/mcp.ts";
-import { listHarnesses } from "../src/index.ts";
+import { listHarnesses, registerHarness } from "../src/index.ts";
+import type { InvokeOptions, InvokeResult, ListModelsOptions } from "../src/index.ts";
+import Cursor from "../src/harnesses/cursor.ts";
 
 const openConnections: Array<{ close(): Promise<void> }> = [];
 
@@ -45,6 +47,57 @@ afterEach(async () => {
 });
 
 describe("harnesses MCP server", () => {
+  it.each(["harnesses_run", "harnesses_models"])(
+    "cancels the owned command for %s",
+    async (name) => {
+      let execution: Promise<InvokeResult> | undefined;
+      registerHarness(
+        class extends Cursor {
+          override readonly binaries = [process.execPath];
+          override readonly invocation = {
+            args: ["-e", "setTimeout(() => {}, 5000)"],
+            level: "inferred" as const,
+          };
+          override readonly modelListing = this.invocation;
+          override invoke(prompt: string, options: InvokeOptions = {}) {
+            const pending = super.invoke(prompt, options);
+            execution = pending;
+            return pending;
+          }
+          override listModels(options: ListModelsOptions = {}) {
+            const pending = super.listModels(options);
+            execution = pending;
+            return pending;
+          }
+        },
+      );
+      const controller = new AbortController();
+      try {
+        const client = await connectTestClient();
+        const request = client
+          .callTool({ name, arguments: { id: "cursor", prompt: "x", tools: true } }, undefined, {
+            signal: controller.signal,
+          })
+          .then(
+            () => "completed",
+            (error: unknown) => String(error),
+          );
+        await expect.poll(() => execution !== undefined, { timeout: 1000 }).toBe(true);
+        controller.abort(new Error("cancel fixture"));
+        await expect(request).resolves.toContain("cancel fixture");
+        await expect(execution).resolves.toMatchObject({
+          aborted: true,
+          timedOut: false,
+          exitCode: null,
+        });
+      } finally {
+        controller.abort();
+        registerHarness(Cursor);
+        await execution;
+      }
+    },
+  );
+
   it("distinguishes metadata reads, executable reads, and mutations", async () => {
     const client = await connectTestClient();
 

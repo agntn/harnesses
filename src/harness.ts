@@ -1,3 +1,4 @@
+import { addAbortListener } from "node:events";
 import { existsSync } from "node:fs";
 import { execFile, execFileSync, spawn } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
@@ -33,6 +34,7 @@ type CommandOptions = Readonly<{
   cwd?: string;
   env?: Readonly<Record<string, string>>;
   timeoutMs?: number;
+  signal?: AbortSignal;
 }>;
 
 type InvocationOptions = Readonly<{
@@ -169,34 +171,30 @@ function executeCommand(
   options: CommandOptions,
 ): Promise<InvokeResult> {
   return new Promise((resolve, reject) => {
+    let stdout = "";
+    let stderr = "";
+    let stopped: "timeout" | "abort" | undefined;
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let abortListener: ReturnType<typeof addAbortListener> | undefined;
+
+    if (options.signal?.aborted) {
+      stopped = "abort";
+      finish(null);
+      return;
+    }
+
     const child = spawn(command, args, {
       cwd: options.cwd,
       env: options.env ? { ...process.env, ...options.env } : process.env,
       stdio: ["ignore", "pipe", "pipe"],
-      detached: process.platform !== "win32" && Boolean(options.timeoutMs),
+      detached:
+        process.platform !== "win32" &&
+        (Boolean(options.timeoutMs) || options.signal !== undefined),
     });
 
-    let stdout = "";
-    let stderr = "";
-    let timedOut = false;
-    const timer = options.timeoutMs
-      ? setTimeout(() => {
-          timedOut = true;
-          if (child.pid === undefined) return;
-          void terminateCommand(child.pid).then(
-            () => {
-              child.stdout.destroy();
-              child.stderr.destroy();
-              finish(null);
-            },
-            (error: unknown) => {
-              child.stdout.destroy();
-              child.stderr.destroy();
-              reject(error);
-            },
-          );
-        }, options.timeoutMs)
-      : undefined;
+    if (options.timeoutMs) timer = setTimeout(() => stop("timeout"), options.timeoutMs);
+    if (options.signal) abortListener = addAbortListener(options.signal, () => stop("abort"));
 
     /* oxlint-disable-next-line typescript/prefer-readonly-parameter-types */
     child.stdout.on("data", (chunk: Buffer) => {
@@ -206,23 +204,54 @@ function executeCommand(
     child.stderr.on("data", (chunk: Buffer) => {
       stderr += chunk.toString("utf8");
     });
-    child.on("error", (error) => {
-      if (timer) clearTimeout(timer);
-      reject(error);
-    });
+    child.on("error", fail);
     child.on("close", (code) => {
-      if (timer) clearTimeout(timer);
-      if (!timedOut) finish(code);
+      if (stopped === undefined) finish(code);
     });
 
+    function cleanup(): void {
+      if (timer) clearTimeout(timer);
+      abortListener?.[Symbol.dispose]();
+    }
+
+    function fail(error: unknown): void {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(error);
+    }
+
+    function stop(reason: "timeout" | "abort"): void {
+      if (settled || stopped !== undefined) return;
+      stopped = reason;
+      cleanup();
+      if (child.pid === undefined) return;
+      void terminateCommand(child.pid).then(
+        () => {
+          child.stdout.destroy();
+          child.stderr.destroy();
+          finish(null);
+        },
+        (error: unknown) => {
+          child.stdout.destroy();
+          child.stderr.destroy();
+          fail(error);
+        },
+      );
+    }
+
     function finish(code: number | null): void {
+      if (settled) return;
+      settled = true;
+      cleanup();
       resolve({
         command,
         args: [...args],
         stdout,
         stderr,
-        exitCode: timedOut ? null : code,
-        timedOut,
+        exitCode: stopped === undefined ? code : null,
+        timedOut: stopped === "timeout",
+        aborted: stopped === "abort",
       });
     }
   });
@@ -357,7 +386,7 @@ export abstract class Harness {
    * exits instead of waiting forever.
    *
    * @param prompt - Prompt sent to the harness.
-   * @param options - Invocation, environment, and timeout options.
+   * @param options - Invocation, environment, timeout, and cancellation options.
    * @returns {Promise<InvokeResult>} The completed process result.
    */
   invoke(prompt: string, options: InvokeOptions = {}): Promise<InvokeResult> {
@@ -399,7 +428,7 @@ export abstract class Harness {
    * Runs the harness's native model-listing command and normalizes its output.
    * stdin is closed for the same reason as {@link invoke}.
    *
-   * @param options - Search, environment, and timeout options.
+   * @param options - Search, environment, timeout, and cancellation options.
    * @returns {Promise<ListModelsResult>} The normalized command and model result.
    */
   async listModels(options: ListModelsOptions = {}): Promise<ListModelsResult> {
@@ -416,7 +445,7 @@ export abstract class Harness {
     return {
       ...result,
       models:
-        !result.timedOut && result.exitCode === 0
+        !result.timedOut && !result.aborted && result.exitCode === 0
           ? this.parseModelListingOutput(result.stdout)
           : [],
     };
