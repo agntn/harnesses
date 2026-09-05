@@ -100,7 +100,7 @@ export interface ListModelsOptions {
   search?: string;
   cwd?: string;
   env?: Record<string, string>;
-  /** Kill the model-listing command after this many milliseconds; unset means no timeout. */
+  /** Milliseconds before cleanup starts. Unset or 0 disables the deadline. */
   timeoutMs?: number;
 }
 
@@ -113,7 +113,7 @@ export interface InvokeOptions {
   tools?: boolean;
   /** Require native enforcement of read-only tool access. Implies `tools: true`. */
   readOnly?: boolean;
-  /** Kill the harness after this many milliseconds; unset means no timeout. */
+  /** Milliseconds before cleanup starts. Unset or 0 disables the deadline. */
   timeoutMs?: number;
   /** Use the harness's structured (JSON) output mode instead of plain text. */
   structured?: boolean;

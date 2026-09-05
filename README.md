@@ -24,7 +24,7 @@ console.log(claude.hooks); // [{ path: ".claude/hooks/", scope: "project", ... }
 console.log(claude.invocationModes); // advisor and full agent modes, no read-only mode
 
 const codex = getHarness("codex");
-await codex.invoke("Review this patch", { readOnly: true });
+await codex.invoke("Review this patch", { readOnly: true, timeoutMs: 60_000 });
 
 const pi = getHarness("pi");
 const { models } = await pi.listModels({ search: "gpt-5.4" });
@@ -88,6 +88,10 @@ import type { ClaudeSessionEntry, CodexThread, GeminiConversationRecord } from "
 | Freebuff        |  No   |  No   | No verified native route                                                    |
 
 Primary references: [Antigravity prompting](https://antigravity.google/docs/cli/prompting/), [Antigravity changelog](https://github.com/google-antigravity/antigravity-cli/blob/main/CHANGELOG.md), [Gemini CLI tools](https://github.com/google-gemini/gemini-cli/blob/main/docs/reference/tools.md), [Gemini CLI video request](https://github.com/google-gemini/gemini-cli/issues/27194), [OpenCode attachments](https://opencode.ai/v2/docs/attachments/), [Cursor prompting](https://cursor.com/docs/agent/prompting), and [Copilot CLI voice input](https://docs.github.com/en/copilot/how-tos/copilot-cli/use-copilot-cli/voice-input).
+
+`invoke()` and `listModels()` accept `timeoutMs`. Unset or `0` means no deadline. On Linux and macOS, timed commands run in their own process group: the deadline sends `SIGTERM`, then `SIGKILL` after 500 ms, even if the root has already exited. Windows uses `taskkill /T /F` immediately, with a 2 s budget for that command. Cleanup failures reject the call. Timed results retain captured output with `timedOut: true` and `exitCode: null`.
+
+This is command cleanup, not a sandbox. Descendants that leave the POSIX process group, or outlive an already exited root on Windows, cannot be reliably reached by these mechanisms. Inherited output pipes do not extend the wait after cleanup. Scheduling and OS delays can exceed the stated budgets.
 
 Each agent is a concrete subclass of the abstract `Harness` class. Custom subclasses can be added with `registerHarness`. Every harness exposes config paths, session locations, instruction files, skills dirs, hooks, commands, persistence formats, capabilities (MCP, vision, audio, video, tools, streaming), detection rules, a normalized non-interactive invocation (`harness.invoke(prompt, { model })`) where the CLI has a headless mode, native model listing (`harness.listModels()`) where the CLI supports it, and its MCP server config files (`listMcpServers`/`addMcpServer`/`removeMcpServer` normalize the dialects; writes rewrite JSON and surgically edit TOML with comments preserved). `syncMcpServers` treats `~/.config/agntn/mcp.jsonc` (JSONC, XDG-aware) as the single source of truth and resets every harness's user-scope MCP config to exactly that list; a top-level `"excludes": ["codex"]` array opts individual harnesses out of the sync (their own servers stay, master-listed names are withdrawn), and `~`/`${HOME}` in commands, args, and env values expand to absolute paths at sync time (harnesses spawn MCP servers without a shell). `syncAgentsFiles` links every harness's global instructions file (CLAUDE.md/AGENTS.md/GEMINI.md) to one master file as symlinks, so an edit made through any harness lands in the single physical copy; `~/.config/agntn/agents.jsonc` sets the `source`, `companions`, and `excludes`, diverged regular files are backed up and relinked, and check mode reports without writing. Companion paths are relative to the source directory and are linked at the same relative path beside each harness target.
 

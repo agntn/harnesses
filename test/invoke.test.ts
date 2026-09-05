@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { getHarness, registerHarness } from "../src/index.ts";
 import { Harness } from "../src/harness.ts";
 import Cursor from "../src/harnesses/cursor.ts";
@@ -27,7 +30,7 @@ class FakeCursor extends Harness {
   readonly skills: Harness["skills"] = [];
   readonly commands: Harness["commands"] = [];
   readonly hooks: Harness["hooks"] = [];
-  readonly mcpConfigs: Harness["mcpConfigs"] = [];
+  override readonly mcpConfigs: Harness["mcpConfigs"] = [];
   readonly detection = { envVars: [], projectMarkers: [] };
   readonly invocation: Harness["invocation"] = {
     args: ["-e", "console.log('echo:' + process.argv[1]); process.exitCode = 0", "{prompt}"],
@@ -192,6 +195,140 @@ describe("normalized invocation", () => {
     );
   });
 });
+
+describe.each(["invoke", "listModels"] as const)("%s deadline cleanup", (operation) => {
+  it("preserves output and exit status when the command finishes before its deadline", async () => {
+    const args = ["-e", "console.log('out'); console.error('err'); process.exitCode = 3"];
+    const fake = new (class extends FakeCursor {
+      override readonly binaries = [process.execPath];
+      override readonly invocation: Harness["invocation"] = { args, level: "inferred" };
+      override readonly modelListing: Harness["modelListing"] = { args, level: "inferred" };
+    })();
+    const options = { timeoutMs: 1000, tools: true };
+    const result = await (operation === "invoke"
+      ? fake.invoke("x", options)
+      : fake.listModels(options));
+    expect(result).toMatchObject({
+      stdout: "out\n",
+      stderr: "err\n",
+      exitCode: 3,
+      timedOut: false,
+    });
+  });
+
+  it("rejects a spawn failure without waiting for its deadline", async () => {
+    const fake = new (class extends FakeCursor {
+      override readonly binaries = [join(tmpdir(), "agntn-missing-harness-binary")];
+      override readonly modelListing: Harness["modelListing"] = { args: [], level: "inferred" };
+    })();
+    const options = { timeoutMs: 1000 };
+    await expect(
+      operation === "invoke" ? fake.invoke("x", options) : fake.listModels(options),
+    ).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it.each(["ignore", "grace", "inherit", "ignore-stdio"] as const)(
+    "cleans up the %s fixture within the deadline and cleanup budget",
+    async (mode) => {
+      const directory = await mkdtemp(join(tmpdir(), "harness-timeout-"));
+      const leaf = `
+        const { writeFileSync } = require('node:fs');
+        const { join } = require('node:path');
+        process.on('SIGTERM', () => {});
+        writeFileSync(join(process.argv[1], 'leaf'), String(process.pid));
+        setTimeout(() => process.exit(0), 5000);
+      `;
+      const script = `
+        const { writeFileSync } = require('node:fs');
+        const { join } = require('node:path');
+        writeFileSync(join(process.argv[1], 'root'), String(process.pid));
+        if (process.argv[2] === 'ignore' || process.argv[2] === 'grace') {
+          process.on('SIGTERM', () => {
+            if (process.argv[2] === 'grace') {
+              setTimeout(() => { console.log('cleaned'); process.exit(0); }, 100);
+            }
+          });
+          console.log('ready');
+        } else {
+          require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(leaf)}, process.argv[1]], {
+            stdio: process.argv[2] === 'inherit' ? 'inherit' : 'ignore'
+          });
+        }
+        setTimeout(() => process.exit(0), 5000);
+      `;
+      const args = ["-e", script, directory, mode];
+      const fake = new (class extends FakeCursor {
+        override readonly binaries = [process.execPath];
+        override readonly invocation: Harness["invocation"] = { args, level: "inferred" };
+        override readonly modelListing: Harness["modelListing"] = { args, level: "inferred" };
+      })();
+
+      try {
+        const start = performance.now();
+        const options = { timeoutMs: 1000, tools: true };
+        const result = await (operation === "invoke"
+          ? fake.invoke("x", options)
+          : fake.listModels(options));
+
+        expect(result.timedOut).toBe(true);
+        expect(result.exitCode).toBeNull();
+        expect(performance.now() - start).toBeLessThan(3000);
+        const rootOnly = mode === "ignore" || mode === "grace";
+        if (rootOnly) {
+          expect(result.stdout).toBe(
+            mode === "grace" && process.platform !== "win32" ? "ready\ncleaned\n" : "ready\n",
+          );
+        }
+        const names = await readdir(directory);
+        expect(names.sort()).toEqual(rootOnly ? ["root"] : ["leaf", "root"]);
+        for (const name of names) {
+          const pid = Number(await readFile(join(directory, name), "utf8"));
+          await expect.poll(() => processIsRunning(pid), { timeout: 1000 }).toBe(false);
+        }
+      } finally {
+        await cleanupFixture(directory);
+      }
+    },
+    10000,
+  );
+});
+
+async function cleanupFixture(directory: string): Promise<void> {
+  for (const name of await readdir(directory)) {
+    const pid = Number(await readFile(join(directory, name), "utf8"));
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch (error) {
+      if (!(error instanceof Error && "code" in error && error.code === "ESRCH")) throw error;
+    }
+  }
+  await rm(directory, { recursive: true, force: true });
+}
+
+/**
+ * Linux may retain an orphan's PID as a zombie after it has stopped executing.
+ * @param pid - PID written by a fixture process.
+ * @returns {Promise<boolean>} Whether the process can still execute.
+ */
+async function processIsRunning(pid: number): Promise<boolean> {
+  try {
+    process.kill(pid, 0);
+    if (process.platform === "linux") {
+      const stat = await readFile(`/proc/${pid}/stat`, "utf8");
+      return stat.slice(stat.lastIndexOf(")") + 2, stat.lastIndexOf(")") + 3) !== "Z";
+    }
+    return true;
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      "code" in error &&
+      ["ESRCH", "ENOENT"].includes(String(error.code))
+    ) {
+      return false;
+    }
+    throw error;
+  }
+}
 
 describe("harness metadata for agents", () => {
   it("exposes invocation modes through the harness API", () => {
