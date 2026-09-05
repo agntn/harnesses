@@ -3,5 +3,5 @@ import oxfmt from "@agntn/ox/oxfmt";
 
 export default defineConfig({
   ...oxfmt,
-  ignorePatterns: ["dist", "coverage"],
+  ignorePatterns: ["dist", "coverage", "docs"],
 });
