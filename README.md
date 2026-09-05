@@ -7,6 +7,8 @@
 
 Metadata toolkit for AI coding harnesses. One registry of paths, formats, and detection rules for every major CLI.
 
+Docs: [harnesses.agntn.dev](https://harnesses.agntn.dev)
+
 ## Install
 
 ```bash

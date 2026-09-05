@@ -8,3 +8,10 @@ websxa/
 CLAUDE.md
 src/**/CLAUDE.md
 test/**/CLAUDE.md
+
+docs/.data
+docs/.nitro
+docs/.cache
+docs/.wrangler
+docs/.nuxt
+docs/.output
