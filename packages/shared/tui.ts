@@ -222,7 +222,7 @@ function modelsMeta(details: ResultDetails): string[] {
   const models = listLength(details, "models");
   return compactStrings([
     id ? sanitizeTerminalText(id) : undefined,
-    models === undefined ? undefined : `${models} models`,
+    details.aborted === true ? "aborted" : models === undefined ? undefined : `${models} models`,
   ]);
 }
 
@@ -230,7 +230,9 @@ function runMeta(details: ResultDetails): string[] {
   const meta: string[] = [];
   const id = scalar(details, "id");
   if (id) meta.push(sanitizeTerminalText(id));
-  if (details.timedOut === true) {
+  if (details.aborted === true) {
+    meta.push("aborted");
+  } else if (details.timedOut === true) {
     meta.push("timed out");
   } else if (typeof details.exitCode === "number") {
     meta.push(`exit ${details.exitCode}`);

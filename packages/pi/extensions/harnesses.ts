@@ -130,20 +130,24 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     async execute(
       _toolCallId,
       params: HarnessSchemas.ModelsParams,
+      signal,
     ): Promise<AgentToolResult<HarnessTools.ModelsOutcome | HarnessTools.RunFailure>> {
       const { listHarnessModels } = await loadToolOperations();
       const { content, details, isError } = await listHarnessModels(params.id, {
         search: params.search,
         cwd: params.cwd,
         timeoutSeconds: params.timeoutSeconds,
+        signal,
       });
       if (isError) {
         const message =
           "error" in details
             ? details.error
-            : details.timedOut
-              ? `Harness ${details.id} model listing timed out`
-              : details.stderr || `Harness ${details.id} exited with code ${details.exitCode}`;
+            : details.aborted
+              ? `Harness ${details.id} model listing aborted`
+              : details.timedOut
+                ? `Harness ${details.id} model listing timed out`
+                : details.stderr || `Harness ${details.id} exited with code ${details.exitCode}`;
         throw new Error(message);
       }
       return { content, details };
@@ -168,12 +172,14 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     async execute(
       _toolCallId,
       params: HarnessSchemas.RunParams,
+      signal,
     ): Promise<AgentToolResult<HarnessTools.RunOutcome | HarnessTools.RunFailure>> {
       const { runHarness } = await loadToolOperations();
       const { content, details, isError } = await runHarness(params.id, params.prompt, {
         cwd: params.cwd,
         model: params.model,
         timeoutSeconds: params.timeoutSeconds,
+        signal,
         structured: params.structured,
         tools: params.tools,
         readOnly: params.readOnly,

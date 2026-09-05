@@ -89,7 +89,21 @@ import type { ClaudeSessionEntry, CodexThread, GeminiConversationRecord } from "
 
 Primary references: [Antigravity prompting](https://antigravity.google/docs/cli/prompting/), [Antigravity changelog](https://github.com/google-antigravity/antigravity-cli/blob/main/CHANGELOG.md), [Gemini CLI tools](https://github.com/google-gemini/gemini-cli/blob/main/docs/reference/tools.md), [Gemini CLI video request](https://github.com/google-gemini/gemini-cli/issues/27194), [OpenCode attachments](https://opencode.ai/v2/docs/attachments/), [Cursor prompting](https://cursor.com/docs/agent/prompting), and [Copilot CLI voice input](https://docs.github.com/en/copilot/how-tos/copilot-cli/use-copilot-cli/voice-input).
 
-`invoke()` and `listModels()` accept `timeoutMs`. Unset or `0` means no deadline. On Linux and macOS, timed commands run in their own process group: the deadline sends `SIGTERM`, then `SIGKILL` after 500 ms, even if the root has already exited. Windows uses `taskkill /T /F` immediately, with a 2 s budget for that command. Cleanup failures reject the call. Timed results retain captured output with `timedOut: true` and `exitCode: null`.
+`invoke()` and `listModels()` accept `timeoutMs` and `signal?: AbortSignal`. Unset or `0` means no deadline. An already aborted signal skips spawning. Otherwise, the first cancellation or deadline starts cleanup: Linux and macOS use a dedicated process group, with `SIGTERM` followed by `SIGKILL` after 500 ms even if the root has exited. Windows uses `taskkill /T /F` immediately, with a 2 s budget for that command. Cleanup failures reject the call.
+
+Stopped results retain captured output and set `exitCode: null`. Caller cancellation sets `aborted: true`, a deadline sets `timedOut: true`, and the first reason wins. Both flags are false on normal completion. Later aborts do nothing, and cancelled model listings return no parsed models. Pi, OMP, and MCP tools forward their host request signal, not a JSON argument supplied by the model.
+
+```ts
+const controller = new AbortController();
+const pending = getHarness("pi").invoke("Review this change", {
+  tools: true,
+  readOnly: true,
+  signal: controller.signal,
+});
+controller.abort();
+const result = await pending;
+console.log(result.aborted);
+```
 
 This is command cleanup, not a sandbox. Descendants that leave the POSIX process group, or outlive an already exited root on Windows, cannot be reliably reached by these mechanisms. Inherited output pipes do not extend the wait after cleanup. Scheduling and OS delays can exceed the stated budgets.
 

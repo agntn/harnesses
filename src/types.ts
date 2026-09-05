@@ -102,6 +102,8 @@ export interface ListModelsOptions {
   env?: Record<string, string>;
   /** Milliseconds before cleanup starts. Unset or 0 disables the deadline. */
   timeoutMs?: number;
+  /** Cancel with the same process cleanup as a timeout. */
+  signal?: AbortSignal;
 }
 
 export interface InvokeOptions {
@@ -115,6 +117,8 @@ export interface InvokeOptions {
   readOnly?: boolean;
   /** Milliseconds before cleanup starts. Unset or 0 disables the deadline. */
   timeoutMs?: number;
+  /** Cancel with the same process cleanup as a timeout. */
+  signal?: AbortSignal;
   /** Use the harness's structured (JSON) output mode instead of plain text. */
   structured?: boolean;
 }
@@ -124,9 +128,11 @@ export interface InvokeResult {
   args: string[];
   stdout: string;
   stderr: string;
-  /** Process exit code; null when the run hit `timeoutMs` and was killed. */
+  /** Process exit code; null when terminated by a signal, timeout, or cancellation. */
   exitCode: number | null;
   timedOut: boolean;
+  /** True when caller cancellation wins over the deadline or completion. */
+  aborted: boolean;
 }
 
 /** Result of one native model-listing command. */

@@ -52,4 +52,4 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm i --frozen-lockfile
-      - run: pnpm vitest run test/invoke.test.ts -t "deadline cleanup"
+      - run: pnpm vitest run test/invoke.test.ts -t "deadline cleanup|cancellation cleanup"
