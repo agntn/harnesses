@@ -1,0 +1,2084 @@
+{
+  "version": "0.0.1",
+  "harnesses": [
+    {
+      "id": "antigravity",
+      "name": "Google Antigravity CLI",
+      "binaries": [
+        "agy"
+      ],
+      "capabilities": {
+        "mcp": true,
+        "vision": true,
+        "audio": true,
+        "video": true,
+        "tools": true,
+        "streaming": true
+      },
+      "invocation": {
+        "args": [
+          "--print",
+          "{prompt}"
+        ],
+        "jsonArgs": [
+          "--print",
+          "--output-format",
+          "json",
+          "{prompt}"
+        ],
+        "modelArgs": [
+          "--model",
+          "{model}"
+        ],
+        "level": "official",
+        "note": "Non-interactive print mode."
+      },
+      "invocationModes": {
+        "advisor": false,
+        "advisorStructured": false,
+        "readOnly": false,
+        "readOnlyStructured": false,
+        "agent": true,
+        "agentStructured": true
+      },
+      "modelListing": null,
+      "config": [
+        {
+          "path": "~/.gemini/config/config.json",
+          "scope": "user",
+          "level": "official",
+          "note": "Shared Antigravity configuration and user settings."
+        },
+        {
+          "path": "~/.gemini/antigravity-cli/settings.json",
+          "scope": "user",
+          "level": "official",
+          "note": "CLI-specific settings, including trusted workspaces."
+        },
+        {
+          "path": "~/.gemini/config/skills.json",
+          "scope": "user",
+          "level": "official",
+          "note": "Explicit registrations of skill directories outside the default locations."
+        },
+        {
+          "path": "~/.gemini/config/plugins.json",
+          "scope": "user",
+          "level": "official",
+          "note": "Explicit registrations of plugin directories outside the default locations."
+        },
+        {
+          "path": ".agents/skills.json",
+          "scope": "project",
+          "level": "official",
+          "note": "Workspace registrations of skill directories outside .agents/skills/."
+        },
+        {
+          "path": ".agents/plugins.json",
+          "scope": "project",
+          "level": "official",
+          "note": "Workspace registrations of plugin directories outside .agents/plugins/."
+        }
+      ],
+      "sessions": [
+        {
+          "path": "~/.gemini/antigravity-cli/conversations/",
+          "scope": "data",
+          "level": "official",
+          "note": "Persisted CLI conversations."
+        },
+        {
+          "path": "~/.gemini/antigravity-cli/history.jsonl",
+          "scope": "data",
+          "level": "official",
+          "note": "CLI prompt history."
+        },
+        {
+          "path": "~/.gemini/antigravity-cli/conversation_summaries.db",
+          "scope": "data",
+          "level": "official",
+          "note": "Conversation summary index."
+        }
+      ],
+      "persistence": [
+        {
+          "format": "JSON",
+          "level": "official",
+          "note": "Settings and project metadata."
+        },
+        {
+          "format": "JSONL",
+          "level": "official",
+          "note": "Prompt history."
+        },
+        {
+          "format": "SQLite",
+          "level": "official",
+          "note": "Conversation summary index."
+        },
+        {
+          "format": "Protocol Buffers",
+          "level": "official",
+          "note": "Conversation and runtime state."
+        }
+      ],
+      "instructions": [
+        {
+          "path": "~/.gemini/config/AGENTS.md",
+          "scope": "user",
+          "level": "official",
+          "note": "Global rules in the shared Antigravity customization root."
+        },
+        {
+          "path": "AGENTS.md",
+          "scope": "project",
+          "level": "official",
+          "note": "Workspace instructions; GEMINI.md is also supported."
+        },
+        {
+          "path": "GEMINI.md",
+          "scope": "project",
+          "level": "official",
+          "note": "Workspace instructions compatible with Gemini CLI."
+        }
+      ],
+      "skills": [
+        {
+          "path": ".agents/skills/",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": "~/.gemini/config/skills/",
+          "scope": "user",
+          "level": "official"
+        }
+      ],
+      "commands": [],
+      "hooks": [
+        {
+          "path": ".agents/hooks.json",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": "~/.gemini/config/hooks.json",
+          "scope": "user",
+          "level": "official"
+        }
+      ],
+      "mcpConfigs": [
+        {
+          "path": "~/.gemini/config/mcp_config.json",
+          "scope": "user",
+          "level": "official",
+          "format": "json",
+          "key": [
+            "mcpServers"
+          ],
+          "dialect": "antigravity"
+        }
+      ],
+      "agentsFile": "~/.gemini/config/AGENTS.md",
+      "detection": {
+        "envVars": [],
+        "projectMarkers": [
+          ".antigravitycli"
+        ]
+      }
+    },
+    {
+      "id": "claude",
+      "name": "Anthropic Claude Code",
+      "binaries": [
+        "claude"
+      ],
+      "capabilities": {
+        "mcp": true,
+        "vision": true,
+        "audio": false,
+        "video": false,
+        "tools": true,
+        "streaming": true
+      },
+      "invocation": {
+        "args": [
+          "-p",
+          "{prompt}"
+        ],
+        "jsonArgs": [
+          "-p",
+          "--output-format",
+          "json",
+          "{prompt}"
+        ],
+        "noToolsArgs": [
+          "-p",
+          "{prompt}",
+          "--tools",
+          ""
+        ],
+        "noToolsJsonArgs": [
+          "-p",
+          "--output-format",
+          "json",
+          "{prompt}",
+          "--tools",
+          ""
+        ],
+        "modelArgs": [
+          "--model",
+          "{model}"
+        ],
+        "level": "official",
+        "note": "Headless print mode; add --output-format json for structured output."
+      },
+      "invocationModes": {
+        "advisor": true,
+        "advisorStructured": true,
+        "readOnly": false,
+        "readOnlyStructured": false,
+        "agent": true,
+        "agentStructured": true
+      },
+      "modelListing": null,
+      "config": [
+        {
+          "path": "~/.claude/settings.json",
+          "scope": "user",
+          "level": "official"
+        },
+        {
+          "path": "~/.claude.json",
+          "scope": "user",
+          "level": "official",
+          "note": "Global MCP server configurations."
+        },
+        {
+          "path": ".claude/settings.json",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": ".claude/settings.local.json",
+          "scope": "project",
+          "level": "official",
+          "note": "Local overrides, typically gitignored."
+        },
+        {
+          "path": ".claude/.mcp.json",
+          "scope": "project",
+          "level": "official",
+          "note": "Project-scoped MCP server configurations."
+        },
+        {
+          "path": "/etc/claude-code/managed-settings.json",
+          "scope": "system",
+          "level": "official",
+          "platforms": [
+            "linux"
+          ],
+          "note": "Enterprise managed settings."
+        },
+        {
+          "path": "/Library/Application Support/ClaudeCode/managed-settings.json",
+          "scope": "system",
+          "level": "official",
+          "platforms": [
+            "darwin"
+          ],
+          "note": "Enterprise managed settings."
+        }
+      ],
+      "sessions": [
+        {
+          "path": "~/.claude/projects/<dash-encoded-cwd>/*.jsonl",
+          "scope": "data",
+          "level": "official",
+          "note": "Per-project session transcripts in JSONL format."
+        },
+        {
+          "path": "~/.claude/history.jsonl",
+          "scope": "data",
+          "level": "official",
+          "note": "Global prompt history across all projects."
+        }
+      ],
+      "persistence": [
+        {
+          "format": "JSON",
+          "level": "official",
+          "note": "Settings and MCP config files."
+        },
+        {
+          "format": "JSONL",
+          "level": "official",
+          "note": "Session transcripts and global history."
+        }
+      ],
+      "instructions": [
+        {
+          "path": "CLAUDE.md",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": ".claude/CLAUDE.md",
+          "scope": "project",
+          "level": "official",
+          "note": "Alternative project-level location."
+        },
+        {
+          "path": "~/.claude/CLAUDE.md",
+          "scope": "user",
+          "level": "official",
+          "note": "Global user-level instructions."
+        }
+      ],
+      "skills": [
+        {
+          "path": ".claude/skills/",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": "~/.claude/skills/",
+          "scope": "user",
+          "level": "official",
+          "note": "Global user-level skills."
+        }
+      ],
+      "commands": [
+        {
+          "path": ".claude/commands/",
+          "scope": "project",
+          "level": "official",
+          "note": "Legacy slash commands, merged into skills."
+        },
+        {
+          "path": "~/.claude/commands/",
+          "scope": "user",
+          "level": "official",
+          "note": "Legacy global slash commands."
+        }
+      ],
+      "hooks": [
+        {
+          "path": ".claude/hooks/",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": "~/.claude/hooks/",
+          "scope": "user",
+          "level": "official",
+          "note": "Global user-level hooks."
+        }
+      ],
+      "mcpConfigs": [
+        {
+          "path": "~/.claude.json",
+          "scope": "user",
+          "level": "official",
+          "format": "json",
+          "key": [
+            "mcpServers"
+          ],
+          "dialect": "standard"
+        },
+        {
+          "path": ".mcp.json",
+          "scope": "project",
+          "level": "official",
+          "format": "json",
+          "key": [
+            "mcpServers"
+          ],
+          "dialect": "standard"
+        }
+      ],
+      "agentsFile": "~/.claude/CLAUDE.md",
+      "detection": {
+        "envVars": [
+          "CLAUDE_CODE",
+          "CLAUDECODE",
+          "CLAUDE_CODE_ENTRYPOINT",
+          "CLAUDE_CONFIG_DIR"
+        ],
+        "projectMarkers": [
+          ".claude/settings.json",
+          ".claude/settings.local.json",
+          ".claude/skills",
+          "CLAUDE.md"
+        ]
+      }
+    },
+    {
+      "id": "codex",
+      "name": "OpenAI Codex CLI",
+      "binaries": [
+        "codex"
+      ],
+      "capabilities": {
+        "mcp": true,
+        "vision": true,
+        "audio": false,
+        "video": false,
+        "tools": true,
+        "streaming": true
+      },
+      "invocation": {
+        "args": [
+          "exec",
+          "--skip-git-repo-check",
+          "{prompt}"
+        ],
+        "jsonArgs": [
+          "exec",
+          "--skip-git-repo-check",
+          "--json",
+          "{prompt}"
+        ],
+        "readOnlyArgs": [
+          "exec",
+          "--skip-git-repo-check",
+          "--sandbox",
+          "read-only",
+          "{prompt}"
+        ],
+        "readOnlyJsonArgs": [
+          "exec",
+          "--skip-git-repo-check",
+          "--sandbox",
+          "read-only",
+          "--json",
+          "{prompt}"
+        ],
+        "modelArgs": [
+          "--model",
+          "{model}"
+        ],
+        "level": "official",
+        "note": "Non-interactive exec subcommand; add --json for structured output."
+      },
+      "invocationModes": {
+        "advisor": false,
+        "advisorStructured": false,
+        "readOnly": true,
+        "readOnlyStructured": true,
+        "agent": true,
+        "agentStructured": true
+      },
+      "modelListing": null,
+      "config": [
+        {
+          "path": "~/.codex/config.toml",
+          "scope": "user",
+          "level": "official"
+        },
+        {
+          "path": ".codex/config.toml",
+          "scope": "project",
+          "level": "official",
+          "note": "Searched from cwd up to project root (.git boundary)."
+        },
+        {
+          "path": "/etc/codex/config.toml",
+          "scope": "system",
+          "level": "official",
+          "platforms": [
+            "linux",
+            "darwin"
+          ]
+        }
+      ],
+      "sessions": [
+        {
+          "path": "~/.codex/sessions/",
+          "scope": "data",
+          "level": "official",
+          "note": "Session rollouts in JSONL format, organized by date."
+        },
+        {
+          "path": "~/.codex/history.jsonl",
+          "scope": "data",
+          "level": "official",
+          "note": "Command history."
+        },
+        {
+          "path": "~/.codex/state_5.sqlite",
+          "scope": "data",
+          "level": "official",
+          "note": "SQLite state database for threads and agent state."
+        }
+      ],
+      "persistence": [
+        {
+          "format": "TOML",
+          "level": "official",
+          "note": "Configuration files."
+        },
+        {
+          "format": "JSONL",
+          "level": "official",
+          "note": "Conversation transcripts."
+        },
+        {
+          "format": "SQLite",
+          "level": "official",
+          "note": "Thread and agent state."
+        }
+      ],
+      "instructions": [
+        {
+          "path": "AGENTS.md",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": "AGENTS.override.md",
+          "scope": "project",
+          "level": "official",
+          "note": "Local override, takes precedence over AGENTS.md."
+        },
+        {
+          "path": "~/.codex/AGENTS.md",
+          "scope": "user",
+          "level": "official",
+          "note": "Global user-level instructions."
+        },
+        {
+          "path": "~/.codex/AGENTS.override.md",
+          "scope": "user",
+          "level": "official",
+          "note": "Global override, takes precedence over global AGENTS.md."
+        }
+      ],
+      "skills": [
+        {
+          "path": ".codex/skills/",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": ".agents/skills/",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": "~/.codex/skills/",
+          "scope": "user",
+          "level": "official",
+          "note": "Deprecated, use ~/.agents/skills/ instead."
+        },
+        {
+          "path": "~/.agents/skills/",
+          "scope": "user",
+          "level": "official"
+        },
+        {
+          "path": "/etc/codex/skills/",
+          "scope": "system",
+          "level": "official",
+          "platforms": [
+            "linux",
+            "darwin"
+          ]
+        }
+      ],
+      "commands": [],
+      "hooks": [],
+      "mcpConfigs": [
+        {
+          "path": "~/.codex/config.toml",
+          "scope": "user",
+          "level": "official",
+          "format": "toml",
+          "key": [
+            "mcp_servers"
+          ],
+          "dialect": "standard"
+        },
+        {
+          "path": ".codex/config.toml",
+          "scope": "project",
+          "level": "official",
+          "format": "toml",
+          "key": [
+            "mcp_servers"
+          ],
+          "dialect": "standard"
+        }
+      ],
+      "agentsFile": "~/.codex/AGENTS.md",
+      "detection": {
+        "envVars": [],
+        "projectMarkers": [
+          ".codex",
+          "AGENTS.md",
+          "AGENTS.override.md",
+          ".agents/skills"
+        ]
+      }
+    },
+    {
+      "id": "cursor",
+      "name": "Cursor",
+      "binaries": [
+        "cursor"
+      ],
+      "capabilities": {
+        "mcp": true,
+        "vision": true,
+        "audio": false,
+        "video": false,
+        "tools": true,
+        "streaming": true
+      },
+      "invocation": {
+        "binary": "cursor-agent",
+        "args": [
+          "-p",
+          "{prompt}"
+        ],
+        "jsonArgs": [
+          "-p",
+          "--output-format",
+          "json",
+          "{prompt}"
+        ],
+        "level": "community",
+        "note": "Cursor CLI agent binary, separate from the editor binary."
+      },
+      "invocationModes": {
+        "advisor": false,
+        "advisorStructured": false,
+        "readOnly": false,
+        "readOnlyStructured": false,
+        "agent": true,
+        "agentStructured": true
+      },
+      "modelListing": null,
+      "config": [
+        {
+          "path": "~/.cursor/settings.json",
+          "scope": "user",
+          "level": "official"
+        }
+      ],
+      "sessions": [],
+      "persistence": [
+        {
+          "format": "JSON",
+          "level": "official",
+          "note": "Settings and rules files."
+        }
+      ],
+      "instructions": [
+        {
+          "path": ".cursor/rules/skilld-activation.mdc",
+          "scope": "project",
+          "level": "official",
+          "note": "MDC format rule for skill activation."
+        },
+        {
+          "path": ".cursorrules",
+          "scope": "project",
+          "level": "official",
+          "note": "Legacy project-level instructions."
+        }
+      ],
+      "skills": [
+        {
+          "path": ".cursor/skills/",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": "~/.cursor/skills/",
+          "scope": "user",
+          "level": "official",
+          "note": "Global user-level skills."
+        },
+        {
+          "path": ".claude/skills/",
+          "scope": "project",
+          "level": "official",
+          "note": "Cursor natively scans Claude skills directory."
+        },
+        {
+          "path": ".codex/skills/",
+          "scope": "project",
+          "level": "official",
+          "note": "Cursor natively scans Codex skills directory."
+        }
+      ],
+      "commands": [],
+      "hooks": [],
+      "mcpConfigs": [
+        {
+          "path": "~/.cursor/mcp.json",
+          "scope": "user",
+          "level": "community",
+          "format": "json",
+          "key": [
+            "mcpServers"
+          ],
+          "dialect": "standard"
+        },
+        {
+          "path": ".cursor/mcp.json",
+          "scope": "project",
+          "level": "community",
+          "format": "json",
+          "key": [
+            "mcpServers"
+          ],
+          "dialect": "standard"
+        }
+      ],
+      "agentsFile": null,
+      "detection": {
+        "envVars": [
+          "CURSOR_SESSION",
+          "CURSOR_TRACE_ID"
+        ],
+        "projectMarkers": [
+          ".cursor",
+          ".cursorrules"
+        ]
+      }
+    },
+    {
+      "id": "freebuff",
+      "name": "Freebuff",
+      "binaries": [
+        "freebuff"
+      ],
+      "capabilities": {
+        "mcp": true,
+        "vision": true,
+        "audio": false,
+        "video": false,
+        "tools": true,
+        "streaming": true
+      },
+      "invocation": null,
+      "invocationModes": {
+        "advisor": false,
+        "advisorStructured": false,
+        "readOnly": false,
+        "readOnlyStructured": false,
+        "agent": false,
+        "agentStructured": false
+      },
+      "modelListing": null,
+      "config": [
+        {
+          "path": "~/.config/manicode/settings.json",
+          "scope": "user",
+          "level": "official",
+          "note": "Freebuff is Codebuff-based; user data lives under ~/.config/manicode/ on all platforms."
+        },
+        {
+          "path": "~/.config/manicode/credentials.json",
+          "scope": "user",
+          "level": "official",
+          "note": "Authentication credentials."
+        }
+      ],
+      "sessions": [
+        {
+          "path": "~/.config/manicode/projects/<project-name>/chats/<timestamp>/",
+          "scope": "data",
+          "level": "official",
+          "note": "Per-chat directories with chat-messages.json, chat-meta.json, run-state.json, and log.jsonl."
+        },
+        {
+          "path": "~/.config/manicode/message-history.json",
+          "scope": "data",
+          "level": "official",
+          "note": "Prompt history."
+        }
+      ],
+      "persistence": [
+        {
+          "format": "JSON",
+          "level": "official",
+          "note": "Settings, credentials, chat messages, and run state."
+        },
+        {
+          "format": "JSONL",
+          "level": "official",
+          "note": "Per-chat logs (log.jsonl)."
+        }
+      ],
+      "instructions": [
+        {
+          "path": "AGENTS.md",
+          "scope": "project",
+          "level": "official",
+          "note": "Knowledge files; scaffolded by the init flow. knowledge.md, *.knowledge.md, and CLAUDE.md in any project directory are loaded the same way."
+        },
+        {
+          "path": "knowledge.md",
+          "scope": "project",
+          "level": "official",
+          "note": "Per-directory project knowledge."
+        },
+        {
+          "path": "~/.AGENTS.md",
+          "scope": "user",
+          "level": "official",
+          "note": "User-level knowledge files in the home directory; ~/.knowledge.md and ~/.CLAUDE.md are accepted too. Read-only for the agent."
+        }
+      ],
+      "skills": [
+        {
+          "path": ".agents/skills/",
+          "scope": "project",
+          "level": "official",
+          "note": "Also the install target for community skills via npx skills add; .agents/types/ holds agent template types."
+        }
+      ],
+      "commands": [],
+      "hooks": [],
+      "mcpConfigs": [
+        {
+          "path": "~/.agents/mcp.json",
+          "scope": "user",
+          "level": "official",
+          "format": "json",
+          "key": [
+            "mcpServers"
+          ],
+          "dialect": "standard"
+        },
+        {
+          "path": ".agents/mcp.json",
+          "scope": "project",
+          "level": "official",
+          "format": "json",
+          "key": [
+            "mcpServers"
+          ],
+          "dialect": "standard",
+          "note": "The parent directory's .agents/mcp.json is scanned too; agent templates can also embed their own mcpServers."
+        }
+      ],
+      "agentsFile": "~/.AGENTS.md",
+      "detection": {
+        "envVars": [],
+        "projectMarkers": [
+          ".agents",
+          "knowledge.md"
+        ]
+      }
+    },
+    {
+      "id": "gemini",
+      "name": "Google Gemini CLI",
+      "binaries": [
+        "gemini"
+      ],
+      "capabilities": {
+        "mcp": true,
+        "vision": true,
+        "audio": true,
+        "video": false,
+        "tools": true,
+        "streaming": true
+      },
+      "invocation": {
+        "args": [
+          "-p",
+          "{prompt}"
+        ],
+        "jsonArgs": [
+          "-p",
+          "{prompt}",
+          "--output-format",
+          "json"
+        ],
+        "modelArgs": [
+          "--model",
+          "{model}"
+        ],
+        "level": "official",
+        "note": "Non-interactive (headless) mode."
+      },
+      "invocationModes": {
+        "advisor": false,
+        "advisorStructured": false,
+        "readOnly": false,
+        "readOnlyStructured": false,
+        "agent": true,
+        "agentStructured": true
+      },
+      "modelListing": null,
+      "config": [
+        {
+          "path": "~/.gemini/settings.json",
+          "scope": "user",
+          "level": "official"
+        },
+        {
+          "path": ".gemini/settings.json",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": "/etc/gemini-cli/settings.json",
+          "scope": "system",
+          "level": "official",
+          "platforms": [
+            "linux"
+          ]
+        },
+        {
+          "path": "/Library/Application Support/GeminiCli/settings.json",
+          "scope": "system",
+          "level": "official",
+          "platforms": [
+            "darwin"
+          ]
+        },
+        {
+          "path": "%PROGRAMDATA%/gemini-cli/settings.json",
+          "scope": "system",
+          "level": "official",
+          "platforms": [
+            "win32"
+          ]
+        }
+      ],
+      "sessions": [
+        {
+          "path": "~/.gemini/history/<project-id>/",
+          "scope": "data",
+          "level": "official",
+          "note": "Conversation history per project (project-id is a slug from projects.json)."
+        },
+        {
+          "path": "~/.gemini/tmp/<project-id>/chats/",
+          "scope": "data",
+          "level": "official",
+          "note": "Active chat session data."
+        }
+      ],
+      "persistence": [
+        {
+          "format": "JSON",
+          "level": "official",
+          "note": "Settings files."
+        },
+        {
+          "format": "JSON",
+          "level": "official",
+          "note": "Session and history records."
+        }
+      ],
+      "instructions": [
+        {
+          "path": "GEMINI.md",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": "~/.gemini/GEMINI.md",
+          "scope": "user",
+          "level": "official",
+          "note": "Global instruction/memory file."
+        }
+      ],
+      "skills": [
+        {
+          "path": ".gemini/skills/",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": ".agents/skills/",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": "~/.gemini/skills/",
+          "scope": "user",
+          "level": "official"
+        },
+        {
+          "path": "~/.agents/skills/",
+          "scope": "user",
+          "level": "official"
+        }
+      ],
+      "commands": [
+        {
+          "path": ".gemini/commands/",
+          "scope": "project",
+          "level": "official",
+          "note": "Custom commands in TOML format."
+        },
+        {
+          "path": "~/.gemini/commands/",
+          "scope": "user",
+          "level": "official",
+          "note": "Global custom commands in TOML format."
+        }
+      ],
+      "hooks": [],
+      "mcpConfigs": [
+        {
+          "path": "~/.gemini/settings.json",
+          "scope": "user",
+          "level": "official",
+          "format": "json",
+          "key": [
+            "mcpServers"
+          ],
+          "dialect": "standard"
+        },
+        {
+          "path": ".gemini/settings.json",
+          "scope": "project",
+          "level": "official",
+          "format": "json",
+          "key": [
+            "mcpServers"
+          ],
+          "dialect": "standard"
+        }
+      ],
+      "agentsFile": "~/.gemini/GEMINI.md",
+      "detection": {
+        "envVars": [
+          "GEMINI_CLI"
+        ],
+        "projectMarkers": [
+          ".gemini",
+          "GEMINI.md"
+        ]
+      }
+    },
+    {
+      "id": "github-copilot",
+      "name": "GitHub Copilot",
+      "binaries": [
+        "copilot"
+      ],
+      "capabilities": {
+        "mcp": true,
+        "vision": true,
+        "audio": false,
+        "video": false,
+        "tools": true,
+        "streaming": true
+      },
+      "invocation": {
+        "binary": "copilot",
+        "args": [
+          "-p",
+          "{prompt}"
+        ],
+        "level": "community",
+        "note": "GitHub Copilot CLI, separate from the editor integration."
+      },
+      "invocationModes": {
+        "advisor": false,
+        "advisorStructured": false,
+        "readOnly": false,
+        "readOnlyStructured": false,
+        "agent": true,
+        "agentStructured": false
+      },
+      "modelListing": null,
+      "config": [
+        {
+          "path": "~/.copilot/config.json",
+          "scope": "user",
+          "level": "inferred"
+        }
+      ],
+      "sessions": [],
+      "persistence": [
+        {
+          "format": "JSON",
+          "level": "official",
+          "note": "Configuration files."
+        }
+      ],
+      "instructions": [
+        {
+          "path": ".github/copilot-instructions.md",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": ".github/instructions/",
+          "scope": "project",
+          "level": "official",
+          "note": "Modular instructions in .instructions.md files."
+        }
+      ],
+      "skills": [
+        {
+          "path": ".github/skills/",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": ".claude/skills/",
+          "scope": "project",
+          "level": "official",
+          "note": "Copilot auto-detects Claude skills directory."
+        }
+      ],
+      "commands": [],
+      "hooks": [],
+      "mcpConfigs": [
+        {
+          "path": ".vscode/mcp.json",
+          "scope": "project",
+          "level": "community",
+          "format": "json",
+          "key": [
+            "servers"
+          ],
+          "dialect": "vscode"
+        }
+      ],
+      "agentsFile": null,
+      "detection": {
+        "envVars": [
+          "COPILOT_RUN_APP"
+        ],
+        "projectMarkers": [
+          ".github/copilot-instructions.md",
+          ".github/skills",
+          ".github/instructions"
+        ]
+      }
+    },
+    {
+      "id": "grok",
+      "name": "xAI Grok CLI",
+      "binaries": [
+        "grok"
+      ],
+      "capabilities": {
+        "mcp": true,
+        "vision": true,
+        "audio": false,
+        "video": false,
+        "tools": true,
+        "streaming": true
+      },
+      "invocation": {
+        "args": [
+          "-p",
+          "{prompt}"
+        ],
+        "jsonArgs": [
+          "-p",
+          "{prompt}",
+          "--output-format",
+          "json"
+        ],
+        "modelArgs": [
+          "--model",
+          "{model}"
+        ],
+        "level": "official",
+        "note": "-p is short for --single; add --output-format json for structured output."
+      },
+      "invocationModes": {
+        "advisor": false,
+        "advisorStructured": false,
+        "readOnly": false,
+        "readOnlyStructured": false,
+        "agent": true,
+        "agentStructured": true
+      },
+      "modelListing": null,
+      "config": [
+        {
+          "path": "~/.grok/config.toml",
+          "scope": "user",
+          "level": "official",
+          "note": "Base directory overridable with GROK_HOME."
+        },
+        {
+          "path": ".grok/config.toml",
+          "scope": "project",
+          "level": "official"
+        }
+      ],
+      "sessions": [
+        {
+          "path": "~/.grok/sessions/<encoded-cwd>/<session-id>/updates.jsonl",
+          "scope": "data",
+          "level": "official",
+          "note": "Authoritative ACP session update stream (conversation + tool calls); session dirs also hold chat_history.jsonl, summary.json, rewind_points.jsonl."
+        },
+        {
+          "path": "~/.grok/sessions/<encoded-cwd>/prompt_history.jsonl",
+          "scope": "data",
+          "level": "official",
+          "note": "Per-project prompt history."
+        }
+      ],
+      "persistence": [
+        {
+          "format": "TOML",
+          "level": "official",
+          "note": "Configuration files."
+        },
+        {
+          "format": "JSONL",
+          "level": "official",
+          "note": "Session update streams, chat history, prompt history."
+        },
+        {
+          "format": "JSON",
+          "level": "official",
+          "note": "Session state files (summary.json, plan.json, signals.json)."
+        },
+        {
+          "format": "SQLite",
+          "level": "official",
+          "note": "Local FTS5 index over session titles and prompts for sessions search."
+        }
+      ],
+      "instructions": [
+        {
+          "path": "AGENTS.md",
+          "scope": "project",
+          "level": "official",
+          "note": "Also accepts Agents.md, AGENT.md, Claude.md, CLAUDE.md, CLAUDE.local.md; every matching file in a directory is loaded."
+        },
+        {
+          "path": ".grok/rules/",
+          "scope": "project",
+          "level": "official",
+          "note": "*.md rules scanned at each level from repo root to cwd; .claude/rules/ and .cursor/rules/ scanned via vendor compatibility."
+        },
+        {
+          "path": "~/.grok/rules/",
+          "scope": "user",
+          "level": "official",
+          "note": "Global user-level rules."
+        }
+      ],
+      "skills": [
+        {
+          "path": ".grok/skills/",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": "~/.grok/skills/",
+          "scope": "user",
+          "level": "official",
+          "note": "Global user-level skills."
+        }
+      ],
+      "commands": [
+        {
+          "path": ".grok/commands/",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": "~/.grok/commands/",
+          "scope": "user",
+          "level": "official",
+          "note": "Global user-level slash commands."
+        }
+      ],
+      "hooks": [
+        {
+          "path": ".grok/hooks/",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": "~/.grok/hooks/",
+          "scope": "user",
+          "level": "official",
+          "note": "JSON hook definitions (e.g. session-start.json); Claude/Cursor hook sources scanned via vendor compatibility."
+        }
+      ],
+      "mcpConfigs": [
+        {
+          "path": "~/.grok/config.toml",
+          "scope": "user",
+          "level": "official",
+          "format": "toml",
+          "key": [
+            "mcp_servers"
+          ],
+          "dialect": "standard",
+          "note": "grok mcp add/remove manage this file; Claude and Cursor configs are also scanned via vendor compatibility."
+        },
+        {
+          "path": ".grok/config.toml",
+          "scope": "project",
+          "level": "official",
+          "format": "toml",
+          "key": [
+            "mcp_servers"
+          ],
+          "dialect": "standard"
+        }
+      ],
+      "agentsFile": null,
+      "detection": {
+        "envVars": [
+          "GROK_SESSION_ID",
+          "GROK_WORKSPACE_ROOT",
+          "GROK_HOME"
+        ],
+        "projectMarkers": [
+          ".grok"
+        ]
+      }
+    },
+    {
+      "id": "mastracode",
+      "name": "Mastra Code",
+      "binaries": [
+        "mastracode"
+      ],
+      "capabilities": {
+        "mcp": true,
+        "vision": true,
+        "audio": false,
+        "video": false,
+        "tools": true,
+        "streaming": true
+      },
+      "invocation": null,
+      "invocationModes": {
+        "advisor": false,
+        "advisorStructured": false,
+        "readOnly": false,
+        "readOnlyStructured": false,
+        "agent": false,
+        "agentStructured": false
+      },
+      "modelListing": null,
+      "config": [
+        {
+          "path": ".mastracode/mcp.json",
+          "scope": "project",
+          "level": "official",
+          "note": "Project-scoped MCP server configurations."
+        },
+        {
+          "path": "~/.mastracode/mcp.json",
+          "scope": "user",
+          "level": "official",
+          "note": "Global MCP server configurations."
+        },
+        {
+          "path": ".mastracode/hooks.json",
+          "scope": "project",
+          "level": "official",
+          "note": "Project-scoped hooks."
+        },
+        {
+          "path": "~/.mastracode/hooks.json",
+          "scope": "user",
+          "level": "official",
+          "note": "Global hooks."
+        }
+      ],
+      "sessions": [
+        {
+          "path": "~/.local/share/mastracode/mastra.db",
+          "scope": "data",
+          "level": "official",
+          "platforms": [
+            "linux"
+          ],
+          "note": "LibSQL database with threads, messages, and observational memory."
+        }
+      ],
+      "persistence": [
+        {
+          "format": "JSON",
+          "level": "official",
+          "note": "MCP and hooks config files."
+        },
+        {
+          "format": "SQLite",
+          "level": "official",
+          "note": "LibSQL database for threads, messages, and observational memory."
+        }
+      ],
+      "instructions": [
+        {
+          "path": "AGENTS.md",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": "CLAUDE.md",
+          "scope": "project",
+          "level": "official",
+          "note": "Supported for Claude Code compatibility."
+        },
+        {
+          "path": ".claude/CLAUDE.md",
+          "scope": "project",
+          "level": "official",
+          "note": "Claude Code compatible."
+        },
+        {
+          "path": ".mastracode/AGENTS.md",
+          "scope": "project",
+          "level": "official",
+          "note": "Alternative project-level location."
+        },
+        {
+          "path": "~/.claude/CLAUDE.md",
+          "scope": "user",
+          "level": "official",
+          "note": "Claude Code compatible."
+        },
+        {
+          "path": "~/.mastracode/AGENTS.md",
+          "scope": "user",
+          "level": "official",
+          "note": "Global user-level instructions."
+        }
+      ],
+      "skills": [
+        {
+          "path": ".mastracode/skills/",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": "~/.mastracode/skills/",
+          "scope": "user",
+          "level": "official",
+          "note": "Global user-level skills."
+        },
+        {
+          "path": ".claude/skills/",
+          "scope": "project",
+          "level": "official",
+          "note": "Claude Code compatible."
+        },
+        {
+          "path": "~/.claude/skills/",
+          "scope": "user",
+          "level": "official",
+          "note": "Claude Code compatible."
+        }
+      ],
+      "commands": [
+        {
+          "path": ".mastracode/commands/",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": "~/.mastracode/commands/",
+          "scope": "user",
+          "level": "official",
+          "note": "Global commands."
+        }
+      ],
+      "hooks": [
+        {
+          "path": ".mastracode/hooks.json",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": "~/.mastracode/hooks.json",
+          "scope": "user",
+          "level": "official",
+          "note": "Global hooks."
+        }
+      ],
+      "mcpConfigs": [],
+      "agentsFile": null,
+      "detection": {
+        "envVars": [],
+        "projectMarkers": [
+          ".mastracode"
+        ]
+      }
+    },
+    {
+      "id": "omp",
+      "name": "OMP (oh-my-pi)",
+      "binaries": [
+        "omp"
+      ],
+      "capabilities": {
+        "mcp": true,
+        "vision": true,
+        "audio": false,
+        "video": false,
+        "tools": true,
+        "streaming": true
+      },
+      "invocation": {
+        "args": [
+          "-p",
+          "{prompt}"
+        ],
+        "jsonArgs": [
+          "-p",
+          "--mode",
+          "json",
+          "{prompt}"
+        ],
+        "modelArgs": [
+          "--model={model}"
+        ],
+        "level": "official",
+        "note": "Add --mode json for structured event output. --no-tools disables only OMP's bundled tools, so it cannot provide an advisor mode without tools."
+      },
+      "invocationModes": {
+        "advisor": false,
+        "advisorStructured": false,
+        "readOnly": false,
+        "readOnlyStructured": false,
+        "agent": true,
+        "agentStructured": true
+      },
+      "modelListing": null,
+      "config": [
+        {
+          "path": "~/.omp/agent/config.yml",
+          "scope": "user",
+          "level": "official",
+          "note": "Agent dir overridable with PI_CODING_AGENT_DIR; profiles use ~/.omp/profiles/<name>/agent."
+        },
+        {
+          "path": "~/.omp/agent/settings.json",
+          "scope": "user",
+          "level": "official"
+        },
+        {
+          "path": "~/.omp/agent/mcp.json",
+          "scope": "user",
+          "level": "official",
+          "note": "MCP server configurations."
+        },
+        {
+          "path": ".omp/config.yml",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": ".omp/settings.json",
+          "scope": "project",
+          "level": "official"
+        }
+      ],
+      "sessions": [
+        {
+          "path": "~/.omp/agent/sessions/<dash-encoded-cwd>/<timestamp>_<session-id>.jsonl",
+          "scope": "data",
+          "level": "official",
+          "note": "Per-project session transcripts in JSONL format; session ids are UUIDv7."
+        },
+        {
+          "path": "~/.omp/agent/history.db",
+          "scope": "data",
+          "level": "official",
+          "note": "SQLite prompt history."
+        },
+        {
+          "path": "~/.omp/agent/agent.db",
+          "scope": "data",
+          "level": "official",
+          "note": "SQLite agent state database."
+        }
+      ],
+      "persistence": [
+        {
+          "format": "YAML",
+          "level": "official",
+          "note": "config.yml configuration files."
+        },
+        {
+          "format": "JSON",
+          "level": "official",
+          "note": "settings.json and mcp.json."
+        },
+        {
+          "format": "JSONL",
+          "level": "official",
+          "note": "Session transcripts."
+        },
+        {
+          "format": "SQLite",
+          "level": "official",
+          "note": "Agent state, prompt history, model catalog (agent.db, history.db, models.db)."
+        }
+      ],
+      "instructions": [
+        {
+          "path": "AGENTS.md",
+          "scope": "project",
+          "level": "official",
+          "note": "Discovered by walking up from cwd; CLAUDE.md and other vendor files loaded via compatibility providers (claude, codex, gemini, cursor, opencode, and more)."
+        },
+        {
+          "path": ".omp/AGENTS.md",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": ".omp/RULES.md",
+          "scope": "project",
+          "level": "official",
+          "note": "Sticky always-apply rules."
+        },
+        {
+          "path": "~/.omp/agent/AGENTS.md",
+          "scope": "user",
+          "level": "official",
+          "note": "Global user-level instructions."
+        },
+        {
+          "path": "~/.omp/agent/RULES.md",
+          "scope": "user",
+          "level": "official",
+          "note": "Global sticky always-apply rules."
+        },
+        {
+          "path": "~/.omp/agent/PERSONALITY.md",
+          "scope": "user",
+          "level": "official",
+          "note": "Overrides the system prompt's personality block; replaces the configured personality preset."
+        }
+      ],
+      "skills": [
+        {
+          "path": ".omp/skills/",
+          "scope": "project",
+          "level": "official",
+          "note": "Scanned in ancestor directories from cwd, closest first."
+        },
+        {
+          "path": "~/.omp/agent/skills/",
+          "scope": "user",
+          "level": "official"
+        },
+        {
+          "path": "~/.omp/agent/managed-skills/",
+          "scope": "user",
+          "level": "official",
+          "note": "Auto-generated managed skills."
+        }
+      ],
+      "commands": [
+        {
+          "path": ".omp/commands/",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": "~/.omp/agent/commands/",
+          "scope": "user",
+          "level": "official",
+          "note": "Global user-level prompt commands."
+        }
+      ],
+      "hooks": [],
+      "mcpConfigs": [
+        {
+          "path": "~/.omp/agent/mcp.json",
+          "scope": "user",
+          "level": "official",
+          "format": "json",
+          "key": [
+            "mcpServers"
+          ],
+          "dialect": "standard"
+        },
+        {
+          "path": ".omp/mcp.json",
+          "scope": "project",
+          "level": "official",
+          "format": "json",
+          "key": [
+            "mcpServers"
+          ],
+          "dialect": "standard"
+        }
+      ],
+      "agentsFile": "~/.omp/agent/AGENTS.md",
+      "detection": {
+        "envVars": [
+          "OMP_PROFILE",
+          "PI_CODING_AGENT_DIR"
+        ],
+        "projectMarkers": [
+          ".omp"
+        ]
+      }
+    },
+    {
+      "id": "opencode",
+      "name": "OpenCode CLI",
+      "binaries": [
+        "opencode"
+      ],
+      "capabilities": {
+        "mcp": true,
+        "vision": true,
+        "audio": false,
+        "video": false,
+        "tools": true,
+        "streaming": true
+      },
+      "invocation": {
+        "args": [
+          "run",
+          "{prompt}"
+        ],
+        "jsonArgs": [
+          "run",
+          "--format",
+          "json",
+          "{prompt}"
+        ],
+        "modelArgs": [
+          "--model",
+          "{model}"
+        ],
+        "level": "official"
+      },
+      "invocationModes": {
+        "advisor": false,
+        "advisorStructured": false,
+        "readOnly": false,
+        "readOnlyStructured": false,
+        "agent": true,
+        "agentStructured": true
+      },
+      "modelListing": null,
+      "config": [
+        {
+          "path": "~/.config/opencode/opencode.jsonc",
+          "scope": "user",
+          "level": "official",
+          "note": "XDG-based, same path on all platforms."
+        },
+        {
+          "path": "~/.config/opencode/opencode.json",
+          "scope": "user",
+          "level": "official"
+        },
+        {
+          "path": "opencode.jsonc",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": "opencode.json",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": ".opencode/opencode.jsonc",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": ".opencode/opencode.json",
+          "scope": "project",
+          "level": "official"
+        }
+      ],
+      "sessions": [
+        {
+          "path": "~/.local/share/opencode/opencode.db",
+          "scope": "data",
+          "level": "official",
+          "note": "SQLite database with sessions, messages, and parts. XDG-based, same path on all platforms."
+        }
+      ],
+      "persistence": [
+        {
+          "format": "JSON/JSONC",
+          "level": "official",
+          "note": "Config files."
+        },
+        {
+          "format": "SQLite",
+          "level": "official",
+          "note": "Session and message storage via Drizzle ORM."
+        }
+      ],
+      "instructions": [
+        {
+          "path": "AGENTS.md",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": "CLAUDE.md",
+          "scope": "project",
+          "level": "official",
+          "note": "Supported for Claude Code compatibility."
+        },
+        {
+          "path": "~/.config/opencode/AGENTS.md",
+          "scope": "user",
+          "level": "official",
+          "note": "Global user-level instructions."
+        }
+      ],
+      "skills": [
+        {
+          "path": ".opencode/skills/",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": ".claude/skills/",
+          "scope": "project",
+          "level": "official",
+          "note": "Claude Code compatible."
+        },
+        {
+          "path": ".agents/skills/",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": "~/.claude/skills/",
+          "scope": "user",
+          "level": "official",
+          "note": "Claude Code compatible."
+        },
+        {
+          "path": "~/.agents/skills/",
+          "scope": "user",
+          "level": "official"
+        }
+      ],
+      "commands": [],
+      "hooks": [],
+      "mcpConfigs": [
+        {
+          "path": "~/.config/opencode/opencode.json",
+          "scope": "user",
+          "level": "official",
+          "format": "json",
+          "key": [
+            "mcp"
+          ],
+          "dialect": "opencode"
+        },
+        {
+          "path": "opencode.json",
+          "scope": "project",
+          "level": "official",
+          "format": "json",
+          "key": [
+            "mcp"
+          ],
+          "dialect": "opencode"
+        }
+      ],
+      "agentsFile": "~/.config/opencode/AGENTS.md",
+      "detection": {
+        "envVars": [],
+        "projectMarkers": [
+          ".opencode",
+          "opencode.jsonc",
+          "opencode.json"
+        ]
+      }
+    },
+    {
+      "id": "pi",
+      "name": "Pi Coding Agent",
+      "binaries": [
+        "pi"
+      ],
+      "capabilities": {
+        "mcp": true,
+        "vision": true,
+        "audio": false,
+        "video": false,
+        "tools": true,
+        "streaming": true
+      },
+      "invocation": {
+        "args": [
+          "-p",
+          "{prompt}"
+        ],
+        "jsonArgs": [
+          "-p",
+          "--mode",
+          "json",
+          "{prompt}"
+        ],
+        "noToolsArgs": [
+          "-p",
+          "--no-tools",
+          "{prompt}"
+        ],
+        "noToolsJsonArgs": [
+          "-p",
+          "--no-tools",
+          "--mode",
+          "json",
+          "{prompt}"
+        ],
+        "readOnlyArgs": [
+          "-p",
+          "--tools",
+          "read,grep,find,ls",
+          "{prompt}"
+        ],
+        "readOnlyJsonArgs": [
+          "-p",
+          "--tools",
+          "read,grep,find,ls",
+          "--mode",
+          "json",
+          "{prompt}"
+        ],
+        "modelArgs": [
+          "--model",
+          "{model}"
+        ],
+        "level": "official",
+        "note": "Add --mode json for structured event output."
+      },
+      "invocationModes": {
+        "advisor": true,
+        "advisorStructured": true,
+        "readOnly": true,
+        "readOnlyStructured": true,
+        "agent": true,
+        "agentStructured": true
+      },
+      "modelListing": {
+        "args": [
+          "--list-models"
+        ],
+        "searchArgs": [
+          "--list-models",
+          "{search}"
+        ],
+        "level": "official",
+        "note": "Lists models with configured provider authentication; accepts an optional fuzzy search."
+      },
+      "config": [
+        {
+          "path": "~/.pi/agent/settings.json",
+          "scope": "user",
+          "level": "official",
+          "note": "Config dir overridable with PI_CODING_AGENT_DIR."
+        },
+        {
+          "path": ".pi/settings.json",
+          "scope": "project",
+          "level": "official"
+        }
+      ],
+      "sessions": [
+        {
+          "path": "~/.pi/agent/sessions/<dash-encoded-cwd>/<timestamp>_<session-id>.jsonl",
+          "scope": "data",
+          "level": "official",
+          "note": "Per-project session transcripts in JSONL format; session ids are UUIDv7. Overridable with PI_CODING_AGENT_SESSION_DIR or --session-dir."
+        }
+      ],
+      "persistence": [
+        {
+          "format": "JSON",
+          "level": "official",
+          "note": "Settings, auth, trust, models, and keybindings files."
+        },
+        {
+          "format": "JSONL",
+          "level": "official",
+          "note": "Session transcripts."
+        }
+      ],
+      "instructions": [
+        {
+          "path": "AGENTS.md",
+          "scope": "project",
+          "level": "official",
+          "note": "Loaded from parent directories and cwd; CLAUDE.md accepted as an alternative, AGENTS.override.md takes precedence over both in a directory."
+        },
+        {
+          "path": ".pi/SYSTEM.md",
+          "scope": "project",
+          "level": "official",
+          "note": "Replaces the default system prompt; APPEND_SYSTEM.md appends instead."
+        },
+        {
+          "path": "~/.pi/agent/AGENTS.md",
+          "scope": "user",
+          "level": "official",
+          "note": "Global user-level instructions."
+        },
+        {
+          "path": "~/.pi/agent/SYSTEM.md",
+          "scope": "user",
+          "level": "official",
+          "note": "Global system prompt replacement; APPEND_SYSTEM.md appends instead."
+        }
+      ],
+      "skills": [
+        {
+          "path": ".pi/skills/",
+          "scope": "project",
+          "level": "official"
+        },
+        {
+          "path": "~/.pi/agent/skills/",
+          "scope": "user",
+          "level": "official",
+          "note": "Global user-level skills."
+        }
+      ],
+      "commands": [
+        {
+          "path": ".pi/prompts/",
+          "scope": "project",
+          "level": "official",
+          "note": "Prompt templates invoked as slash commands."
+        },
+        {
+          "path": "~/.pi/agent/prompts/",
+          "scope": "user",
+          "level": "official",
+          "note": "Global user-level prompt templates."
+        }
+      ],
+      "hooks": [],
+      "mcpConfigs": [],
+      "agentsFile": "~/.pi/agent/AGENTS.md",
+      "detection": {
+        "envVars": [
+          "PI_CODING_AGENT",
+          "PI_SESSION_ID",
+          "PI_SESSION_FILE"
+        ],
+        "projectMarkers": [
+          ".pi"
+        ]
+      }
+    }
+  ]
+}
