@@ -44,6 +44,24 @@ describe("model listing", () => {
     });
   });
 
+  it("preserves replacement tokens in model names", () => {
+    const model = "custom/$$-$&-$`-$'-$1-{model}";
+
+    expect(new Pi().buildInvocation("answer this", { model })).toEqual({
+      command: "pi",
+      args: ["-p", "--no-tools", "answer this", "--model", model],
+    });
+  });
+
+  it("preserves replacement tokens in model search filters", () => {
+    const search = "$$ $& $` $' $1 {search}";
+
+    expect(new Pi().buildModelListInvocation(search)).toEqual({
+      command: "pi",
+      args: ["--list-models", search],
+    });
+  });
+
   it("adds an explicit model to a Pi run invocation", () => {
     const pi = new Pi();
 
