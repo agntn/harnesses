@@ -128,9 +128,9 @@ function buildInvocationArgs(
   modelArgs: readonly string[] | undefined,
   model: string | undefined,
 ): string[] {
-  const args = template.map((arg) => arg.replaceAll("{prompt}", prompt));
+  const args = template.map((arg) => arg.replaceAll("{prompt}", () => prompt));
   if (model !== undefined && modelArgs) {
-    args.push(...modelArgs.map((arg) => arg.replaceAll("{model}", model)));
+    args.push(...modelArgs.map((arg) => arg.replaceAll("{model}", () => model)));
   }
   return args;
 }
@@ -420,7 +420,7 @@ export abstract class Harness {
     if (!template) return null;
     return {
       command,
-      args: template.map((arg) => arg.replaceAll("{search}", search ?? "")),
+      args: template.map((arg) => arg.replaceAll("{search}", () => search ?? "")),
     };
   }
 

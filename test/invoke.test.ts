@@ -56,6 +56,31 @@ class FakeCursor extends Harness {
 }
 
 describe("normalized invocation", () => {
+  it("preserves replacement tokens in prompts across invocation modes", () => {
+    const prompt = "Explain $$, $&, $`, $', $1 and {prompt}";
+    const claude = getHarness("claude");
+    const codex = getHarness("codex");
+
+    for (const built of [
+      claude.buildInvocation(prompt),
+      claude.buildInvocation(prompt, { structured: true }),
+      claude.buildInvocation(prompt, { tools: true }),
+      claude.buildInvocation(prompt, { tools: true, structured: true }),
+      codex.buildInvocation(prompt, { readOnly: true }),
+      codex.buildInvocation(prompt, { readOnly: true, structured: true }),
+    ]) {
+      expect(built?.args).toContain(prompt);
+    }
+  });
+
+  it("delivers replacement tokens unchanged to the child process", async () => {
+    const prompt = "Explain $$, $&, $`, $', $1 and {prompt}";
+    const result = await new FakeCursor().invoke(prompt, { structured: true });
+
+    expect(result.exitCode).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual({ advisor: prompt });
+  });
+
   it("keeps the Claude advisor prompt outside the variadic tools option", () => {
     const claude = getHarness("claude");
     expect(claude.buildInvocation("answer this")).toEqual({
