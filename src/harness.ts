@@ -122,6 +122,25 @@ function invocationRetryHint(
   return alternateAvailable ? (INVOCATION_RETRY_HINT[mode] ?? "") : "";
 }
 
+/**
+ * Orders two dotted versions numerically; a pre-release tag sorts below its release.
+ *
+ * @param a - Left version.
+ * @param b - Right version.
+ * @returns {number} Negative when a is older, positive when newer, zero when equal.
+ */
+function compareVersions(a: string, b: string): number {
+  const [aBase = "", aPre] = a.split("-", 2);
+  const [bBase = "", bPre] = b.split("-", 2);
+  const left = aBase.split(".").map(Number);
+  const right = bBase.split(".").map(Number);
+  for (let i = 0; i < Math.max(left.length, right.length); i++) {
+    const diff = (left[i] ?? 0) - (right[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return Number(aPre === undefined) - Number(bPre === undefined);
+}
+
 function buildInvocationArgs(
   template: readonly string[],
   prompt: string,
@@ -402,8 +421,28 @@ export abstract class Harness {
         new Error(this.invocationError(invocationOptions) ?? "Invalid invocation"),
       );
     }
+    const versionError = this.readOnlyVersionError(invocationOptions);
+    if (versionError) return Promise.reject(new Error(versionError));
 
     return executeCommand(built.command, built.args, options);
+  }
+
+  /**
+   * Explains why the installed CLI cannot run a read-only recipe that carries a
+   * version floor, or returns null when no floor applies or the installed
+   * version meets it. An unknown version fails closed, like a missing recipe.
+   *
+   * @param options - Requested execution mode.
+   * @returns {string | null} The version incompatibility, or null when the run may proceed.
+   */
+  private readOnlyVersionError(options: InvocationOptions): string | null {
+    const floor = this.invocation?.readOnlyMinVersion;
+    if (floor === undefined || options.readOnly !== true) return null;
+    const installed = this.version;
+    const error = `Harness ${this.id} requires version ${floor} or newer for read-only runs`;
+    if (installed === null) return `${error}; installed version unknown`;
+    if (compareVersions(installed, floor) < 0) return `${error}; installed ${installed}`;
+    return null;
   }
 
   /**

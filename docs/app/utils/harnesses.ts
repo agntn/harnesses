@@ -26,6 +26,7 @@ export interface Invocation {
   noToolsJsonArgs?: string[];
   readOnlyArgs?: string[];
   readOnlyJsonArgs?: string[];
+  readOnlyMinVersion?: string;
   modelArgs?: string[];
   level: EvidenceLevel;
   note?: string;
