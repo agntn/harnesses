@@ -86,6 +86,15 @@ describe("@agntn/harnesses", () => {
     expect(resolved).toBe("/tmp/home/x//repo/project");
   });
 
+  it("should substitute home and project roots verbatim", () => {
+    const homeDir = "/home/$$ $& $` $' $1";
+    const projectRoot = "/srv/$$ $& $` $' $1";
+
+    expect(resolvePathTemplate("~/x", { homeDir })).toBe(`${homeDir}/x`);
+    expect(resolvePathTemplate("${HOME}/x", { homeDir })).toBe(`${homeDir}/x`);
+    expect(resolvePathTemplate("${PROJECT_ROOT}/x", { projectRoot })).toBe(`${projectRoot}/x`);
+  });
+
   it("should resolve harness config and session paths", () => {
     const claude = getHarness("claude");
     const resolved = claude.resolve({

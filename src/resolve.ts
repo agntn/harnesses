@@ -7,9 +7,9 @@ export function resolvePathTemplate(template: string, options: ResolveOptions = 
   const projectRoot = options.projectRoot ?? process.cwd();
 
   return template
-    .replace(/^~(?=\/|$)/, homeDir)
-    .replaceAll("${HOME}", homeDir)
-    .replaceAll("${PROJECT_ROOT}", projectRoot)
+    .replace(/^~(?=\/|$)/, () => homeDir)
+    .replaceAll("${HOME}", () => homeDir)
+    .replaceAll("${PROJECT_ROOT}", () => projectRoot)
     .replaceAll(/%([^%]+)%/g, (match: string, name: string) => process.env[name] ?? match);
 }
 
