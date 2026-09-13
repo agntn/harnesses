@@ -86,6 +86,34 @@ describe("@agntn/harnesses", () => {
     expect(resolved).toBe("/tmp/home/x//repo/project");
   });
 
+  it("should substitute home and project roots verbatim", () => {
+    const homeDir = "/home/$$ $& $` $' $1";
+    const projectRoot = "/srv/$$ $& $` $' $1";
+
+    expect(resolvePathTemplate("~/x", { homeDir })).toBe(`${homeDir}/x`);
+    expect(resolvePathTemplate("${HOME}/x", { homeDir })).toBe(`${homeDir}/x`);
+    expect(resolvePathTemplate("${PROJECT_ROOT}/x", { projectRoot })).toBe(`${projectRoot}/x`);
+  });
+
+  it("should not expand markers inside substituted roots", () => {
+    const previous = process.env.HARNESSES_TEST_DIR;
+    process.env.HARNESSES_TEST_DIR = "/test/appdata";
+    try {
+      const homeDir = "/users/${HOME}/${PROJECT_ROOT}/%HARNESSES_TEST_DIR%";
+      const projectRoot = "/repos/%HARNESSES_TEST_DIR%";
+
+      expect(resolvePathTemplate("~/x", { homeDir, projectRoot })).toBe(`${homeDir}/x`);
+      expect(resolvePathTemplate("${HOME}/x", { homeDir, projectRoot })).toBe(`${homeDir}/x`);
+      expect(resolvePathTemplate("${PROJECT_ROOT}/x", { projectRoot })).toBe(`${projectRoot}/x`);
+      expect(resolvePathTemplate("%HARNESSES_TEST_DIR%/${HOME}", { homeDir })).toBe(
+        `/test/appdata/${homeDir}`,
+      );
+    } finally {
+      if (previous === undefined) delete process.env.HARNESSES_TEST_DIR;
+      else process.env.HARNESSES_TEST_DIR = previous;
+    }
+  });
+
   it("should resolve harness config and session paths", () => {
     const claude = getHarness("claude");
     const resolved = claude.resolve({

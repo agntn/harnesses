@@ -536,6 +536,35 @@ describe("syncMcpServers", () => {
     }
   });
 
+  it("expands ~ and ${HOME} verbatim when the home path holds replacement tokens", () => {
+    const homeDir = join(fixtureDirs().homeDir, "$$ $& $` $' $1 ${HOME}");
+    const projectRoot = join(homeDir, "project");
+    mkdirSync(projectRoot, { recursive: true });
+    const dirs = { homeDir, projectRoot };
+    const previousXdg = process.env.XDG_CONFIG_HOME;
+    delete process.env.XDG_CONFIG_HOME;
+    try {
+      writeMaster(
+        homeDir,
+        JSON.stringify({
+          mcpServers: {
+            probe: { command: "~/bin/probe", args: ["${HOME}/data"] },
+          },
+        }),
+      );
+
+      syncMcpServers([getHarness("claude")], dirs);
+
+      const server = listMcpServers(getHarness("claude"), dirs)
+        .find((l) => l.scope === "user")
+        ?.servers.find((s) => s.name === "probe");
+      expect(server?.command).toBe(join(homeDir, "bin", "probe"));
+      expect(server?.args).toEqual([join(homeDir, "data")]);
+    } finally {
+      if (previousXdg !== undefined) process.env.XDG_CONFIG_HOME = previousXdg;
+    }
+  });
+
   it("withdraws master-owned servers when a harness is excluded after a sync", () => {
     const dirs = fixtureDirs();
     const previousXdg = process.env.XDG_CONFIG_HOME;
