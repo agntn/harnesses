@@ -537,7 +537,7 @@ describe("syncMcpServers", () => {
   });
 
   it("expands ~ and ${HOME} verbatim when the home path holds replacement tokens", () => {
-    const homeDir = join(fixtureDirs().homeDir, "$$ $& $` $' $1");
+    const homeDir = join(fixtureDirs().homeDir, "$$ $& $` $' $1 ${HOME}");
     const projectRoot = join(homeDir, "project");
     mkdirSync(projectRoot, { recursive: true });
     const dirs = { homeDir, projectRoot };

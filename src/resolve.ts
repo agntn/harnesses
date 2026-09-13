@@ -2,15 +2,21 @@ import os from "node:os";
 import { join } from "node:path";
 import type { ResolveOptions } from "./types.ts";
 
+/**
+ * Every marker a path template can carry, matched in one pass so a substituted
+ * value is never scanned for markers again.
+ */
+const PATH_MARKERS = /^~(?=\/|$)|\$\{HOME\}|\$\{PROJECT_ROOT\}|%([^%]+)%/g;
+
 export function resolvePathTemplate(template: string, options: ResolveOptions = {}): string {
   const homeDir = options.homeDir ?? os.homedir();
   const projectRoot = options.projectRoot ?? process.cwd();
 
-  return template
-    .replace(/^~(?=\/|$)/, () => homeDir)
-    .replaceAll("${HOME}", () => homeDir)
-    .replaceAll("${PROJECT_ROOT}", () => projectRoot)
-    .replaceAll(/%([^%]+)%/g, (match: string, name: string) => process.env[name] ?? match);
+  return template.replaceAll(PATH_MARKERS, (match: string, name: string | undefined) => {
+    if (match === "${PROJECT_ROOT}") return projectRoot;
+    if (name === undefined) return homeDir;
+    return process.env[name] ?? match;
+  });
 }
 
 /**

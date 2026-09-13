@@ -670,7 +670,7 @@ function canonical(server: McpServerConfig): string {
  * @returns {string} The expanded value.
  */
 function expandHome(value: string, home: string): string {
-  return value.replace(/^~(?=\/|$)/, () => home).replaceAll("${HOME}", () => home);
+  return value.replaceAll(/^~(?=\/|$)|\$\{HOME\}/g, () => home);
 }
 
 function expandServerHome(server: McpServerConfig, home: string): McpServerConfig {
