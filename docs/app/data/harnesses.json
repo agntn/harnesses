@@ -226,18 +226,35 @@
           "--tools",
           ""
         ],
+        "readOnlyArgs": [
+          "-p",
+          "{prompt}",
+          "--strict-mcp-config",
+          "--tools",
+          "Read,Glob,Grep"
+        ],
+        "readOnlyJsonArgs": [
+          "-p",
+          "--output-format",
+          "json",
+          "{prompt}",
+          "--strict-mcp-config",
+          "--tools",
+          "Read,Glob,Grep"
+        ],
+        "readOnlyMinVersion": "2.1.175",
         "modelArgs": [
           "--model",
           "{model}"
         ],
         "level": "official",
-        "note": "Headless print mode; add --output-format json for structured output."
+        "note": "Headless print mode; add --output-format json for structured output. Read-only runs keep the built-in Read, Glob and Grep tools and --strict-mcp-config drops every configured MCP server, so no write tool exists whatever permission mode the settings carry; verified on 2.1.175 and 2.1.268. --permission-mode plan does not qualify: its shell commands run through the auto mode classifier, which let a file write through."
       },
       "invocationModes": {
         "advisor": true,
         "advisorStructured": true,
-        "readOnly": false,
-        "readOnlyStructured": false,
+        "readOnly": true,
+        "readOnlyStructured": true,
         "agent": true,
         "agentStructured": true
       },
