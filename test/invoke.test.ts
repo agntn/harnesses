@@ -97,6 +97,40 @@ describe("normalized invocation", () => {
     });
   });
 
+  it("keeps Claude read-only runs on its built-in inspection tools", () => {
+    const claude = getHarness("claude");
+
+    expect(claude.invocation?.readOnlyMinVersion).toBe("2.1.175");
+    expect(claude.buildInvocation("review this", { readOnly: true })).toEqual({
+      command: "claude",
+      args: ["-p", "review this", "--strict-mcp-config", "--tools", "Read,Glob,Grep"],
+    });
+    expect(claude.buildInvocation("review this", { readOnly: true, structured: true })).toEqual({
+      command: "claude",
+      args: [
+        "-p",
+        "--output-format",
+        "json",
+        "review this",
+        "--strict-mcp-config",
+        "--tools",
+        "Read,Glob,Grep",
+      ],
+    });
+    expect(claude.buildInvocation("review this", { readOnly: true, model: "sonnet" })).toEqual({
+      command: "claude",
+      args: [
+        "-p",
+        "review this",
+        "--strict-mcp-config",
+        "--tools",
+        "Read,Glob,Grep",
+        "--model",
+        "sonnet",
+      ],
+    });
+  });
+
   it("uses the full agent invocation only when tools are enabled", () => {
     const claude = getHarness("claude");
     expect(claude.buildInvocation("do the thing", { tools: true })).toEqual({
@@ -176,7 +210,7 @@ describe("normalized invocation", () => {
   });
 
   it("rejects read-only access when a harness cannot enforce it", () => {
-    expect(getHarness("claude").invocationError({ readOnly: true })).toContain(
+    expect(getHarness("gemini").invocationError({ readOnly: true })).toContain(
       "no read-only full agent invocation",
     );
   });
@@ -483,8 +517,8 @@ describe("harness metadata for agents", () => {
     expect(getHarness("claude").invocationModes).toEqual({
       advisor: true,
       advisorStructured: true,
-      readOnly: false,
-      readOnlyStructured: false,
+      readOnly: true,
+      readOnlyStructured: true,
       agent: true,
       agentStructured: true,
     });
@@ -721,7 +755,7 @@ describe("runHarness tool operation", () => {
   });
 
   it("keeps unsupported read-only access from widening to a full agent", async () => {
-    const result = await runHarness("claude", "inspect", { tools: true, readOnly: true });
+    const result = await runHarness("omp", "inspect", { tools: true, readOnly: true });
 
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("no read-only full agent invocation");
