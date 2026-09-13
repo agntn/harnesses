@@ -107,9 +107,12 @@ export default class Grok extends Harness {
   readonly invocation: Harness["invocation"] = {
     args: ["-p", "{prompt}"],
     jsonArgs: ["-p", "{prompt}", "--output-format", "json"],
+    readOnlyArgs: ["-p", "{prompt}", "--sandbox", "read-only"],
+    readOnlyJsonArgs: ["-p", "{prompt}", "--sandbox", "read-only", "--output-format", "json"],
+    readOnlyMinVersion: "1.0.13",
     modelArgs: ["--model", "{model}"],
     level: "official",
-    note: "-p is short for --single; add --output-format json for structured output.",
+    note: "-p is short for --single; add --output-format json for structured output. --sandbox read-only is kernel-enforced (Landlock, Seatbelt) regardless of the inherited permission mode and still allows writes to ~/.grok and temp dirs; verified on Linux with 1.0.13 and 1.0.25.",
   };
   override readonly mcpConfigs: Harness["mcpConfigs"] = [
     {

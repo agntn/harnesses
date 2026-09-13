@@ -146,6 +146,20 @@ describe("normalized invocation", () => {
     });
   });
 
+  it("runs Grok read-only jobs inside its native sandbox", () => {
+    const grok = getHarness("grok");
+
+    expect(grok.invocationError({ readOnly: true })).toBeNull();
+    expect(grok.buildInvocation("review this", { readOnly: true })).toEqual({
+      command: "grok",
+      args: ["-p", "review this", "--sandbox", "read-only"],
+    });
+    expect(grok.buildInvocation("review this", { readOnly: true, structured: true })).toEqual({
+      command: "grok",
+      args: ["-p", "review this", "--sandbox", "read-only", "--output-format", "json"],
+    });
+  });
+
   it("rejects OMP advisor mode because --no-tools only disables bundled tools", () => {
     const omp = getHarness("omp");
 
@@ -645,6 +659,65 @@ describe("runHarness tool operation", () => {
       tools: true,
       readOnly: true,
     });
+  });
+
+  it("refuses read-only runs below the verified CLI version", async () => {
+    const versions: Array<string | null> = ["1.0.5", "1.0.13-alpha.2", null];
+    for (const installed of versions) {
+      registerHarness(
+        class extends FakeCursor {
+          override readonly invocation: Harness["invocation"] = {
+            args: ["-e", "console.log('write')"],
+            readOnlyArgs: ["-e", "console.log('read')", "{prompt}"],
+            readOnlyMinVersion: "1.0.13",
+            level: "inferred",
+          };
+          override get version(): string | null {
+            return installed;
+          }
+        },
+      );
+
+      try {
+        const result = await runHarness("cursor", "review", { tools: true, readOnly: true });
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0]?.text).toContain(
+          `requires version 1.0.13 or newer for read-only runs; installed ${installed ?? "version unknown"}`,
+        );
+        expect(result.details).not.toHaveProperty("retry");
+
+        const agent = await runHarness("cursor", "review", { tools: true });
+        expect(agent.isError).toBeUndefined();
+      } finally {
+        registerHarness(Cursor);
+      }
+    }
+  });
+
+  it("runs read-only jobs once the installed CLI meets the verified version", async () => {
+    registerHarness(
+      class extends FakeCursor {
+        override readonly invocation: Harness["invocation"] = {
+          args: ["-e", "console.log('write')"],
+          readOnlyArgs: ["-e", "console.log('read:' + process.argv[1])", "{prompt}"],
+          readOnlyMinVersion: "1.0.13",
+          level: "inferred",
+        };
+        override get version(): string | null {
+          return "1.0.25";
+        }
+      },
+    );
+
+    try {
+      const result = await runHarness("cursor", "review", { tools: true, readOnly: true });
+
+      expect(result.isError).toBeUndefined();
+      expect(result.details).toMatchObject({ stdout: "read:review\n", readOnly: true });
+    } finally {
+      registerHarness(Cursor);
+    }
   });
 
   it("keeps unsupported read-only access from widening to a full agent", async () => {

@@ -59,6 +59,8 @@ export interface HarnessInvocation {
   readOnlyArgs?: string[];
   /** Structured agent argument template with read-only tool access. */
   readOnlyJsonArgs?: string[];
+  /** Lowest CLI version whose read-only enforcement was verified; older or unknown versions reject read-only runs. */
+  readOnlyMinVersion?: string;
   /** Arguments appended when a model is selected; every "{model}" is replaced. */
   modelArgs?: string[];
   level: EvidenceLevel;
