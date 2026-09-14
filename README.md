@@ -1,8 +1,8 @@
 # @agntn/harnesses
 
-[![npm version](https://img.shields.io/npm/v/%40agntn%2Fharnesses?style=flat&colorA=130f40&colorB=474787)](https://npmjs.com/package/@agntn/harnesses)
-[![npm downloads](https://img.shields.io/npm/dm/%40agntn%2Fharnesses?style=flat&colorA=130f40&colorB=474787)](https://npm.chart.dev/@agntn/harnesses)
-[![license](https://img.shields.io/github/license/agntn/harnesses?style=flat&colorA=130f40&colorB=474787)](https://github.com/agntn/harnesses/blob/main/LICENSE)
+[![npm version](https://npmx.dev/api/registry/badge/version/@agntn/harnesses)](https://npmx.dev/package/@agntn/harnesses)
+[![npm downloads](https://npmx.dev/api/registry/badge/downloads/@agntn/harnesses)](https://npmx.dev/package/@agntn/harnesses)
+[![license](https://npmx.dev/api/registry/badge/license/@agntn/harnesses)](https://npmx.dev/package/@agntn/harnesses)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/agntn/harnesses)
 
 Metadata toolkit for AI coding harnesses. One registry of paths, formats, and detection rules for every major CLI.
