@@ -16,6 +16,7 @@ export default defineConfig({
               "AgentsConfig",
               "AgentsSyncParams",
               "Harness",
+              "HarnessInfoResult",
               "HarnessInvocation",
               "InfoParams",
               "InvokeOptions",

@@ -123,7 +123,7 @@ Each agent is a concrete subclass of the abstract `Harness` class. Custom subcla
 
 All paths carry `scope` (user/project/system/data), `level` (official/community/inferred), and optional `platforms` tags.
 
-The `harnesses_info` agent tool accepts one harness id or a batch of up to 20 ids. Batch results keep the input order and include errors for unknown ids beside successful metadata.
+The `harnesses_info` agent tool accepts one harness id or a batch of up to 20 ids. Batch results keep the input order and include errors for unknown ids beside successful metadata. Paths come once, resolved for the current platform. The templates stay with `harnesses info`.
 
 ## CLI
 
