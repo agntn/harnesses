@@ -180,9 +180,6 @@ function completedRun(
   options: RunInvocationOptions,
   templateArgs: readonly string[],
 ): ToolResult<RunOutcome> {
-  // The model already wrote the prompt, so the content echoes the invocation
-  // with the "{prompt}" placeholder left in place; the expanded arguments stay
-  // in details for programmatic callers.
   const contentOutcome: Omit<RunOutcome, "stderr"> = {
     id: harness.id,
     command: result.command,
@@ -401,7 +398,7 @@ export interface RunOptions {
 export interface RunOutcome {
   id: HarnessId;
   command: string;
-  /** Expanded arguments; the text sent to the model keeps "{prompt}" in their place. */
+  /** Expanded arguments; the model's text keeps "{prompt}" instead, it wrote the prompt itself. */
   args: string[];
   model?: string;
   structured: boolean;
@@ -457,8 +454,6 @@ export async function runHarness(
   const structured = options.structured ?? false;
   const { tools, readOnly } = normalizedRunAccess(options);
   const invocationOptions = { model: options.model, structured, tools, readOnly };
-  // Expanding the template with its own placeholder yields the argument list
-  // as it will be echoed to the model, with the prompt left out.
   const template = harness.buildInvocation("{prompt}", invocationOptions);
   if (!template) {
     return unsupportedInvocation(harness, id, invocationOptions);
