@@ -100,6 +100,49 @@ describe("listMcpServers", () => {
     expect(listings.find((l) => l.scope === "project")?.exists).toBe(false);
   });
 
+  it("reads Prime Agent settings and drops the env references it cannot represent", () => {
+    const dirs = fixtureDirs();
+    const settings = join(dirs.homeDir, ".prime", "agent", "settings.json");
+    mkdirSync(dirname(settings), { recursive: true });
+    writeFileSync(
+      settings,
+      JSON.stringify({
+        theme: "dark",
+        mcpServers: {
+          local: {
+            type: "stdio",
+            command: "node",
+            args: ["server.js", "--stdio"],
+            env: { TOKEN: { env: "EXAMPLE_TOKEN" } },
+          },
+          proxy: { type: "http", url: "https://proxy.example.com/mcp", bearerTokenEnvVar: "T" },
+        },
+      }),
+    );
+
+    const [user] = listMcpServers(getHarness("prime-agent"), dirs);
+    expect(user?.servers).toEqual([
+      { name: "local", transport: "stdio", command: "node", args: ["server.js", "--stdio"] },
+      { name: "proxy", transport: "http", url: "https://proxy.example.com/mcp" },
+    ]);
+
+    addMcpServer(
+      getHarness("prime-agent"),
+      { name: "extra", transport: "http", url: "https://example.com/mcp" },
+      "user",
+      dirs,
+    );
+
+    const raw = parseJsonRecord(settings);
+    expect(raw.theme).toBe("dark");
+    expect(nestedRecord(nestedRecord(raw, "mcpServers"), "proxy").bearerTokenEnvVar).toBe("T");
+    expect(Object.keys(nestedRecord(raw, "mcpServers")).sort()).toEqual([
+      "extra",
+      "local",
+      "proxy",
+    ]);
+  });
+
   it("normalizes the Antigravity serverUrl dialect", () => {
     const dirs = fixtureDirs();
     const configDir = join(dirs.homeDir, ".gemini", "config");

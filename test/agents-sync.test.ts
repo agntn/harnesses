@@ -70,9 +70,16 @@ describe("syncAgentsFiles", () => {
       mkdirSync(join(homeDir, ".gemini"), { recursive: true });
       writeFileSync(join(homeDir, ".gemini", "GEMINI.md"), "");
 
-      const targets = ["antigravity", "claude", "codex", "omp", "pi", "gemini", "grok"].map((id) =>
-        getHarness(id as never),
-      );
+      const targets = [
+        "antigravity",
+        "claude",
+        "codex",
+        "omp",
+        "pi",
+        "prime-agent",
+        "gemini",
+        "grok",
+      ].map((id) => getHarness(id as never));
       const report = syncAgentsFiles(targets, false, { homeDir });
       const byId = new Map(report.targets.map((t) => [t.id, t]));
 
@@ -83,10 +90,13 @@ describe("syncAgentsFiles", () => {
       expect(requiredTarget(byId, "codex").action).toBe("skipped");
       expect(requiredTarget(byId, "omp").action).toBe("relinked");
       expect(requiredTarget(byId, "pi").action).toBe("adopted");
+      const primeAgent = requiredTarget(byId, "prime-agent");
+      expect(primeAgent.action).toBe("linked");
+      expect(primeAgent.path).toBe(join(homeDir, ".prime", "agent", "AGENTS.md"));
       expect(requiredTarget(byId, "gemini").action).toBe("relinked");
       expect(requiredTarget(byId, "grok").action).toBe("skipped");
 
-      for (const id of ["antigravity", "claude", "omp", "pi", "gemini"]) {
+      for (const id of ["antigravity", "claude", "omp", "pi", "prime-agent", "gemini"]) {
         const path = requiredPath(requiredTarget(byId, id));
         expect(lstatSync(path).isSymbolicLink()).toBe(true);
         expect(realpathSync(path)).toBe(realpathSync(master));
