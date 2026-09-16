@@ -177,6 +177,40 @@ function normalizeStandard(name: string, raw: Readonly<Record<string, unknown>>)
   });
 }
 
+/** An env value that is exactly `${NAME}` stands for the variable NAME of the harness environment. */
+const ENV_REFERENCE = /^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$/;
+
+/** Thrown when a server's env cannot be written the way the target dialect requires. */
+export class McpEnvError extends Error {
+  override readonly name = "McpEnvError";
+}
+
+function envReference(value: string): string | undefined {
+  return ENV_REFERENCE.exec(value)?.[1];
+}
+
+/**
+ * Reads a Prime Agent env map, where each value is a {"env": "NAME"}
+ * reference, into the shared `${NAME}` spelling. Literal strings are kept
+ * as found so the listing shows what the file holds.
+ *
+ * @param value - Raw `env` field of a Prime Agent server entry.
+ * @returns {Record<string, string> | undefined} The env map, or undefined when empty.
+ */
+function primeEnv(value: unknown): Record<string, string> | undefined {
+  if (!isObjectRecord(value) || Array.isArray(value)) return undefined;
+  const out: Record<string, string> = {};
+  for (const [key, raw] of Object.entries(value)) {
+    if (typeof raw === "string") out[key] = raw;
+    else if (isObjectRecord(raw) && typeof raw.env === "string") out[key] = `\${${raw.env}}`;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+function normalizePrime(name: string, raw: Readonly<Record<string, unknown>>): McpServerConfig {
+  return compact({ ...normalizeStandard(name, raw), env: primeEnv(raw.env) });
+}
+
 /**
  * Maps one raw config entry to the normalized shape, per dialect.
  *
@@ -192,6 +226,7 @@ function normalizeEntry(
 ): McpServerConfig {
   if (dialect === "antigravity") return normalizeAntigravity(name, raw);
   if (dialect === "opencode") return normalizeOpenCode(name, raw);
+  if (dialect === "prime") return normalizePrime(name, raw);
   return normalizeStandard(name, raw);
 }
 
@@ -234,6 +269,77 @@ function denormalizeStandard(server: McpServerConfig): Record<string, unknown> {
 }
 
 /**
+ * Prime Agent's kernel hands stdio servers a trimmed environment plus the
+ * variables the entry names, so its env map holds references only. A
+ * literal has no way in and is refused rather than written as a server
+ * that fails on its first connection.
+ *
+ * @param server - Normalized server whose env values are `${NAME}` references.
+ * @returns {Record<string, unknown>} The Prime Agent entry.
+ */
+function denormalizePrime(server: McpServerConfig): Record<string, unknown> {
+  const env = server.env
+    ? Object.fromEntries(
+        Object.entries(server.env).map(([key, value]) => [
+          key,
+          { env: requirePrimeReference(server, key, value) },
+        ]),
+      )
+    : undefined;
+  return compact({ ...denormalizeStandard(server), env });
+}
+
+function requirePrimeReference(server: McpServerConfig, key: string, value: string): string {
+  const reference = envReference(value);
+  if (reference === undefined) {
+    throw new McpEnvError(
+      `${server.name}: Prime Agent takes only environment references in env; write ${key} as "\${NAME}" and export NAME where prime-agent runs`,
+    );
+  }
+  return reference;
+}
+
+/**
+ * Shapes a server's env for one dialect before it is compared or written:
+ * Prime Agent keeps `${NAME}` references and refuses literals, every other
+ * dialect gets the references resolved from the environment of this
+ * process, the same way `~` and `${HOME}` are expanded before a sync.
+ *
+ * @param server - Normalized server, possibly carrying references.
+ * @param dialect - Target harness config dialect.
+ * @returns {McpServerConfig} The server as the dialect can hold it.
+ */
+function resolveEnvReferences(
+  server: McpServerConfig,
+  dialect: McpConfigFile["dialect"],
+): McpServerConfig {
+  if (!server.env) return server;
+  if (dialect === "prime") {
+    for (const [key, value] of Object.entries(server.env))
+      requirePrimeReference(server, key, value);
+    return server;
+  }
+  const env: Record<string, string> = {};
+  for (const [key, value] of Object.entries(server.env)) {
+    const reference = envReference(value);
+    if (reference === undefined) {
+      env[key] = value;
+      continue;
+    }
+    // process.env inherits Object.prototype, so a bare lookup would turn
+    // ${constructor} into a function; only own string values count.
+    const resolved = Object.hasOwn(process.env, reference) ? process.env[reference] : undefined;
+    if (typeof resolved !== "string") {
+      throw new McpEnvError(
+        `${server.name}: env ${key} references ${reference}, which is not set in this environment`,
+      );
+    }
+    env[key] = resolved;
+  }
+  return { ...server, env };
+}
+
+/**
  * Converts a normalized server back to the raw shape one dialect expects.
  *
  * @param server - Normalized server configuration.
@@ -246,6 +352,7 @@ function denormalizeEntry(
 ): Record<string, unknown> {
   if (dialect === "antigravity") return denormalizeAntigravity(server);
   if (dialect === "opencode") return denormalizeOpenCode(server);
+  if (dialect === "prime") return denormalizePrime(server);
   return denormalizeStandard(server);
 }
 
@@ -485,9 +592,10 @@ export function addMcpServer(
   options: ResolveOptions = {},
 ): { path: string; replaced: boolean } {
   const { entry, path } = writableConfig(harness, scope, options);
+  const resolved = resolveEnvReferences(server, entry.dialect);
 
   if (entry.format === "toml") {
-    return { path, replaced: addTomlServer(path, entry.key, server) };
+    return { path, replaced: addTomlServer(path, entry.key, resolved) };
   }
 
   const root = JSON.parse(readIfExists(path) ?? "{}") as Record<string, unknown>;
@@ -495,7 +603,7 @@ export function addMcpServer(
   if (!map) throw new Error(`Config at ${path} has a non-object at ${entry.key.join(".")}`);
 
   const replaced = Object.hasOwn(map, server.name);
-  map[server.name] = denormalizeEntry(server, entry.dialect);
+  map[server.name] = denormalizeEntry(resolved, entry.dialect);
   writeAtomically(path, `${JSON.stringify(root, null, 2)}\n`);
   return { path, replaced };
 }
@@ -644,7 +752,12 @@ export interface SyncTargetResult {
   skipped?: string;
   /** Set when the master list excludes this harness; master-listed names are withdrawn. */
   excluded?: true;
-  results: Array<{ name: string; action: "added" | "replaced" | "removed" | "unchanged" }>;
+  results: Array<{
+    name: string;
+    action: "added" | "replaced" | "removed" | "unchanged" | "skipped";
+    /** Why a master server could not be written to this harness. */
+    reason?: string;
+  }>;
 }
 
 /** Outcome of resetting the harness configs to the master list. */
@@ -786,14 +899,22 @@ function syncIncludedHarness(
 ): SyncTargetResult {
   const results: SyncTargetResult["results"] = [];
   let path = initialPath;
+  const { dialect } = writableConfig(harness, "user", options).entry;
   for (const server of master.servers) {
-    if (existing.get(server.name) === canonical(server)) {
-      results.push({ name: server.name, action: "unchanged" });
-      continue;
+    try {
+      const resolved = resolveEnvReferences(server, dialect);
+      if (existing.get(server.name) === canonical(resolved)) {
+        results.push({ name: server.name, action: "unchanged" });
+        continue;
+      }
+      const written = addMcpServer(harness, resolved, "user", options);
+      path = written.path;
+      results.push({ name: server.name, action: written.replaced ? "replaced" : "added" });
+    } catch (error) {
+      // One server the dialect cannot hold must not stop the rest of the list.
+      if (!(error instanceof McpEnvError)) throw error;
+      results.push({ name: server.name, action: "skipped", reason: error.message });
     }
-    const written = addMcpServer(harness, server, "user", options);
-    path = written.path;
-    results.push({ name: server.name, action: written.replaced ? "replaced" : "added" });
   }
   for (const name of existing.keys()) {
     if (masterNames.has(name)) continue;

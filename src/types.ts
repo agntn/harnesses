@@ -150,6 +150,11 @@ export interface McpServerConfig {
   transport: "stdio" | "http" | "sse";
   command?: string;
   args?: string[];
+  /**
+   * Environment for stdio servers. A value that is exactly "${NAME}" refers to
+   * the variable NAME of the harness environment: dialects with native
+   * references keep it, the others resolve it when the entry is written.
+   */
   env?: Record<string, string>;
   url?: string;
   headers?: Record<string, string>;
@@ -162,8 +167,11 @@ export interface McpConfigFile extends PathCandidate {
   format: "json" | "toml";
   /** Object path to the server map inside the file, e.g. ["mcpServers"]. */
   key: string[];
-  /** Shape of individual entries; "standard" is the {command, args, env, url} family. */
-  dialect: "standard" | "antigravity" | "opencode" | "vscode";
+  /**
+   * Shape of individual entries; "standard" is the {command, args, env, url}
+   * family and "prime" is that family with env values as {"env": "NAME"} references.
+   */
+  dialect: "standard" | "antigravity" | "opencode" | "prime" | "vscode";
 }
 
 export interface HarnessDetection {

@@ -15,7 +15,7 @@ export interface PathCandidate {
 export interface McpConfigFile extends PathCandidate {
   format: "json" | "toml";
   key: string[];
-  dialect: "standard" | "antigravity" | "opencode" | "vscode";
+  dialect: "standard" | "antigravity" | "opencode" | "prime" | "vscode";
 }
 
 export interface Invocation {

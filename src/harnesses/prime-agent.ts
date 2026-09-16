@@ -138,8 +138,8 @@ export default class PrimeAgent extends Harness {
       level: "official",
       format: "json",
       key: ["mcpServers"],
-      dialect: "standard",
-      note: 'prime-agent mcp add/remove manage this map; project settings entries are ignored for execution. Stdio env values must be {"env": "NAME"} references, which the standard dialect drops on read; literal env values written through it are rejected by the kernel at connect time.',
+      dialect: "prime",
+      note: 'prime-agent mcp add/remove manage this map; project settings entries are ignored for execution. Stdio env values are {"env": "NAME"} references, written from "${NAME}" values; literals are refused because the kernel rejects them at connect time.',
     },
   ];
   override readonly agentsFile = "~/.prime/agent/AGENTS.md";
