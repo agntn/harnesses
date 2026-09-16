@@ -14,7 +14,8 @@ export type HarnessId =
   | "github-copilot"
   | "mastracode"
   | "omp"
-  | "pi";
+  | "pi"
+  | "prime-agent";
 export type EvidenceLevel = "official" | "community" | "inferred";
 export type Platform = "linux" | "darwin" | "win32";
 

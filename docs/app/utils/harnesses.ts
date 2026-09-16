@@ -123,6 +123,11 @@ const PRESENTATION: Record<string, { icon: string; short: string; blurb: string 
     short: "Pi",
     blurb: "Every invocation mode, native model listing with search. The reference harness here.",
   },
+  "prime-agent": {
+    icon: "i-solar-cpu-linear",
+    short: "Prime Agent",
+    blurb: "Pi fork with one Python REPL tool, flat JSONL sessions and model listing. No read-only mode.",
+  },
 };
 
 export interface HarnessEntry extends HarnessRecord {

@@ -55,20 +55,21 @@ import type { ClaudeSessionEntry, CodexThread, GeminiConversationRecord } from "
 
 ## Supported agents
 
-| Agent           | ID               | Detection     | Skills                | Hooks                    | Sessions       |
-| --------------- | ---------------- | ------------- | --------------------- | ------------------------ | -------------- |
-| Antigravity CLI | `antigravity`    | project       | `.agents/skills/`     | -                        | JSONL + SQLite |
-| Claude Code     | `claude`         | env + project | `.claude/skills/`     | `.claude/hooks/`         | JSONL          |
-| Codex CLI       | `codex`          | project       | `.agents/skills/`     | -                        | SQLite + JSONL |
-| Gemini CLI      | `gemini`         | env + project | `.gemini/skills/`     | -                        | JSON           |
-| Grok CLI        | `grok`           | env + project | `.grok/skills/`       | `.grok/hooks/`           | TOML + JSONL   |
-| OpenCode        | `opencode`       | project       | `.opencode/skills/`   | -                        | SQLite         |
-| Cursor          | `cursor`         | env + project | `.cursor/skills/`     | -                        | -              |
-| GitHub Copilot  | `github-copilot` | env + project | `.github/skills/`     | -                        | -              |
-| Mastra Code     | `mastracode`     | project       | `.mastracode/skills/` | `.mastracode/hooks.json` | SQLite         |
-| OMP (oh-my-pi)  | `omp`            | env + project | `.omp/skills/`        | -                        | JSONL + SQLite |
-| Pi Coding Agent | `pi`             | env + project | `.pi/skills/`         | -                        | JSON + JSONL   |
-| Freebuff        | `freebuff`       | project       | `.agents/skills/`     | -                        | JSON + JSONL   |
+| Agent           | ID               | Detection     | Skills                 | Hooks                    | Sessions       |
+| --------------- | ---------------- | ------------- | ---------------------- | ------------------------ | -------------- |
+| Antigravity CLI | `antigravity`    | project       | `.agents/skills/`      | -                        | JSONL + SQLite |
+| Claude Code     | `claude`         | env + project | `.claude/skills/`      | `.claude/hooks/`         | JSONL          |
+| Codex CLI       | `codex`          | project       | `.agents/skills/`      | -                        | SQLite + JSONL |
+| Gemini CLI      | `gemini`         | env + project | `.gemini/skills/`      | -                        | JSON           |
+| Grok CLI        | `grok`           | env + project | `.grok/skills/`        | `.grok/hooks/`           | TOML + JSONL   |
+| OpenCode        | `opencode`       | project       | `.opencode/skills/`    | -                        | SQLite         |
+| Cursor          | `cursor`         | env + project | `.cursor/skills/`      | -                        | -              |
+| GitHub Copilot  | `github-copilot` | env + project | `.github/skills/`      | -                        | -              |
+| Mastra Code     | `mastracode`     | project       | `.mastracode/skills/`  | `.mastracode/hooks.json` | SQLite         |
+| OMP (oh-my-pi)  | `omp`            | env + project | `.omp/skills/`         | -                        | JSONL + SQLite |
+| Pi Coding Agent | `pi`             | env + project | `.pi/skills/`          | -                        | JSON + JSONL   |
+| Prime Agent     | `prime-agent`    | env + project | `.prime/agent/skills/` | -                        | JSONL + JSON   |
+| Freebuff        | `freebuff`       | project       | `.agents/skills/`      | -                        | JSON + JSONL   |
 
 ### Native audio and video input
 
@@ -87,6 +88,7 @@ import type { ClaudeSessionEntry, CodexThread, GeminiConversationRecord } from "
 | Mastra Code     |  No   |  No   | No verified native route                                                    |
 | OMP (oh-my-pi)  |  No   |  No   | No verified native route                                                    |
 | Pi Coding Agent |  No   |  No   | No verified native route                                                    |
+| Prime Agent     |  No   |  No   | No verified native route                                                    |
 | Freebuff        |  No   |  No   | No verified native route                                                    |
 
 Primary references: [Antigravity prompting](https://antigravity.google/docs/cli/prompting/), [Antigravity changelog](https://github.com/google-antigravity/antigravity-cli/blob/main/CHANGELOG.md), [Gemini CLI tools](https://github.com/google-gemini/gemini-cli/blob/main/docs/reference/tools.md), [Gemini CLI video request](https://github.com/google-gemini/gemini-cli/issues/27194), [OpenCode attachments](https://opencode.ai/v2/docs/attachments/), [Cursor prompting](https://cursor.com/docs/agent/prompting), and [Copilot CLI voice input](https://docs.github.com/en/copilot/how-tos/copilot-cli/use-copilot-cli/voice-input).
@@ -151,7 +153,7 @@ harnesses mcp                   # run the MCP server over stdio
 
 [unagent](https://github.com/onmax/unagent) covers similar ground but makes different tradeoffs.
 
-**harnesses is deep and narrow.** Each harness gets verified, platform-specific paths with scope, evidence level, and platform tags. Session formats are typed per harness. Twelve harnesses, each fully mapped.
+**harnesses is deep and narrow.** Each harness gets verified, platform-specific paths with scope, evidence level, and platform tags. Session formats are typed per harness. Thirteen harnesses, each fully mapped.
 
 **unagent is wide and shallow.** 40+ agents detected by env vars, but each definition is just `configDir` + `rulesFile` + `skillsDir`. No platform-specific paths, no session schemas. In exchange, it ships runtime primitives harnesses doesn't touch yet: skill install/uninstall, vector stores, browser automation, sandboxes, queues, workflows.
 

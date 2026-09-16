@@ -4,17 +4,69 @@ import type { AvailableModel } from "../types.ts";
 
 const MODEL_HEADERS = ["provider", "model", "context", "max-out", "thinking", "images"];
 
-function parseTokenCount(value: string): number {
+function parseTokenCount(value: string, harness: string): number {
   const match = /^(\d+(?:\.\d+)?)([KM])?$/.exec(value);
-  if (!match?.[1]) throw new Error(`Invalid Pi token count: ${JSON.stringify(value)}`);
+  if (!match?.[1]) throw new Error(`Invalid ${harness} token count: ${JSON.stringify(value)}`);
   const multiplier = match[2] === "M" ? 1_000_000 : match[2] === "K" ? 1_000 : 1;
   return Number(match[1]) * multiplier;
 }
 
-function parseBoolean(value: string, column: string): boolean {
+function parseBoolean(value: string, column: string, harness: string): boolean {
   if (value === "yes") return true;
   if (value === "no") return false;
-  throw new Error(`Invalid Pi ${column} value: ${JSON.stringify(value)}`);
+  throw new Error(`Invalid ${harness} ${column} value: ${JSON.stringify(value)}`);
+}
+
+/**
+ * Parses the model table Pi and its forks print, one row per model with
+ * two or more spaces between columns.
+ *
+ * @param stdout - Native model-listing output.
+ * @param harness - Harness name for error messages.
+ * @returns {AvailableModel[]} The normalized models; empty when the CLI reports no matching models.
+ */
+export function parsePiModelTable(stdout: string, harness: string): AvailableModel[] {
+  const lines = stripVTControlCharacters(stdout)
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const first = lines[0];
+  if (!first) throw new Error(`Unexpected empty ${harness} model-list output`);
+  if (first.startsWith("No models available.") || first.startsWith("No models matching ")) {
+    return [];
+  }
+
+  const headers = first.split(/\s{2,}/);
+  if (
+    headers.length !== MODEL_HEADERS.length ||
+    headers.some((value, i) => value !== MODEL_HEADERS[i])
+  ) {
+    throw new Error(`Unexpected ${harness} model-list header: ${JSON.stringify(first)}`);
+  }
+
+  return lines.slice(1).map((line) => {
+    const columns = line.split(/\s{2,}/);
+    const [provider, id, context, maxOutput, thinking, images] = columns;
+    if (
+      columns.length !== MODEL_HEADERS.length ||
+      !provider ||
+      !id ||
+      !context ||
+      !maxOutput ||
+      !thinking ||
+      !images
+    ) {
+      throw new Error(`Unexpected ${harness} model-list row: ${JSON.stringify(line)}`);
+    }
+    return {
+      provider,
+      id,
+      contextWindow: parseTokenCount(context, harness),
+      maxOutputTokens: parseTokenCount(maxOutput, harness),
+      thinking: parseBoolean(thinking, "thinking", harness),
+      images: parseBoolean(images, "images", harness),
+    };
+  });
 }
 
 export default class Pi extends Harness {
@@ -128,46 +180,6 @@ export default class Pi extends Harness {
   };
 
   protected override parseModelListingOutput(stdout: string): AvailableModel[] {
-    const lines = stripVTControlCharacters(stdout)
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean);
-    const first = lines[0];
-    if (!first) throw new Error("Unexpected empty Pi model-list output");
-    if (first.startsWith("No models available.") || first.startsWith("No models matching ")) {
-      return [];
-    }
-
-    const headers = first.split(/\s{2,}/);
-    if (
-      headers.length !== MODEL_HEADERS.length ||
-      headers.some((value, i) => value !== MODEL_HEADERS[i])
-    ) {
-      throw new Error(`Unexpected Pi model-list header: ${JSON.stringify(first)}`);
-    }
-
-    return lines.slice(1).map((line) => {
-      const columns = line.split(/\s{2,}/);
-      const [provider, id, context, maxOutput, thinking, images] = columns;
-      if (
-        columns.length !== MODEL_HEADERS.length ||
-        !provider ||
-        !id ||
-        !context ||
-        !maxOutput ||
-        !thinking ||
-        !images
-      ) {
-        throw new Error(`Unexpected Pi model-list row: ${JSON.stringify(line)}`);
-      }
-      return {
-        provider,
-        id,
-        contextWindow: parseTokenCount(context),
-        maxOutputTokens: parseTokenCount(maxOutput),
-        thinking: parseBoolean(thinking, "thinking"),
-        images: parseBoolean(images, "images"),
-      };
-    });
+    return parsePiModelTable(stdout, "Pi");
   }
 }

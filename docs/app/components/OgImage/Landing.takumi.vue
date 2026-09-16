@@ -3,7 +3,7 @@
 defineProps<{ title?: string; description?: string }>();
 
 const TAGLINE =
-  "Where twelve coding agents keep their config, sessions and skills, per platform, with evidence. Detect, invoke, sync.";
+  "Where thirteen coding agents keep their config, sessions and skills, per platform, with evidence. Detect, invoke, sync.";
 
 const { name: siteName } = useSiteConfig();
 
@@ -51,7 +51,7 @@ const PROVIDERS = ["Claude Code", "Codex", "Gemini", "OpenCode", "Pi"];
           class="m-0 text-[76px] font-medium leading-[1.05] tracking-[-0.03em]"
           style="color: #f0f4f8"
         >
-          Twelve agents.
+          Thirteen agents.
         </h1>
         <h1
           class="m-0 ml-[22px] text-[76px] font-medium leading-[1.05] tracking-[-0.03em]"
