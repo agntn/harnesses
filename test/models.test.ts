@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { getHarness, registerHarness } from "../src/index.ts";
-import Pi from "../src/harnesses/pi.ts";
+import Pi, { parsePiModelTable } from "../src/harnesses/pi.ts";
+import PrimeAgent from "../src/harnesses/prime-agent.ts";
 import { listHarnessModels, runHarness } from "../src/tool-operations.ts";
 
 const MODELS_OUTPUT = `provider      model                context  max-out  thinking  images
@@ -42,6 +43,29 @@ describe("model listing", () => {
       command: "pi",
       args: ["--list-models", "gpt-5.4"],
     });
+  });
+
+  it("exposes the Prime Agent model-listing command", () => {
+    const primeAgent = new PrimeAgent();
+
+    expect(primeAgent.buildModelListInvocation()).toEqual({
+      command: "prime-agent",
+      args: ["model", "list"],
+    });
+    expect(primeAgent.buildModelListInvocation("gpt-5.4")).toEqual({
+      command: "prime-agent",
+      args: ["model", "list", "gpt-5.4"],
+    });
+  });
+
+  it("names the harness in shared model table errors", () => {
+    expect(() => parsePiModelTable("", "Prime Agent")).toThrow(
+      "Unexpected empty Prime Agent model-list output",
+    );
+    expect(() => parsePiModelTable("provider  model\n", "Prime Agent")).toThrow(
+      "Unexpected Prime Agent model-list header",
+    );
+    expect(parsePiModelTable('No models matching "missing"\n', "Prime Agent")).toEqual([]);
   });
 
   it("preserves replacement tokens in model names", () => {

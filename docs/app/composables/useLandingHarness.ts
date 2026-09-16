@@ -13,6 +13,7 @@ const WALK = [
   "antigravity",
   "github-copilot",
   "mastracode",
+  "prime-agent",
   "freebuff",
 ] as const;
 

@@ -1,17 +1,23 @@
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   addMcpServer,
   getHarness,
   listMcpServers,
+  McpEnvError,
   registerHarness,
   removeMcpServer,
   syncMcpServers,
+  type SyncTargetResult,
 } from "../src/index.ts";
 import Cursor from "../src/harnesses/cursor.ts";
 import { mcpList } from "../src/tool-operations.ts";
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 let mcpListFixturePath = "";
 
@@ -98,6 +104,108 @@ describe("listMcpServers", () => {
       { name: "cloud", transport: "http", url: "https://example.com/mcp" },
     ]);
     expect(listings.find((l) => l.scope === "project")?.exists).toBe(false);
+  });
+
+  it("reads Prime Agent env references as ${NAME} values", () => {
+    const dirs = fixtureDirs();
+    const settings = join(dirs.homeDir, ".prime", "agent", "settings.json");
+    mkdirSync(dirname(settings), { recursive: true });
+    writeFileSync(
+      settings,
+      JSON.stringify({
+        theme: "dark",
+        mcpServers: {
+          local: {
+            type: "stdio",
+            command: "node",
+            args: ["server.js", "--stdio"],
+            env: { TOKEN: { env: "EXAMPLE_TOKEN" } },
+          },
+          proxy: { type: "http", url: "https://proxy.example.com/mcp", bearerTokenEnvVar: "T" },
+        },
+      }),
+    );
+
+    const [user] = listMcpServers(getHarness("prime-agent"), dirs);
+    expect(user?.servers).toEqual([
+      {
+        name: "local",
+        transport: "stdio",
+        command: "node",
+        args: ["server.js", "--stdio"],
+        env: { TOKEN: "${EXAMPLE_TOKEN}" },
+      },
+      { name: "proxy", transport: "http", url: "https://proxy.example.com/mcp" },
+    ]);
+
+    addMcpServer(
+      getHarness("prime-agent"),
+      { name: "extra", transport: "stdio", command: "wiki", env: { WIKI_ROOT: "${WIKI_ROOT}" } },
+      "user",
+      dirs,
+    );
+
+    const raw = parseJsonRecord(settings);
+    expect(raw.theme).toBe("dark");
+    expect(nestedRecord(nestedRecord(raw, "mcpServers"), "proxy").bearerTokenEnvVar).toBe("T");
+    expect(nestedRecord(nestedRecord(raw, "mcpServers"), "extra")).toEqual({
+      type: "stdio",
+      command: "wiki",
+      env: { WIKI_ROOT: { env: "WIKI_ROOT" } },
+    });
+    expect(Object.keys(nestedRecord(raw, "mcpServers")).sort()).toEqual([
+      "extra",
+      "local",
+      "proxy",
+    ]);
+  });
+
+  it("refuses a literal env value for Prime Agent instead of writing a broken server", () => {
+    const dirs = fixtureDirs();
+    const settings = join(dirs.homeDir, ".prime", "agent", "settings.json");
+
+    expect(() =>
+      addMcpServer(
+        getHarness("prime-agent"),
+        { name: "wiki", transport: "stdio", command: "wiki", env: { WIKI_ROOT: "/srv/wiki" } },
+        "user",
+        dirs,
+      ),
+    ).toThrow(McpEnvError);
+    expect(existsSync(settings)).toBe(false);
+  });
+
+  it("resolves ${NAME} env references for dialects without native ones", () => {
+    const dirs = fixtureDirs();
+    vi.stubEnv("HARNESSES_TEST_TOKEN", "from-env");
+
+    addMcpServer(
+      getHarness("claude"),
+      {
+        name: "probe",
+        transport: "stdio",
+        command: "node",
+        env: { TOKEN: "${HARNESSES_TEST_TOKEN}" },
+      },
+      "user",
+      dirs,
+    );
+    const probe = nestedRecord(
+      nestedRecord(parseJsonRecord(join(dirs.homeDir, ".claude.json")), "mcpServers"),
+      "probe",
+    );
+    expect(probe.env).toEqual({ TOKEN: "from-env" });
+
+    for (const missing of ["HARNESSES_UNSET_VAR", "constructor", "__proto__"]) {
+      expect(() =>
+        addMcpServer(
+          getHarness("claude"),
+          { name: "probe", transport: "stdio", command: "node", env: { TOKEN: `\${${missing}}` } },
+          "user",
+          dirs,
+        ),
+      ).toThrow(McpEnvError);
+    }
   });
 
   it("normalizes the Antigravity serverUrl dialect", () => {
@@ -386,6 +494,17 @@ describe("addMcpServer / removeMcpServer", () => {
 });
 
 describe("syncMcpServers", () => {
+  type SyncRow = Readonly<SyncTargetResult["results"][number]>;
+
+  function targetResults(
+    targets: ReadonlyArray<Readonly<{ id: string; results: readonly SyncRow[] }>>,
+    id: string,
+  ): readonly SyncRow[] {
+    const target = targets.find((t) => t.id === id);
+    if (!target) throw new Error(`Missing sync target: ${id}`);
+    return target.results;
+  }
+
   function writeMaster(homeDir: string, body: string): string {
     const dir = join(homeDir, ".config", "agntn");
     mkdirSync(dir, { recursive: true });
@@ -440,6 +559,105 @@ describe("syncMcpServers", () => {
       for (const target of second.targets) {
         expect(target.results.map((r) => r.action)).toEqual(["unchanged", "unchanged"]);
       }
+    } finally {
+      if (previousXdg !== undefined) process.env.XDG_CONFIG_HOME = previousXdg;
+    }
+  });
+
+  it("writes env references natively for Prime Agent and skips what a dialect cannot hold", () => {
+    const dirs = fixtureDirs();
+    const previousXdg = process.env.XDG_CONFIG_HOME;
+    delete process.env.XDG_CONFIG_HOME;
+    vi.stubEnv("HARNESSES_TEST_NAMESPACE", "team");
+    try {
+      writeMaster(
+        dirs.homeDir,
+        `{
+  "mcpServers": {
+    "plain": { "command": "node", "args": ["srv.mjs"] },
+    "memory": { "command": "memory", "env": { "NAMESPACE": "\${HARNESSES_TEST_NAMESPACE}" } },
+    "wiki": { "command": "wiki", "env": { "WIKI_ROOT": "/srv/wiki" } },
+    "unset": { "command": "x", "env": { "KEY": "\${HARNESSES_UNSET_VAR}" } },
+  },
+}`,
+      );
+
+      const targets = [getHarness("prime-agent"), getHarness("claude")];
+      const first = syncMcpServers(targets, dirs);
+      const prime = targetResults(first.targets, "prime-agent");
+      const claude = targetResults(first.targets, "claude");
+
+      expect(prime.map((r) => [r.name, r.action])).toEqual([
+        ["plain", "added"],
+        ["memory", "added"],
+        ["wiki", "skipped"],
+        ["unset", "added"],
+      ]);
+      expect(prime[2]?.reason).toContain("environment references");
+      expect(claude.map((r) => [r.name, r.action])).toEqual([
+        ["plain", "added"],
+        ["memory", "added"],
+        ["wiki", "added"],
+        ["unset", "skipped"],
+      ]);
+      expect(claude[3]?.reason).toContain("HARNESSES_UNSET_VAR");
+
+      const primeRaw = nestedRecord(
+        parseJsonRecord(join(dirs.homeDir, ".prime", "agent", "settings.json")),
+        "mcpServers",
+      );
+      expect(nestedRecord(primeRaw, "memory").env).toEqual({
+        NAMESPACE: { env: "HARNESSES_TEST_NAMESPACE" },
+      });
+      expect(nestedRecord(primeRaw, "unset").env).toEqual({ KEY: { env: "HARNESSES_UNSET_VAR" } });
+      expect(primeRaw.wiki).toBeUndefined();
+      const claudeRaw = nestedRecord(
+        parseJsonRecord(join(dirs.homeDir, ".claude.json")),
+        "mcpServers",
+      );
+      expect(nestedRecord(claudeRaw, "memory").env).toEqual({ NAMESPACE: "team" });
+      expect(nestedRecord(claudeRaw, "wiki").env).toEqual({ WIKI_ROOT: "/srv/wiki" });
+      expect(claudeRaw.unset).toBeUndefined();
+
+      const second = syncMcpServers(targets, dirs);
+      expect(targetResults(second.targets, "prime-agent").map((r) => r.action)).toEqual([
+        "unchanged",
+        "unchanged",
+        "skipped",
+        "unchanged",
+      ]);
+      expect(targetResults(second.targets, "claude").map((r) => r.action)).toEqual([
+        "unchanged",
+        "unchanged",
+        "unchanged",
+        "skipped",
+      ]);
+    } finally {
+      if (previousXdg !== undefined) process.env.XDG_CONFIG_HOME = previousXdg;
+    }
+  });
+
+  it("reports a literal Prime Agent env as skipped even when the file already holds it", () => {
+    const dirs = fixtureDirs();
+    const previousXdg = process.env.XDG_CONFIG_HOME;
+    delete process.env.XDG_CONFIG_HOME;
+    try {
+      writeMaster(
+        dirs.homeDir,
+        `{ "mcpServers": { "wiki": { "command": "wiki", "env": { "WIKI_ROOT": "/srv/wiki" } } } }`,
+      );
+      const settings = join(dirs.homeDir, ".prime", "agent", "settings.json");
+      mkdirSync(dirname(settings), { recursive: true });
+      const broken = {
+        mcpServers: { wiki: { type: "stdio", command: "wiki", env: { WIKI_ROOT: "/srv/wiki" } } },
+      };
+      writeFileSync(settings, JSON.stringify(broken));
+
+      const report = syncMcpServers([getHarness("prime-agent")], dirs);
+      expect(report.targets[0]?.results).toEqual([
+        { name: "wiki", action: "skipped", reason: expect.stringContaining("WIKI_ROOT") as string },
+      ]);
+      expect(parseJsonRecord(settings)).toEqual(broken);
     } finally {
       if (previousXdg !== undefined) process.env.XDG_CONFIG_HOME = previousXdg;
     }

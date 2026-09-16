@@ -15,7 +15,7 @@ export interface PathCandidate {
 export interface McpConfigFile extends PathCandidate {
   format: "json" | "toml";
   key: string[];
-  dialect: "standard" | "antigravity" | "opencode" | "vscode";
+  dialect: "standard" | "antigravity" | "opencode" | "prime" | "vscode";
 }
 
 export interface Invocation {
@@ -122,6 +122,11 @@ const PRESENTATION: Record<string, { icon: string; short: string; blurb: string 
     icon: "i-solar-atom-linear",
     short: "Pi",
     blurb: "Every invocation mode, native model listing with search. The reference harness here.",
+  },
+  "prime-agent": {
+    icon: "i-solar-cpu-linear",
+    short: "Prime Agent",
+    blurb: "Pi fork with one Python REPL tool, flat JSONL sessions and model listing. No read-only mode.",
   },
 };
 

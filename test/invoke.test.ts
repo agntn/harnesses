@@ -180,6 +180,36 @@ describe("normalized invocation", () => {
     });
   });
 
+  it("runs Prime Agent advisor and agent modes without a read-only recipe", () => {
+    const primeAgent = getHarness("prime-agent");
+
+    expect(primeAgent.buildInvocation("review this")).toEqual({
+      command: "prime-agent",
+      args: ["-p", "--no-tools", "review this"],
+    });
+    expect(primeAgent.buildInvocation("review this", { structured: true })).toEqual({
+      command: "prime-agent",
+      args: ["-p", "--no-tools", "--mode", "json", "review this"],
+    });
+    expect(primeAgent.buildInvocation("review this", { tools: true })).toEqual({
+      command: "prime-agent",
+      args: ["-p", "review this"],
+    });
+    expect(
+      primeAgent.buildInvocation("review this", {
+        tools: true,
+        structured: true,
+        model: "gpt-5.4",
+      }),
+    ).toEqual({
+      command: "prime-agent",
+      args: ["-p", "--mode", "json", "review this", "--model", "gpt-5.4"],
+    });
+    expect(primeAgent.invocationError({ readOnly: true })).toContain(
+      "no read-only full agent invocation",
+    );
+  });
+
   it("runs Grok read-only jobs inside its native sandbox", () => {
     const grok = getHarness("grok");
 

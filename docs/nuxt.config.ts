@@ -64,6 +64,7 @@ export default defineNuxtConfig({
         "solar:code-2-linear",
         "solar:code-square-linear",
         "solar:copy-linear",
+        "solar:cpu-linear",
         "solar:cursor-linear",
         "solar:document-text-linear",
         "solar:ghost-linear",

@@ -55,20 +55,21 @@ import type { ClaudeSessionEntry, CodexThread, GeminiConversationRecord } from "
 
 ## Supported agents
 
-| Agent           | ID               | Detection     | Skills                | Hooks                    | Sessions       |
-| --------------- | ---------------- | ------------- | --------------------- | ------------------------ | -------------- |
-| Antigravity CLI | `antigravity`    | project       | `.agents/skills/`     | -                        | JSONL + SQLite |
-| Claude Code     | `claude`         | env + project | `.claude/skills/`     | `.claude/hooks/`         | JSONL          |
-| Codex CLI       | `codex`          | project       | `.agents/skills/`     | -                        | SQLite + JSONL |
-| Gemini CLI      | `gemini`         | env + project | `.gemini/skills/`     | -                        | JSON           |
-| Grok CLI        | `grok`           | env + project | `.grok/skills/`       | `.grok/hooks/`           | TOML + JSONL   |
-| OpenCode        | `opencode`       | project       | `.opencode/skills/`   | -                        | SQLite         |
-| Cursor          | `cursor`         | env + project | `.cursor/skills/`     | -                        | -              |
-| GitHub Copilot  | `github-copilot` | env + project | `.github/skills/`     | -                        | -              |
-| Mastra Code     | `mastracode`     | project       | `.mastracode/skills/` | `.mastracode/hooks.json` | SQLite         |
-| OMP (oh-my-pi)  | `omp`            | env + project | `.omp/skills/`        | -                        | JSONL + SQLite |
-| Pi Coding Agent | `pi`             | env + project | `.pi/skills/`         | -                        | JSON + JSONL   |
-| Freebuff        | `freebuff`       | project       | `.agents/skills/`     | -                        | JSON + JSONL   |
+| Agent           | ID               | Detection     | Skills                 | Hooks                    | Sessions       |
+| --------------- | ---------------- | ------------- | ---------------------- | ------------------------ | -------------- |
+| Antigravity CLI | `antigravity`    | project       | `.agents/skills/`      | -                        | JSONL + SQLite |
+| Claude Code     | `claude`         | env + project | `.claude/skills/`      | `.claude/hooks/`         | JSONL          |
+| Codex CLI       | `codex`          | project       | `.agents/skills/`      | -                        | SQLite + JSONL |
+| Gemini CLI      | `gemini`         | env + project | `.gemini/skills/`      | -                        | JSON           |
+| Grok CLI        | `grok`           | env + project | `.grok/skills/`        | `.grok/hooks/`           | TOML + JSONL   |
+| OpenCode        | `opencode`       | project       | `.opencode/skills/`    | -                        | SQLite         |
+| Cursor          | `cursor`         | env + project | `.cursor/skills/`      | -                        | -              |
+| GitHub Copilot  | `github-copilot` | env + project | `.github/skills/`      | -                        | -              |
+| Mastra Code     | `mastracode`     | project       | `.mastracode/skills/`  | `.mastracode/hooks.json` | SQLite         |
+| OMP (oh-my-pi)  | `omp`            | env + project | `.omp/skills/`         | -                        | JSONL + SQLite |
+| Pi Coding Agent | `pi`             | env + project | `.pi/skills/`          | -                        | JSON + JSONL   |
+| Prime Agent     | `prime-agent`    | env + project | `.prime/agent/skills/` | -                        | JSONL + JSON   |
+| Freebuff        | `freebuff`       | project       | `.agents/skills/`      | -                        | JSON + JSONL   |
 
 ### Native audio and video input
 
@@ -87,6 +88,7 @@ import type { ClaudeSessionEntry, CodexThread, GeminiConversationRecord } from "
 | Mastra Code     |  No   |  No   | No verified native route                                                    |
 | OMP (oh-my-pi)  |  No   |  No   | No verified native route                                                    |
 | Pi Coding Agent |  No   |  No   | No verified native route                                                    |
+| Prime Agent     |  No   |  No   | No verified native route                                                    |
 | Freebuff        |  No   |  No   | No verified native route                                                    |
 
 Primary references: [Antigravity prompting](https://antigravity.google/docs/cli/prompting/), [Antigravity changelog](https://github.com/google-antigravity/antigravity-cli/blob/main/CHANGELOG.md), [Gemini CLI tools](https://github.com/google-gemini/gemini-cli/blob/main/docs/reference/tools.md), [Gemini CLI video request](https://github.com/google-gemini/gemini-cli/issues/27194), [OpenCode attachments](https://opencode.ai/v2/docs/attachments/), [Cursor prompting](https://cursor.com/docs/agent/prompting), and [Copilot CLI voice input](https://docs.github.com/en/copilot/how-tos/copilot-cli/use-copilot-cli/voice-input).
@@ -109,7 +111,7 @@ console.log(result.aborted);
 
 This is command cleanup, not a sandbox. Descendants that leave the POSIX process group, or outlive an already exited root on Windows, cannot be reliably reached by these mechanisms. Inherited output pipes do not extend the wait after cleanup. Scheduling and OS delays can exceed the stated budgets.
 
-Each agent is a concrete subclass of the abstract `Harness` class. Custom subclasses can be added with `registerHarness`. Every harness exposes config paths, session locations, instruction files, skills dirs, hooks, commands, persistence formats, capabilities (MCP, vision, audio, video, tools, streaming), detection rules, a normalized non-interactive invocation (`harness.invoke(prompt, { model })`) where the CLI has a headless mode, native model listing (`harness.listModels()`) where the CLI supports it, and its MCP server config files (`listMcpServers`/`addMcpServer`/`removeMcpServer` normalize the dialects; writes rewrite JSON and surgically edit TOML with comments preserved). `syncMcpServers` treats `~/.config/agntn/mcp.jsonc` (JSONC, XDG-aware) as the single source of truth and resets every harness's user-scope MCP config to exactly that list; a top-level `"excludes": ["codex"]` array opts individual harnesses out of the sync (their own servers stay, master-listed names are withdrawn), and `~`/`${HOME}` in commands, args, and env values expand to absolute paths at sync time (harnesses spawn MCP servers without a shell). `syncAgentsFiles` links every harness's global instructions file (CLAUDE.md/AGENTS.md/GEMINI.md) to one master file as symlinks, so an edit made through any harness lands in the single physical copy; `~/.config/agntn/agents.jsonc` sets the `source`, `companions`, and `excludes`, diverged regular files are backed up and relinked, and check mode reports without writing. Companion paths are relative to the source directory and are linked at the same relative path beside each harness target.
+Each agent is a concrete subclass of the abstract `Harness` class. Custom subclasses can be added with `registerHarness`. Every harness exposes config paths, session locations, instruction files, skills dirs, hooks, commands, persistence formats, capabilities (MCP, vision, audio, video, tools, streaming), detection rules, a normalized non-interactive invocation (`harness.invoke(prompt, { model })`) where the CLI has a headless mode, native model listing (`harness.listModels()`) where the CLI supports it, and its MCP server config files (`listMcpServers`/`addMcpServer`/`removeMcpServer` normalize the dialects; writes rewrite JSON and surgically edit TOML with comments preserved). `syncMcpServers` treats `~/.config/agntn/mcp.jsonc` (JSONC, XDG-aware) as the single source of truth and resets every harness's user-scope MCP config to exactly that list; a top-level `"excludes": ["codex"]` array opts individual harnesses out of the sync (their own servers stay, master-listed names are withdrawn), and `~`/`${HOME}` in commands, args, and env values expand to absolute paths at sync time (harnesses spawn MCP servers without a shell). An env value that is exactly `${NAME}` references that variable of the harness environment: Prime Agent stores it natively as `{"env": "NAME"}`, the other harnesses receive the value from the syncing process, and a server one dialect cannot hold is reported as `skipped` with a reason while the rest of the list syncs. `syncAgentsFiles` links every harness's global instructions file (CLAUDE.md/AGENTS.md/GEMINI.md) to one master file as symlinks, so an edit made through any harness lands in the single physical copy; `~/.config/agntn/agents.jsonc` sets the `source`, `companions`, and `excludes`, diverged regular files are backed up and relinked, and check mode reports without writing. Companion paths are relative to the source directory and are linked at the same relative path beside each harness target.
 
 ```jsonc
 {
@@ -151,7 +153,7 @@ harnesses mcp                   # run the MCP server over stdio
 
 [unagent](https://github.com/onmax/unagent) covers similar ground but makes different tradeoffs.
 
-**harnesses is deep and narrow.** Each harness gets verified, platform-specific paths with scope, evidence level, and platform tags. Session formats are typed per harness. Twelve harnesses, each fully mapped.
+**harnesses is deep and narrow.** Each harness gets verified, platform-specific paths with scope, evidence level, and platform tags. Session formats are typed per harness. Thirteen harnesses, each fully mapped.
 
 **unagent is wide and shallow.** 40+ agents detected by env vars, but each definition is just `configDir` + `rulesFile` + `skillsDir`. No platform-specific paths, no session schemas. In exchange, it ships runtime primitives harnesses doesn't touch yet: skill install/uninstall, vector stores, browser automation, sandboxes, queues, workflows.
 

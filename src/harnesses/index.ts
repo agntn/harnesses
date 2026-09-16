@@ -11,6 +11,7 @@ import MastraCode from "./mastracode.ts";
 import Omp from "./omp.ts";
 import OpenCode from "./opencode.ts";
 import Pi from "./pi.ts";
+import PrimeAgent from "./prime-agent.ts";
 
 export const harnesses: HarnessConstructor[] = [
   Antigravity,
@@ -24,5 +25,8 @@ export const harnesses: HarnessConstructor[] = [
   MastraCode,
   Omp,
   OpenCode,
+  // Prime Agent is a Pi fork that still exports PI_CODING_AGENT, so its own
+  // env marker must be checked before Pi's.
+  PrimeAgent,
   Pi,
 ];

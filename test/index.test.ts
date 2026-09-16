@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   getAllHarnesses,
@@ -36,6 +39,7 @@ describe("@agntn/harnesses", () => {
       "omp",
       "opencode",
       "pi",
+      "prime-agent",
     ]);
     expect(listHarnesses().sort()).toEqual([...harnessIds].sort());
   });
@@ -286,6 +290,7 @@ describe("@agntn/harnesses", () => {
       omp: { audio: false, video: false },
       opencode: { audio: false, video: false },
       pi: { audio: false, video: false },
+      "prime-agent": { audio: false, video: false },
     });
   });
 
@@ -337,6 +342,21 @@ describe("@agntn/harnesses", () => {
     }
   });
 
+  it("should detect Prime Agent ahead of Pi inside its kernel shell", () => {
+    for (const harness of getAllHarnesses()) {
+      for (const v of harness.detection.envVars) {
+        vi.stubEnv(v, "");
+      }
+    }
+    // Prime Agent exports PI_CODING_AGENT like its Pi upstream.
+    vi.stubEnv("PI_CODING_AGENT", "true");
+    vi.stubEnv("PRIME_AGENT_KERNEL_OWNER_PID", "4242");
+    expect(detectHarnessFromEnv()?.id).toBe("prime-agent");
+
+    vi.stubEnv("PRIME_AGENT_KERNEL_OWNER_PID", "");
+    expect(detectHarnessFromEnv()?.id).toBe("pi");
+  });
+
   it("should detect cursor from env vars", () => {
     // Clear Claude env vars first (we might be running inside Claude Code)
     for (const v of getHarness("claude").detection.envVars) {
@@ -367,6 +387,18 @@ describe("@agntn/harnesses", () => {
   it("should detect project harnesses from markers", () => {
     const results = detectProjectHarnesses("/nonexistent/path/that/has/no/markers");
     expect(Array.isArray(results)).toBe(true);
+  });
+
+  it("should detect Prime Agent projects by their nested agent directory", () => {
+    const root = mkdtempSync(join(tmpdir(), "harnesses-prime-"));
+    try {
+      mkdirSync(join(root, ".prime"));
+      expect(detectProjectHarnesses(root).map((h) => h.id)).not.toContain("prime-agent");
+      mkdirSync(join(root, ".prime", "agent"));
+      expect(detectProjectHarnesses(root).map((h) => h.id)).toEqual(["prime-agent"]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it("should return null from detectHarness when no agent matches", () => {
