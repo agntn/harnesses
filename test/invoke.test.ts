@@ -684,6 +684,38 @@ describe("runHarness tool operation", () => {
     }
   });
 
+  it("keeps the prompt out of content sent to the model", async () => {
+    registerHarness(
+      class extends FakeCursor {
+        override readonly invocation: Harness["invocation"] = {
+          args: ["-e", "console.log('answer')", "{prompt}"],
+          noToolsArgs: ["-e", "console.error('trace'); process.exit(3)", "{prompt}"],
+          modelArgs: ["--model", "{model}"],
+          level: "inferred",
+        };
+      },
+    );
+    const prompt = "Here is a long document the model already wrote";
+
+    try {
+      for (const options of [
+        { tools: true, model: "fast" },
+        { tools: false, model: "fast" },
+      ]) {
+        const result = await runHarness("cursor", prompt, options);
+        const content = result.content[0]?.text ?? "";
+
+        expect((result.details as { args: string[] }).args).toContain(prompt);
+        expect(content).toContain("{prompt}");
+        expect(content).toContain("--model");
+        expect(content).not.toContain(prompt);
+        expect(content).toContain(options.tools ? "answer" : "trace");
+      }
+    } finally {
+      registerHarness(Cursor);
+    }
+  });
+
   it("uses successful stderr when the harness returns no stdout", async () => {
     registerHarness(
       class extends FakeCursor {
