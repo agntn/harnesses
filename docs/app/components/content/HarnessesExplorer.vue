@@ -11,8 +11,8 @@ import {
   resolveGroup,
   shellLine,
   type ModeKey,
-  type Platform,
 } from "../../utils/harnesses";
+import type { Platform } from "#shared/types/registry";
 
 const route = useRoute();
 const router = useRouter();

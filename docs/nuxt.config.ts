@@ -18,7 +18,7 @@ export default defineNuxtConfig({
     sections: [
       {
         title: "Tools",
-        description: "Pages built from the registry snapshot rather than from Markdown.",
+        description: "Pages built from the registry rather than from Markdown.",
         links: [
           {
             title: "Explorer",

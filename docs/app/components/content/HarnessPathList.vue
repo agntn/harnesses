@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { PathCandidate } from "../../utils/harnesses";
+import type { PathCandidate } from "#shared/types/registry";
 
 defineProps<{
   group: string;
