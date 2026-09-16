@@ -17,7 +17,7 @@ const WALK = [
   "freebuff",
 ] as const;
 
-/** One clock for every landing panel. Values come from the snapshot, at build and live. */
+/** One clock for every landing panel. Values come from the registry, at build and live. */
 export function useLandingHarness() {
   const samples: HarnessEntry[] = WALK.map(
     (id) => HARNESSES.find((entry) => entry.id === id) ?? HARNESSES[0]!,

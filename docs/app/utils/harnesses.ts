@@ -1,67 +1,14 @@
-import snapshot from "../data/harnesses.json";
+import registry from "#harnesses-registry";
+import type {
+  HarnessInvocation,
+  HarnessInvocationModes,
+  HarnessRecord,
+  PathCandidate,
+  Platform,
+  Scope,
+} from "#shared/types/registry";
 
-export type Platform = "linux" | "darwin" | "win32";
-export type Scope = "user" | "project" | "system" | "data";
-export type EvidenceLevel = "official" | "community" | "inferred";
-
-export interface PathCandidate {
-  path: string;
-  scope: Scope;
-  level: EvidenceLevel;
-  platforms?: Platform[];
-  note?: string;
-}
-
-export interface McpConfigFile extends PathCandidate {
-  format: "json" | "toml";
-  key: string[];
-  dialect: "standard" | "antigravity" | "opencode" | "prime" | "vscode";
-}
-
-export interface Invocation {
-  binary?: string;
-  args: string[];
-  jsonArgs?: string[];
-  noToolsArgs?: string[];
-  noToolsJsonArgs?: string[];
-  readOnlyArgs?: string[];
-  readOnlyJsonArgs?: string[];
-  readOnlyMinVersion?: string;
-  modelArgs?: string[];
-  level: EvidenceLevel;
-  note?: string;
-}
-
-export interface InvocationModes {
-  advisor: boolean;
-  advisorStructured: boolean;
-  readOnly: boolean;
-  readOnlyStructured: boolean;
-  agent: boolean;
-  agentStructured: boolean;
-}
-
-export interface HarnessRecord {
-  id: string;
-  name: string;
-  binaries: string[];
-  capabilities: Record<"mcp" | "vision" | "audio" | "video" | "tools" | "streaming", boolean>;
-  invocation: Invocation | null;
-  invocationModes: InvocationModes;
-  modelListing: { args: string[]; searchArgs?: string[]; level: EvidenceLevel; note?: string } | null;
-  config: PathCandidate[];
-  sessions: PathCandidate[];
-  persistence: { format: string; level: EvidenceLevel; note?: string }[];
-  instructions: PathCandidate[];
-  skills: PathCandidate[];
-  commands: PathCandidate[];
-  hooks: PathCandidate[];
-  mcpConfigs: McpConfigFile[];
-  agentsFile: string | null;
-  detection: { envVars: string[]; projectMarkers: string[] };
-}
-
-/** Icon, short label and a sentence per harness. Everything else comes from the snapshot. */
+/** Icon, short label and a sentence per harness. Everything else comes from the registry. */
 const PRESENTATION: Record<string, { icon: string; short: string; blurb: string }> = {
   antigravity: {
     icon: "i-simple-icons-google",
@@ -137,9 +84,9 @@ export interface HarnessEntry extends HarnessRecord {
   to: string;
 }
 
-export const LIBRARY_VERSION: string = snapshot.version;
+export const LIBRARY_VERSION: string = registry.version;
 
-export const HARNESSES: HarnessEntry[] = (snapshot.harnesses as HarnessRecord[]).map((record) => {
+export const HARNESSES: HarnessEntry[] = registry.harnesses.map((record) => {
   const presentation = PRESENTATION[record.id];
   if (!presentation) throw new Error(`No presentation for harness ${record.id}`);
   return { ...record, ...presentation, to: `/harnesses/${record.id}` };
@@ -201,7 +148,7 @@ export function resolveGroup(
     .map((entry) => ({ ...entry, path: resolveTemplate(entry.path, options) }));
 }
 
-export type ModeKey = keyof InvocationModes;
+export type ModeKey = keyof HarnessInvocationModes;
 
 /** Option fields of each mode, as they would sit inside `invoke(prompt, { ... })`. */
 const MODE_FIELDS: Record<ModeKey, string> = {
@@ -213,7 +160,7 @@ const MODE_FIELDS: Record<ModeKey, string> = {
   agentStructured: "tools: true, structured: true",
 };
 
-const MODE_TEMPLATE: Record<ModeKey, keyof Invocation> = {
+const MODE_TEMPLATE: Record<ModeKey, keyof HarnessInvocation> = {
   advisor: "noToolsArgs",
   advisorStructured: "noToolsJsonArgs",
   readOnly: "readOnlyArgs",
@@ -248,7 +195,7 @@ export interface ModeSpec {
   fields: string;
   /** Options literal for display: `{}` or `{ tools: true }`. */
   options: string;
-  template: keyof Invocation;
+  template: keyof HarnessInvocation;
 }
 
 export const MODES: ModeSpec[] = (Object.keys(MODE_FIELDS) as ModeKey[]).map((key) => ({
