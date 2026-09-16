@@ -273,6 +273,46 @@ function harnessInfoResult(id: string): HarnessInfoResult {
   };
 }
 
+/** One lookup as the model reads it: every path list once, in {@link HarnessMetadata.resolved}. */
+type HarnessInfoText =
+  | Omit<HarnessMetadata, "config" | "sessions" | "instructions" | "skills" | "commands" | "hooks">
+  | UnknownHarness;
+
+/**
+ * Leaves the path templates out of the text: `resolved` already carries each
+ * of them for this machine, so they only doubled every answer.
+ *
+ * @param result - One lookup result.
+ * @returns {HarnessInfoText} The lookup with its path lists shown once.
+ */
+function harnessInfoText(result: HarnessInfoResult): HarnessInfoText {
+  if ("error" in result) return result;
+  const {
+    id,
+    name,
+    binaries,
+    capabilities,
+    invocationModes,
+    modelListing,
+    modelSelection,
+    persistence,
+    detection,
+    resolved,
+  } = result;
+  return {
+    id,
+    name,
+    binaries,
+    capabilities,
+    invocationModes,
+    modelListing,
+    modelSelection,
+    persistence,
+    detection,
+    resolved,
+  };
+}
+
 /** Full metadata for one harness, with paths resolved for the current platform. */
 export function harnessInfo(id: string): ToolResult<HarnessInfoResult>;
 /** Full metadata for several harnesses, preserving input order and errors for each item. */
@@ -283,7 +323,11 @@ export function harnessInfo(input: string | readonly string[]): ToolResult<Harne
 export function harnessInfo(input: string | readonly string[]): ToolResult<HarnessInfoDetails> {
   if (typeof input === "string") {
     const details = harnessInfoResult(input);
-    return { content: text(details), details, ...("error" in details ? { isError: true } : {}) };
+    return {
+      content: text(harnessInfoText(details)),
+      details,
+      ...("error" in details ? { isError: true } : {}),
+    };
   }
 
   if (input.length < 1 || input.length > HARNESS_INFO_MAX_ITEMS) {
@@ -295,7 +339,7 @@ export function harnessInfo(input: string | readonly string[]): ToolResult<Harne
 
   const details = input.map(harnessInfoResult);
   return {
-    content: text(details),
+    content: text(details.map(harnessInfoText)),
     details,
     ...(details.some((result) => "error" in result) ? { isError: true } : {}),
   };
