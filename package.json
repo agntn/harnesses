@@ -2,7 +2,7 @@
   "name": "@agntn/harnesses",
   "version": "0.1.1",
   "description": "Metadata registry for AI coding harnesses: binaries, configs, sessions, and capabilities.",
-  "homepage": "https://github.com/agntn/harnesses#readme",
+  "homepage": "https://harnesses.agntn.dev",
   "bugs": "https://github.com/agntn/harnesses/issues",
   "license": "MIT",
   "author": "oritwoen (https://github.com/oritwoen)",
