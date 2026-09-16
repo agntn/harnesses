@@ -1,6 +1,6 @@
 {
   "name": "@agntn/harnesses",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Metadata registry for AI coding harnesses: binaries, configs, sessions, and capabilities.",
   "homepage": "https://github.com/agntn/harnesses#readme",
   "bugs": "https://github.com/agntn/harnesses/issues",

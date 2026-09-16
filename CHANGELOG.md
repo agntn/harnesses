@@ -1,6 +1,29 @@
 # Changelog
 
 
+## v0.1.1
+
+[compare changes](https://github.com/agntn/harnesses/compare/v0.1.0...v0.1.1)
+
+### 🚀 Enhancements
+
+- Register Prime Agent as a harness ([#44](https://github.com/agntn/harnesses/pull/44))
+
+### 🩹 Fixes
+
+- **run:** Stop echoing the prompt to the model ([#45](https://github.com/agntn/harnesses/pull/45))
+- **info:** Leave path templates out of the text ([#46](https://github.com/agntn/harnesses/pull/46))
+- **docs:** Drop the registry snapshot ([#47](https://github.com/agntn/harnesses/pull/47))
+
+### 🤖 CI
+
+- Build before publish tests, ignore changelog ([#43](https://github.com/agntn/harnesses/pull/43))
+
+### ❤️ Contributors
+
+- Ori ([@oritwoen](https://github.com/oritwoen))
+- Aeitwoen ([@aeitwoen](https://github.com/aeitwoen))
+
 ## v0.1.0
 
 
