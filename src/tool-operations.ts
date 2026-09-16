@@ -178,11 +178,15 @@ function completedRun(
   harness: Harness,
   result: InvokeResult,
   options: RunInvocationOptions,
+  templateArgs: readonly string[],
 ): ToolResult<RunOutcome> {
+  // The model already wrote the prompt, so the content echoes the invocation
+  // with the "{prompt}" placeholder left in place; the expanded arguments stay
+  // in details for programmatic callers.
   const contentOutcome: Omit<RunOutcome, "stderr"> = {
     id: harness.id,
     command: result.command,
-    args: result.args,
+    args: [...templateArgs],
     ...(options.model === undefined ? {} : { model: options.model }),
     structured: options.structured,
     tools: options.tools,
@@ -192,11 +196,15 @@ function completedRun(
     aborted: result.aborted,
     stdout: truncate(result.stdout),
   };
-  const details: RunOutcome = { ...contentOutcome, stderr: truncate(result.stderr) };
+  const stderr = truncate(result.stderr);
+  const details: RunOutcome = { ...contentOutcome, args: result.args, stderr };
   if (result.timedOut || result.exitCode !== 0) {
-    return { content: text(details), details, isError: true };
+    return { content: text({ ...contentOutcome, stderr }), details, isError: true };
   }
-  return { content: text(result.stdout.length > 0 ? contentOutcome : details), details };
+  return {
+    content: text(result.stdout.length > 0 ? contentOutcome : { ...contentOutcome, stderr }),
+    details,
+  };
 }
 
 function unsupportedInvocation(
@@ -393,6 +401,7 @@ export interface RunOptions {
 export interface RunOutcome {
   id: HarnessId;
   command: string;
+  /** Expanded arguments; the text sent to the model keeps "{prompt}" in their place. */
   args: string[];
   model?: string;
   structured: boolean;
@@ -429,8 +438,8 @@ function normalizedRunAccess(options: Readonly<RunOptions>): {
  * Tool use defaults to a native advisor without tools invocation. Harnesses that
  * cannot disable tools reject that mode; setting `tools` selects their full
  * agent invocation. `model` is translated through the harness-specific recipe.
- * This layer also closes stdin, enforces the timeout, and
- * caps the echoed output.
+ * This layer also closes stdin, enforces the timeout, caps the echoed output,
+ * and leaves the prompt out of the echoed invocation.
  *
  * @param id - Harness id to run.
  * @param prompt - Prompt sent to the selected harness.
@@ -448,7 +457,10 @@ export async function runHarness(
   const structured = options.structured ?? false;
   const { tools, readOnly } = normalizedRunAccess(options);
   const invocationOptions = { model: options.model, structured, tools, readOnly };
-  if (!harness.buildInvocation(prompt, invocationOptions)) {
+  // Expanding the template with its own placeholder yields the argument list
+  // as it will be echoed to the model, with the prompt left out.
+  const template = harness.buildInvocation("{prompt}", invocationOptions);
+  if (!template) {
     return unsupportedInvocation(harness, id, invocationOptions);
   }
 
@@ -470,7 +482,7 @@ export async function runHarness(
     return { content: text(details), details, isError: true };
   }
 
-  return completedRun(harness, result, invocationOptions);
+  return completedRun(harness, result, invocationOptions, template.args);
 }
 
 /** MCP server listings for one harness or all of them. */
