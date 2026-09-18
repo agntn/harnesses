@@ -431,10 +431,6 @@ function writeAtomically(path: string, content: string): void {
   renameSync(temp, path);
 }
 
-function escapeRegExp(value: string): string {
-  return value.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 function tomlValue(value: string): string {
   return JSON.stringify(value);
 }
@@ -482,8 +478,8 @@ function tomlSections(key: readonly string[], server: McpServerConfig): string {
  * @returns {string} TOML text without the target server.
  */
 function stripTomlServer(raw: string, key: readonly string[], name: string): string {
-  const prefix = escapeRegExp(key.map(tomlKeyPart).join("."));
-  const namePart = `(?:${escapeRegExp(tomlKeyPart(name))}|${escapeRegExp(JSON.stringify(name))})`;
+  const prefix = RegExp.escape(key.map(tomlKeyPart).join("."));
+  const namePart = `(?:${RegExp.escape(tomlKeyPart(name))}|${RegExp.escape(JSON.stringify(name))})`;
   const sectionRe = new RegExp(`^\\s*\\[${prefix}\\.${namePart}(\\.[^\\]]+)?\\]`);
   const bareTableRe = new RegExp(`^\\s*\\[${prefix}\\]\\s*(#.*)?$`);
   const anyHeaderRe = /^\s*\[/;
