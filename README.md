@@ -33,7 +33,7 @@ The rest of it sits on [harnesses.agntn.dev](https://harnesses.agntn.dev).
 pnpm add @agntn/harnesses
 ```
 
-Node.js 22 or newer.
+Node.js 24 or newer.
 
 ## 🚀 First call
 
