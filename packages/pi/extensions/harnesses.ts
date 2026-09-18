@@ -81,7 +81,9 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     label: HARNESS_TOOL_LABELS.harnesses_detect,
     description: "List every known AI coding harness with its install state and version",
     promptSnippet: "Use harnesses_detect to see which AI coding harnesses are installed.",
-    promptGuidelines: ["The scan checks each harness's binaries on PATH and reads their versions."],
+    promptGuidelines: [
+      "The scan checks binaries on PATH. Versions come from native metadata or the CLI.",
+    ],
     parameters: schemas.detect,
     ...statusRenderers("harnesses_detect"),
     async execute(_toolCallId, _params): Promise<AgentToolResult<HarnessTools.HarnessListing>> {

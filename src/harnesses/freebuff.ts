@@ -1,9 +1,38 @@
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { Harness } from "../harness.ts";
 
 export default class Freebuff extends Harness {
   readonly id = "freebuff";
   readonly name = "Freebuff";
   readonly binaries = ["freebuff"];
+
+  override get version(): string | null {
+    const configDir = join(homedir(), ".config", "manicode");
+    const binaryName = process.platform === "win32" ? "freebuff.exe" : "freebuff";
+    if (!existsSync(join(configDir, binaryName))) return null;
+
+    try {
+      const metadata: unknown = JSON.parse(
+        readFileSync(join(configDir, "freebuff-metadata.json"), "utf8"),
+      );
+      if (
+        typeof metadata === "object" &&
+        metadata !== null &&
+        "version" in metadata &&
+        typeof metadata.version === "string" &&
+        metadata.version !== ""
+      ) {
+        return metadata.version;
+      }
+    } catch {
+      return null;
+    }
+
+    return null;
+  }
+
   readonly capabilities = {
     mcp: true,
     vision: true,
