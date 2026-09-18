@@ -1,9 +1,54 @@
+import { execFileSync } from "node:child_process";
+import { readFileSync, realpathSync } from "node:fs";
+import { createRequire } from "node:module";
 import { Harness } from "../harness.ts";
+
+function packageVersion(commandPath: string): string | null {
+  try {
+    const require = createRequire(realpathSync(commandPath));
+    const metadata: unknown = JSON.parse(
+      readFileSync(require.resolve("mastracode/package.json"), "utf8"),
+    );
+    if (
+      typeof metadata === "object" &&
+      metadata !== null &&
+      "version" in metadata &&
+      typeof metadata.version === "string" &&
+      metadata.version !== ""
+    ) {
+      return metadata.version;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
 
 export default class MastraCode extends Harness {
   readonly id = "mastracode";
   readonly name = "Mastra Code";
   readonly binaries = ["mastracode"];
+
+  override get version(): string | null {
+    const locator = process.platform === "win32" ? "where" : "which";
+    let output: string;
+    try {
+      output = execFileSync(locator, [this.binaries[0] ?? "mastracode"], {
+        encoding: "utf8",
+        stdio: ["pipe", "pipe", "pipe"],
+        timeout: 5000,
+      });
+    } catch {
+      return null;
+    }
+
+    const paths = output.split(/\r?\n/u).filter((path) => path !== "");
+    for (const path of paths) {
+      const version = packageVersion(path);
+      if (version !== null) return version;
+    }
+    return null;
+  }
   readonly capabilities = {
     mcp: true,
     vision: true,

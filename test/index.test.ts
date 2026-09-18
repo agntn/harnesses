@@ -1,4 +1,12 @@
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it, expect, vi, afterEach } from "vitest";
@@ -343,6 +351,35 @@ describe("@agntn/harnesses", () => {
       writeFileSync(join(configDir, "freebuff"), "");
       expect(freebuff.version).toBe("0.0.172");
       expect(existsSync(wrapperMarker)).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("should read the Mastra Code package version without starting its TUI", () => {
+    const root = mkdtempSync(join(tmpdir(), "harnesses-mastracode-"));
+    const binDir = join(root, "bin");
+    const packageDir = join(root, "lib", "node_modules", "mastracode");
+    const cliPath = join(packageDir, "dist", "cli.js");
+    const tuiMarker = join(root, "tui-ran");
+
+    try {
+      mkdirSync(binDir, { recursive: true });
+      mkdirSync(join(packageDir, "dist"), { recursive: true });
+      writeFileSync(
+        cliPath,
+        `#!/usr/bin/env node\nrequire("node:fs").writeFileSync(${JSON.stringify(tuiMarker)}, "");\n`,
+      );
+      chmodSync(cliPath, 0o755);
+      writeFileSync(
+        join(packageDir, "package.json"),
+        JSON.stringify({ name: "mastracode", version: "0.40.0" }),
+      );
+      symlinkSync(cliPath, join(binDir, "mastracode"));
+      vi.stubEnv("PATH", `${binDir}:${process.env.PATH ?? ""}`);
+
+      expect(getHarness("mastracode").version).toBe("0.40.0");
+      expect(existsSync(tuiMarker)).toBe(false);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
