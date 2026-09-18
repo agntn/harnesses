@@ -1,6 +1,39 @@
 # Changelog
 
 
+## v0.2.0
+
+[compare changes](https://github.com/agntn/harnesses/compare/v0.1.1...v0.2.0)
+
+### 🩹 Fixes
+
+- **freebuff:** Read version from metadata ([#51](https://github.com/agntn/harnesses/pull/51))
+- **mastracode:** Stop detection opening the TUI ([#52](https://github.com/agntn/harnesses/pull/52))
+
+### 📖 Documentation
+
+- PATH scan at the top of the README ([#48](https://github.com/agntn/harnesses/pull/48))
+
+### 🏡 Chore
+
+- **package:** Update `homepage` ([aa15490](https://github.com/agntn/harnesses/commit/aa15490))
+- Refresh dependency set ([#49](https://github.com/agntn/harnesses/pull/49))
+- ⚠️  Require Node.js 24 ([#50](https://github.com/agntn/harnesses/pull/50))
+
+### 🤖 CI
+
+- Use `--no-git-checks` for pnpm publish ([824abea](https://github.com/agntn/harnesses/commit/824abea))
+
+#### ⚠️ Breaking Changes
+
+- ⚠️  Require Node.js 24 ([#50](https://github.com/agntn/harnesses/pull/50))
+
+### ❤️ Contributors
+
+- Aeitwoen ([@aeitwoen](https://github.com/aeitwoen))
+- Ori ([@oritwoen](https://github.com/oritwoen))
+- Aei ([@aeitwoen](https://github.com/aeitwoen))
+
 ## v0.1.1
 
 [compare changes](https://github.com/agntn/harnesses/compare/v0.1.0...v0.1.1)
