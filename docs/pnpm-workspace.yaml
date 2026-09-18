@@ -8,3 +8,7 @@ allowBuilds:
   esbuild: true
   workerd: true
   vue-demi: true
+
+minimumReleaseAgeExclude:
+  - "wrangler@4.134.0"
+  - miniflare@5.20260917.0-alpha
