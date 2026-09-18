@@ -62,8 +62,7 @@ const tools: ToolDefinition[] = [
   {
     name: "harnesses_detect",
     title: "Harnesses Detect",
-    description:
-      "List every known AI coding harness with its install state and version, scanned from the binaries on PATH.",
+    description: "List every known AI coding harness with its install state and version.",
     inputSchema: schemas.detect,
     annotations: READ_ONLY,
     execute: () => detectHarnesses(),

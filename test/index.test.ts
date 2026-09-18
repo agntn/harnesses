@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it, expect, vi, afterEach } from "vitest";
@@ -314,6 +314,38 @@ describe("@agntn/harnesses", () => {
     const harness = getHarness("codex");
     const v = harness.version;
     expect(v === null || typeof v === "string").toBe(true);
+  });
+
+  it("should read the Freebuff version without starting its updater wrapper", () => {
+    const root = mkdtempSync(join(tmpdir(), "harnesses-freebuff-"));
+    const binDir = join(root, "bin");
+    const configDir = join(root, ".config", "manicode");
+    const wrapperMarker = join(root, "wrapper-ran");
+
+    try {
+      mkdirSync(binDir, { recursive: true });
+      mkdirSync(configDir, { recursive: true });
+      writeFileSync(
+        join(binDir, "freebuff"),
+        `#!/usr/bin/env node\nrequire("node:fs").writeFileSync(${JSON.stringify(wrapperMarker)}, "");\nconsole.log("9.9.9");\n`,
+      );
+      chmodSync(join(binDir, "freebuff"), 0o755);
+      writeFileSync(
+        join(configDir, "freebuff-metadata.json"),
+        JSON.stringify({ version: "0.0.172", target: "linux-x64" }),
+      );
+      vi.stubEnv("HOME", root);
+      vi.stubEnv("PATH", `${binDir}:${process.env.PATH ?? ""}`);
+
+      const freebuff = getHarness("freebuff");
+      expect(freebuff.version).toBeNull();
+
+      writeFileSync(join(configDir, "freebuff"), "");
+      expect(freebuff.version).toBe("0.0.172");
+      expect(existsSync(wrapperMarker)).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it("should detect a harness from env vars", () => {
