@@ -24,7 +24,13 @@
         "binding": "DB",
         "database_id": "50a76ee3-a154-4f1d-a426-3dcb8692c659"
       }
-    ]
+    ],
+    "observability": {
+      "logs": {
+        "enabled": true,
+        "invocation_logs": true
+      }
+    }
   },
   "routes": [{ "pattern": "harnesses.agntn.dev", "custom_domain": true }],
   "observability": {
