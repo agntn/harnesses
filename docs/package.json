@@ -15,11 +15,11 @@
     "nuxt": "4.5.2"
   },
   "devDependencies": {
-    "@iconify-json/lucide": "1.2.128",
-    "@iconify-json/simple-icons": "1.2.94",
-    "@iconify-json/solar": "1.2.10",
-    "@iconify-json/vscode-icons": "1.2.76",
-    "wrangler": "4.128.0"
+    "@iconify-json/lucide": "1.2.133",
+    "@iconify-json/simple-icons": "1.2.96",
+    "@iconify-json/solar": "1.2.11",
+    "@iconify-json/vscode-icons": "1.2.77",
+    "wrangler": "4.134.0"
   },
-  "packageManager": "pnpm@11.3.0"
+  "packageManager": "pnpm@12.4.2"
 }
