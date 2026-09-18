@@ -15,6 +15,17 @@
       "database_id": "5cc72a3a-39ed-4633-8504-4867d7ead784"
     }
   ],
+  "previews": {
+    "vars": {
+      "NUXT_SITE_URL": "https://harnesses.agntn.dev"
+    },
+    "d1_databases": [
+      {
+        "binding": "DB",
+        "database_id": "50a76ee3-a154-4f1d-a426-3dcb8692c659"
+      }
+    ]
+  },
   "routes": [{ "pattern": "harnesses.agntn.dev", "custom_domain": true }],
   "observability": {
     "logs": {
