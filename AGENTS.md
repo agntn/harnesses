@@ -57,7 +57,7 @@ docs/                   # Docus site for harnesses.agntn.dev; own AGENTS.md, rea
 1. Add the ID to `HarnessId` union in `src/types.ts`
 2. Create `src/harnesses/<name>.ts` with a concrete class extending `Harness`
 3. Import it in `src/harnesses/index.ts`
-4. Add a row in `README.md` agents table
+4. Add a row in the `README.md` harnesses table
 5. Update the harness ID list in `test/index.test.ts` (`should expose stable harness ids`)
 6. Run `pnpm lint && pnpm typecheck && pnpm build && pnpm test:run`
 

@@ -5,160 +5,172 @@
 [![license](https://npmx.dev/api/registry/badge/license/@agntn/harnesses)](https://npmx.dev/package/@agntn/harnesses)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/agntn/harnesses)
 
-Metadata toolkit for AI coding harnesses. One registry of paths, formats, and detection rules for every major CLI.
+🧭 Thirteen coding CLIs, one map. You ask where Claude keeps skills, you get the path.
 
-Docs: [harnesses.agntn.dev](https://harnesses.agntn.dev)
+> [!WARNING]
+> **@agntn/harnesses is pre-1.0.** Paths follow upstream CLIs that still move. Building on it now means pinning the version.
 
-## Install
+## Why?
+
+Claude stores transcripts under a mangled copy of your cwd. Codex keeps TOML with comments you wanted to keep. Ask a model where Codex lives and it invents `.claude/`. So this is one registry: thirteen harnesses, same object, paths for your machine.
+
+The rest of it sits on [harnesses.agntn.dev](https://harnesses.agntn.dev).
+
+## ✨ Features
+
+- 🧩 **Thirteen harnesses, one class.** Same fields on Claude, Codex, Pi and the rest.
+- 📂 **Every path has a receipt.** Scope, evidence level, and a platform tag when the OS actually differs.
+- 🔎 **Detects which CLI you're inside.** Environment variables first. Two project markers in one directory is `null`, not a guess.
+- ▶️ **Headless runs with real modes.** Advisor without tools, full agent, or a native read-only sandbox. A mode the CLI cannot enforce is rejected.
+- 🔌 **MCP across the dialects.** One master list at `~/.config/agntn/mcp.jsonc`. TOML edits keep the comments.
+- 🔗 **One AGENTS.md behind the global files.** Symlinks, so an edit through Claude or Gemini is the same bytes.
+- 📜 **Session types when the format is stable.** JSONL, SQLite, JSON. Unstable shapes stay `unknown`.
+- 🤖 **Nine tools, three doors.** MCP, Pi and OMP call the same executors.
+
+## 📦 Install
 
 ```bash
 pnpm add @agntn/harnesses
 ```
 
-## Usage
+Node.js 22 or newer.
 
-```ts
-import { getHarness, detectHarness, detectProjectHarnesses } from "@agntn/harnesses";
-
-const claude = getHarness("claude");
-console.log(claude.skills); // [{ path: ".claude/skills/", scope: "project", ... }, ...]
-console.log(claude.hooks); // [{ path: ".claude/hooks/", scope: "project", ... }, ...]
-console.log(claude.invocationModes); // advisor and full agent modes, no read-only mode
-
-const codex = getHarness("codex");
-await codex.invoke("Review this patch", { readOnly: true, timeoutMs: 60_000 });
-
-const pi = getHarness("pi");
-const { models } = await pi.listModels({ search: "gpt-5.4" });
-console.log(models); // [{ provider: "openai-codex", id: "gpt-5.4", ... }]
-await pi.invoke("Review this patch", { model: "openai-codex/gpt-5.4", readOnly: true });
-
-// Resolve to absolute paths for current platform
-const paths = claude.resolve({ platform: "linux", homeDir: "/home/dev" });
-console.log(paths.config); // [{ path: "/home/dev/.claude/settings.json", ... }, ...]
-
-// Detect which agent is running (env vars first, then project markers)
-const active = detectHarness();
-if (active) {
-  console.log(`Running inside ${active.name}`);
-}
-
-// Find all agents configured in a project directory
-const harnesses = detectProjectHarnesses("/path/to/project");
-```
-
-Session schemas are typed per agent, so you get structure when parsing JSONL/SQLite/JSON files:
-
-```ts
-import type { ClaudeSessionEntry, CodexThread, GeminiConversationRecord } from "@agntn/harnesses";
-```
-
-## Supported agents
-
-| Agent           | ID               | Detection     | Skills                 | Hooks                    | Sessions       |
-| --------------- | ---------------- | ------------- | ---------------------- | ------------------------ | -------------- |
-| Antigravity CLI | `antigravity`    | project       | `.agents/skills/`      | -                        | JSONL + SQLite |
-| Claude Code     | `claude`         | env + project | `.claude/skills/`      | `.claude/hooks/`         | JSONL          |
-| Codex CLI       | `codex`          | project       | `.agents/skills/`      | -                        | SQLite + JSONL |
-| Gemini CLI      | `gemini`         | env + project | `.gemini/skills/`      | -                        | JSON           |
-| Grok CLI        | `grok`           | env + project | `.grok/skills/`        | `.grok/hooks/`           | TOML + JSONL   |
-| OpenCode        | `opencode`       | project       | `.opencode/skills/`    | -                        | SQLite         |
-| Cursor          | `cursor`         | env + project | `.cursor/skills/`      | -                        | -              |
-| GitHub Copilot  | `github-copilot` | env + project | `.github/skills/`      | -                        | -              |
-| Mastra Code     | `mastracode`     | project       | `.mastracode/skills/`  | `.mastracode/hooks.json` | SQLite         |
-| OMP (oh-my-pi)  | `omp`            | env + project | `.omp/skills/`         | -                        | JSONL + SQLite |
-| Pi Coding Agent | `pi`             | env + project | `.pi/skills/`          | -                        | JSON + JSONL   |
-| Prime Agent     | `prime-agent`    | env + project | `.prime/agent/skills/` | -                        | JSONL + JSON   |
-| Freebuff        | `freebuff`       | project       | `.agents/skills/`      | -                        | JSON + JSONL   |
-
-### Native audio and video input
-
-`audio` and `video` report whether the harness has a verified native route that puts that medium into model context. External conversion, MCP tools, and voice dictation that becomes text do not count. `false` means no native route was verified, not that every possible provider or extension was disproved.
-
-| Agent           | Audio | Video | Evidence boundary                                                           |
-| --------------- | :---: | :---: | --------------------------------------------------------------------------- |
-| Antigravity CLI |  Yes  |  Yes  | Native attachments; documented audio formats and direct video pasting       |
-| Gemini CLI      |  Yes  |  No   | The `read_file` tool supports audio; native video support is not documented |
-| Claude Code     |  No   |  No   | No verified native route                                                    |
-| Codex CLI       |  No   |  No   | No verified native route                                                    |
-| Grok CLI        |  No   |  No   | Its ACP parser recognizes audio blocks, but the runtime rejects them        |
-| OpenCode        |  No   |  No   | Its attachment documentation explicitly excludes audio and video            |
-| Cursor          |  No   |  No   | Voice input is transcribed to text                                          |
-| GitHub Copilot  |  No   |  No   | Voice input is transcribed locally to text                                  |
-| Mastra Code     |  No   |  No   | No verified native route                                                    |
-| OMP (oh-my-pi)  |  No   |  No   | No verified native route                                                    |
-| Pi Coding Agent |  No   |  No   | No verified native route                                                    |
-| Prime Agent     |  No   |  No   | No verified native route                                                    |
-| Freebuff        |  No   |  No   | No verified native route                                                    |
-
-Primary references: [Antigravity prompting](https://antigravity.google/docs/cli/prompting/), [Antigravity changelog](https://github.com/google-antigravity/antigravity-cli/blob/main/CHANGELOG.md), [Gemini CLI tools](https://github.com/google-gemini/gemini-cli/blob/main/docs/reference/tools.md), [Gemini CLI video request](https://github.com/google-gemini/gemini-cli/issues/27194), [OpenCode attachments](https://opencode.ai/v2/docs/attachments/), [Cursor prompting](https://cursor.com/docs/agent/prompting), and [Copilot CLI voice input](https://docs.github.com/en/copilot/how-tos/copilot-cli/use-copilot-cli/voice-input).
-
-`invoke()` and `listModels()` accept `timeoutMs` and `signal?: AbortSignal`. Unset or `0` means no deadline. An already aborted signal skips spawning. Otherwise, the first cancellation or deadline starts cleanup: Linux and macOS use a dedicated process group, with `SIGTERM` followed by `SIGKILL` after 500 ms even if the root has exited. Windows uses `taskkill /T /F` immediately, with a 2 s budget for that command. Cleanup failures reject the call.
-
-Stopped results retain captured output and set `exitCode: null`. Caller cancellation sets `aborted: true`, a deadline sets `timedOut: true`, and the first reason wins. Both flags are false on normal completion. Later aborts do nothing, and cancelled model listings return no parsed models. Pi, OMP, and MCP tools forward their host request signal, not a JSON argument supplied by the model.
-
-```ts
-const controller = new AbortController();
-const pending = getHarness("pi").invoke("Review this change", {
-  tools: true,
-  readOnly: true,
-  signal: controller.signal,
-});
-controller.abort();
-const result = await pending;
-console.log(result.aborted);
-```
-
-This is command cleanup, not a sandbox. Descendants that leave the POSIX process group, or outlive an already exited root on Windows, cannot be reliably reached by these mechanisms. Inherited output pipes do not extend the wait after cleanup. Scheduling and OS delays can exceed the stated budgets.
-
-Each agent is a concrete subclass of the abstract `Harness` class. Custom subclasses can be added with `registerHarness`. Every harness exposes config paths, session locations, instruction files, skills dirs, hooks, commands, persistence formats, capabilities (MCP, vision, audio, video, tools, streaming), detection rules, a normalized non-interactive invocation (`harness.invoke(prompt, { model })`) where the CLI has a headless mode, native model listing (`harness.listModels()`) where the CLI supports it, and its MCP server config files (`listMcpServers`/`addMcpServer`/`removeMcpServer` normalize the dialects; writes rewrite JSON and surgically edit TOML with comments preserved). `syncMcpServers` treats `~/.config/agntn/mcp.jsonc` (JSONC, XDG-aware) as the single source of truth and resets every harness's user-scope MCP config to exactly that list; a top-level `"excludes": ["codex"]` array opts individual harnesses out of the sync (their own servers stay, master-listed names are withdrawn), and `~`/`${HOME}` in commands, args, and env values expand to absolute paths at sync time (harnesses spawn MCP servers without a shell). An env value that is exactly `${NAME}` references that variable of the harness environment: Prime Agent stores it natively as `{"env": "NAME"}`, the other harnesses receive the value from the syncing process, and a server one dialect cannot hold is reported as `skipped` with a reason while the rest of the list syncs. `syncAgentsFiles` links every harness's global instructions file (CLAUDE.md/AGENTS.md/GEMINI.md) to one master file as symlinks, so an edit made through any harness lands in the single physical copy; `~/.config/agntn/agents.jsonc` sets the `source`, `companions`, and `excludes`, diverged regular files are backed up and relinked, and check mode reports without writing. Companion paths are relative to the source directory and are linked at the same relative path beside each harness target.
-
-```jsonc
-{
-  "source": "bundle/AGENTS.md",
-  "companions": ["RULES.md"],
-  "excludes": ["codex"],
-}
-```
-
-All paths carry `scope` (user/project/system/data), `level` (official/community/inferred), and optional `platforms` tags.
-
-The `harnesses_info` agent tool accepts one harness id or a batch of up to 20 ids. Batch results keep the input order and include errors for unknown ids beside successful metadata. Paths come once, resolved for the current platform. The templates stay with `harnesses info`.
-
-## CLI
+## 🚀 First call
 
 ```bash
-harnesses list                  # all known harnesses
-harnesses detect                # which ones are installed + versions
-harnesses info claude           # metadata, including supported invocation modes
-harnesses paths claude          # resolved paths for current platform
-harnesses info codex --json     # machine-readable output
-harnesses models pi             # models available to Pi
-harnesses models pi gpt-5.4 --json
-harnesses run claude "review this design"       # advisor without tools mode (default)
-harnesses run pi --model openai-codex/gpt-5.4 "review this design"
-harnesses run claude --tools "fix lint"         # full agent with tools enabled
-harnesses run codex --read-only "review this"   # tools inside a native read-only sandbox
-harnesses mcp-servers list      # MCP servers configured across all harnesses
-harnesses mcp-servers add omp probe --command node --args "srv.mjs mcp"
-harnesses mcp-servers remove omp probe
-harnesses mcp-servers sync      # reset all harnesses to ~/.config/agntn/mcp.jsonc
-harnesses agents sync --check   # doctor: link global AGENTS.md files to one master
-harnesses mcp                   # run the MCP server over stdio
+npx @agntn/harnesses detect
 ```
 
-`tools` defaults to `false` in the library and CLI. The MCP, Pi, and OMP tools require agents to choose it explicitly. `false` must use a native CLI flag that removes tools from the model context; it is a lightweight advisor, not an agent constrained only by prompt wording. Set `tools: true` (or CLI `--tools`) whenever the task needs harness tools, including Grok's native X search. Add `readOnly: true` when those tools must stay inside a sandbox enforced by the harness CLI; the agent tools pass it beside `tools: true`, while the library and CLI let it imply tools. Read-only mode is rejected when a harness has no verified native recipe, so it never falls back to broader access. A recipe can also carry the lowest CLI version whose enforcement was verified, and `invoke()` rejects read-only runs on older or unknown versions: Grok runs `--sandbox read-only` from 1.0.13, and Claude Code keeps read-only runs on `Read`, `Glob` and `Grep` with `--strict-mcp-config` from 2.1.175. Harnesses whose CLI cannot disable tools reject advisor mode instead of silently running an agent and return an explicit `tools` retry when their full agent mode can handle the request.
+```
+  System Scan
 
-## How harnesses compares to unagent
+    ● antigravity     Google Antigravity CLI  v1.2.5
+    ● claude          Anthropic Claude Code  v2.1.276
+    ● codex           OpenAI Codex CLI  v0.154.0
+    ○ cursor          Cursor
+    ● freebuff        Freebuff
+    ○ gemini          Google Gemini CLI
+    ○ github-copilot  GitHub Copilot
+    ● grok            xAI Grok CLI  v1.0.34
+    ● mastracode      Mastra Code
+    ● omp             OMP (oh-my-pi)  v18.2.4
+    ● opencode        OpenCode CLI  v2.0.5
+    ● prime-agent     Prime Agent  v0.9.5
+    ● pi              Pi Coding Agent  v0.85.1
+```
 
-[unagent](https://github.com/onmax/unagent) covers similar ground but makes different tradeoffs.
+No key, no config. No network either. `detect` looks at `PATH`. Filled dot is installed, hollow is not. After `pnpm add`, the same command is `pnpm exec harnesses`, or install it once with `pnpm add -g @agntn/harnesses`.
 
-**harnesses is deep and narrow.** Each harness gets verified, platform-specific paths with scope, evidence level, and platform tags. Session formats are typed per harness. Thirteen harnesses, each fully mapped.
+Same binary, more commands:
 
-**unagent is wide and shallow.** 40+ agents detected by env vars, but each definition is just `configDir` + `rulesFile` + `skillsDir`. No platform-specific paths, no session schemas. In exchange, it ships runtime primitives harnesses doesn't touch yet: skill install/uninstall, vector stores, browser automation, sandboxes, queues, workflows.
+```bash
+harnesses list
+harnesses info claude
+harnesses paths pi
+harnesses models pi gpt-5.4 --json
+harnesses run claude "review this design"
+harnesses run codex --read-only "review this"
+harnesses mcp-servers list
+harnesses agents sync --check
+```
 
-harnesses tells you _where coding harnesses live and what format their data uses_. unagent tells you _which agent is running_ and gives you tools to _do things_ with skills. They could use each other.
+`run` without `--tools` is the advisor. `--tools` is the full agent. `--read-only` asks the CLI for a sandbox and implies tools. Timeouts, `--cwd` and `--model` sit in the [CLI guide](https://harnesses.agntn.dev/guide/cli).
 
-## License
+### Commands
+
+| Command       | What it does                                           | Example                                     |
+| ------------- | ------------------------------------------------------ | ------------------------------------------- |
+| `list`        | Every known harness, id and name                       | `harnesses list`                            |
+| `detect`      | Which ones are installed, with versions                | `harnesses detect`                          |
+| `info`        | Registry entry: modes, capabilities, path templates    | `harnesses info claude`                     |
+| `paths`       | Those templates expanded for this machine              | `harnesses paths pi`                        |
+| `models`      | Models the harness can use, through its native listing | `harnesses models pi`                       |
+| `run`         | One prompt through headless mode                       | `harnesses run claude "review this design"` |
+| `mcp-servers` | MCP servers across the config dialects                 | `harnesses mcp-servers list`                |
+| `agents sync` | Link global instructions files to one master           | `harnesses agents sync --check`             |
+| `mcp`         | The MCP server on stdio                                | `harnesses mcp`                             |
+
+`list`, `detect`, `info`, `paths` and `models` take `--json` or `--toon`. `run --json` is different: that one is the harness's own structured output.
+
+## 🧠 Library
+
+```ts
+import { getHarness, detectHarness } from "@agntn/harnesses";
+
+const claude = getHarness("claude");
+const paths = claude.resolve({ platform: "linux", homeDir: "/home/dev" });
+console.log(paths.skills);
+
+const active = detectHarness();
+if (active) console.log(active.id);
+
+await getHarness("codex").invoke("Review this patch", { readOnly: true });
+```
+
+That's most of it, really. `getHarness` wants an exact id. `detectHarness` uses env vars first, then a single project marker. `invoke()` talks to the CLI. A mode the CLI cannot run comes back as an error, not a quieter one. The rest: [Registry](https://harnesses.agntn.dev/guide/registry), [Invoke](https://harnesses.agntn.dev/guide/invoke), [MCP servers](https://harnesses.agntn.dev/guide/mcp-servers), [Instructions files](https://harnesses.agntn.dev/guide/agents-sync).
+
+## 🗺️ Harnesses
+
+| ID               | Name                   | Project skills         |
+| ---------------- | ---------------------- | ---------------------- |
+| `antigravity`    | Google Antigravity CLI | `.agents/skills/`      |
+| `claude`         | Anthropic Claude Code  | `.claude/skills/`      |
+| `codex`          | OpenAI Codex CLI       | `.codex/skills/`       |
+| `cursor`         | Cursor                 | `.cursor/skills/`      |
+| `freebuff`       | Freebuff               | `.agents/skills/`      |
+| `gemini`         | Google Gemini CLI      | `.gemini/skills/`      |
+| `github-copilot` | GitHub Copilot         | `.github/skills/`      |
+| `grok`           | xAI Grok CLI           | `.grok/skills/`        |
+| `mastracode`     | Mastra Code            | `.mastracode/skills/`  |
+| `omp`            | OMP (oh-my-pi)         | `.omp/skills/`         |
+| `opencode`       | OpenCode CLI           | `.opencode/skills/`    |
+| `prime-agent`    | Prime Agent            | `.prime/agent/skills/` |
+| `pi`             | Pi Coding Agent        | `.pi/skills/`          |
+
+That's the project directory. Most of them also keep a copy under your home directory, and a few read someone else's skills folder on purpose. Sessions, hooks, audio, video, the whole sheet: [Harnesses](https://harnesses.agntn.dev/harnesses).
+
+## 🤖 Agents
+
+```bash
+harnesses mcp
+pi install npm:@agntn/harnesses
+omp install @agntn/harnesses
+```
+
+```json
+{
+  "mcpServers": {
+    "harnesses": { "command": "npx", "args": ["-y", "@agntn/harnesses", "mcp"] }
+  }
+}
+```
+
+Nine tools, the same nine on MCP, Pi and OMP. `harnesses_detect`, `harnesses_info` and `harnesses_mcp_list` only read. `harnesses_run` is the one that can spend tokens. `tools` is required, so the model has to pick advisor or agent. What each call returns is on the [Agents page](https://harnesses.agntn.dev/guide/agents).
+
+## 🚫 What this does not do
+
+It does not install skills, drive a browser, or run a sandbox of its own. `invoke()` is the harness CLI plus process cleanup. The wide, thin agent list is [unagent](https://github.com/onmax/unagent).
+
+## 🧩 Adding a harness
+
+Want a fourteenth? One class extending `Harness`, then `registerHarness`. `getHarness`, the CLI and the tools pick it up. How to write that class: [Custom harnesses](https://harnesses.agntn.dev/guide/custom).
+
+## 🛠️ Development
+
+```bash
+pnpm install
+pnpm lint        # builds first, then oxlint and oxfmt --check
+pnpm lint:fix
+pnpm typecheck
+pnpm test:run
+pnpm build       # obuild
+pnpm docs        # the Docus site, bundles src/ itself
+```
+
+## 💛 Thanks
+
+Anthropic and OpenAI both run programs this package was built with. [Claude for Open Source](https://claude.com/contact-sales/claude-for-oss) and [Codex for Open Source](https://developers.openai.com/community/codex-for-oss). Thank you <3
+
+## 📄 License
 
 [MIT](./LICENSE)
