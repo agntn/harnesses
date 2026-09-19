@@ -57,7 +57,7 @@
     "typebox": "^1.3.33"
   },
   "devDependencies": {
-    "@agntn/ox": "^0.1.0",
+    "@agntn/ox": "0.1.0",
     "@earendil-works/pi-coding-agent": "0.85.1",
     "@earendil-works/pi-tui": "0.85.1",
     "@oh-my-pi/omptype": "18.2.5",
@@ -67,9 +67,9 @@
     "@typescript/native-preview": "latest",
     "changelogen": "^0.6.2",
     "obuild": "^0.4.40",
-    "oxfmt": "^0.68.0",
-    "oxlint": "^1.83.0",
-    "oxlint-tsgolint": "^7.0.2002",
+    "oxfmt": "0.68.0",
+    "oxlint": "1.83.0",
+    "oxlint-tsgolint": "7.0.2002",
     "typescript": "6.0.3",
     "vitest": "^5.0.1"
   },
