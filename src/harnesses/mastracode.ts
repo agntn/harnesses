@@ -71,6 +71,12 @@ export default class MastraCode extends Harness {
       note: "Global MCP server configurations.",
     },
     {
+      path: ".mcp.json",
+      scope: "project",
+      level: "official",
+      note: "Claude Code compatible project MCP servers, read below .mastracode/mcp.json.",
+    },
+    {
       path: ".mastracode/hooks.json",
       scope: "project",
       level: "official",
@@ -177,6 +183,35 @@ export default class MastraCode extends Harness {
     },
   ];
   readonly invocation: Harness["invocation"] = null;
+  override readonly mcpConfigs: Harness["mcpConfigs"] = [
+    {
+      path: "~/.mastracode/mcp.json",
+      scope: "user",
+      level: "official",
+      format: "json",
+      key: ["mcpServers"],
+      dialect: "mastracode",
+      note: "An entry with command is stdio and one with url is HTTP, type is ignored. Loaded above mcpServers from the project's .claude/settings.local.json and below both project files, later names winning.",
+    },
+    {
+      path: ".mastracode/mcp.json",
+      scope: "project",
+      level: "official",
+      format: "json",
+      key: ["mcpServers"],
+      dialect: "mastracode",
+      note: "Highest priority, overrides the other files entry by entry.",
+    },
+    {
+      path: ".mcp.json",
+      scope: "project",
+      level: "official",
+      format: "json",
+      key: ["mcpServers"],
+      dialect: "mastracode",
+      note: "Claude Code's project file, read between the user file and .mastracode/mcp.json. Project writes go to .mastracode/mcp.json, this one is Claude's to edit.",
+    },
+  ];
   readonly detection = {
     envVars: [],
     projectMarkers: [".mastracode"],
