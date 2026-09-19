@@ -108,6 +108,7 @@ export const PATH_GROUPS = [
   "instructions",
   "skills",
   "commands",
+  "promptTemplates",
   "hooks",
 ] as const;
 export type PathGroup = (typeof PATH_GROUPS)[number];

@@ -108,7 +108,7 @@ const activeId = computed(() => current.value.id);
       ]"
     >
       <code class="font-mono text-[13px] text-highlighted">getHarness("codex")</code> is one object
-      with config, sessions, instructions, skills, commands and hooks. Nothing is fetched or
+      with config, sessions, instructions, skills, commands, prompt templates and hooks. Nothing is fetched or
       scanned; it's a table someone checked against the CLI's own docs, source, or a local probe,
       and wrote the level down. <code class="font-mono text-[13px] text-highlighted">inferred</code>
       means exactly that. This panel walks through {{ samples.length }} harnesses, values expanded

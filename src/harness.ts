@@ -286,6 +286,8 @@ export abstract class Harness {
   abstract readonly instructions: PathCandidate[];
   abstract readonly skills: PathCandidate[];
   abstract readonly commands: PathCandidate[];
+  /** Reusable prompt files; empty when no CLI template location is verified. */
+  readonly promptTemplates: PathCandidate[] = [];
   abstract readonly hooks: PathCandidate[];
   abstract readonly capabilities: HarnessCapabilities;
   abstract readonly detection: HarnessDetection;
@@ -532,6 +534,7 @@ export abstract class Harness {
       instructions: this.resolveCandidates(this.instructions, options),
       skills: this.resolveCandidates(this.skills, options),
       commands: this.resolveCandidates(this.commands, options),
+      promptTemplates: this.resolveCandidates(this.promptTemplates, options),
       hooks: this.resolveCandidates(this.hooks, options),
     };
   }

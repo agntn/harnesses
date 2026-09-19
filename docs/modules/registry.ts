@@ -26,6 +26,7 @@ export default defineNuxtModule({
       instructions: harness.instructions,
       skills: harness.skills,
       commands: harness.commands,
+      promptTemplates: harness.promptTemplates,
       hooks: harness.hooks,
       mcpConfigs: harness.mcpConfigs,
       agentsFile: harness.agentsFile,

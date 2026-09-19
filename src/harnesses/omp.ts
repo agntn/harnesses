@@ -116,12 +116,32 @@ export default class Omp extends Harness {
     },
   ];
   readonly commands: Harness["commands"] = [
-    { path: ".omp/commands/", scope: "project", level: "official" },
+    {
+      path: ".omp/commands/",
+      scope: "project",
+      level: "official",
+      note: "Markdown prompt commands and TypeScript commands; only Markdown files are templates.",
+    },
     {
       path: "~/.omp/agent/commands/",
       scope: "user",
       level: "official",
-      note: "Global user-level prompt commands.",
+      note: "Global Markdown prompt commands and TypeScript commands; only Markdown files are templates.",
+    },
+  ];
+  override readonly promptTemplates: Harness["promptTemplates"] = [
+    ...this.commands,
+    {
+      path: ".omp/prompts/",
+      scope: "project",
+      level: "official",
+      note: "Markdown prompt templates invoked as /name; subdirectories are scanned.",
+    },
+    {
+      path: "~/.omp/agent/prompts/",
+      scope: "user",
+      level: "official",
+      note: "Global Markdown prompt templates, separate from executable commands.",
     },
   ];
   readonly hooks: Harness["hooks"] = [];

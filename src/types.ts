@@ -194,5 +194,6 @@ export interface ResolvedPaths {
   instructions: PathCandidate[];
   skills: PathCandidate[];
   commands: PathCandidate[];
+  promptTemplates: PathCandidate[];
   hooks: PathCandidate[];
 }

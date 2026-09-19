@@ -161,14 +161,44 @@ export default class MastraCode extends Harness {
     },
   ];
   readonly commands: Harness["commands"] = [
-    { path: ".mastracode/commands/", scope: "project", level: "official" },
+    {
+      path: ".mastracode/commands/",
+      scope: "project",
+      level: "official",
+      note: "Markdown prompt commands; subdirectories become colon-separated command names.",
+    },
     {
       path: "~/.mastracode/commands/",
       scope: "user",
       level: "official",
-      note: "Global commands.",
+      note: "Global Markdown prompt commands.",
+    },
+    {
+      path: ".claude/commands/",
+      scope: "project",
+      level: "official",
+      note: "Claude compatibility.",
+    },
+    {
+      path: "~/.claude/commands/",
+      scope: "user",
+      level: "official",
+      note: "Claude compatibility.",
+    },
+    {
+      path: ".opencode/command/",
+      scope: "project",
+      level: "official",
+      note: "Mastra's OpenCode compatibility loader uses the singular command directory.",
+    },
+    {
+      path: "~/.opencode/command/",
+      scope: "user",
+      level: "official",
+      note: "Mastra's OpenCode compatibility loader uses the singular command directory.",
     },
   ];
+  override readonly promptTemplates = this.commands;
   readonly hooks: Harness["hooks"] = [
     {
       path: ".mastracode/hooks.json",

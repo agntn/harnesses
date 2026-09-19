@@ -109,6 +109,19 @@ await getHarness("codex").invoke("Review this patch", { readOnly: true });
 
 That's most of it, really. `getHarness` wants an exact id. `detectHarness` uses env vars first, then a single project marker. `invoke()` talks to the CLI. A mode the CLI cannot run comes back as an error, not a quieter one. The rest: [Registry](https://harnesses.agntn.dev/guide/registry), [Invoke](https://harnesses.agntn.dev/guide/invoke), [MCP servers](https://harnesses.agntn.dev/guide/mcp-servers), [Instructions files](https://harnesses.agntn.dev/guide/agents-sync).
 
+### Prompt templates
+
+`getHarness("pi").promptTemplates` lists reusable prompt file locations.
+`resolve().promptTemplates` expands their paths. CLI `info` and `paths`, and the
+`harnesses_info` agent tool expose them. These are metadata, not a template engine: the package
+doesn't read, expand or execute prompt files.
+
+Pi, OMP and Prime Agent have prompt directories. Gemini, OpenCode, Mastra Code
+and Claude Code expose equivalent custom commands; Codex still documents its
+deprecated local prompts. `commands` remains the broader category, so some paths
+belong to both. Formats and CLI versus IDE limits are in the
+[registry guide](https://harnesses.agntn.dev/guide/registry#prompt-templates).
+
 ## 🗺️ Harnesses
 
 | ID               | Name                   | Project skills         |
