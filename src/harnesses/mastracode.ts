@@ -71,6 +71,12 @@ export default class MastraCode extends Harness {
       note: "Global MCP server configurations.",
     },
     {
+      path: ".mcp.json",
+      scope: "project",
+      level: "official",
+      note: "Claude Code compatible project MCP servers, read below .mastracode/mcp.json.",
+    },
+    {
       path: ".mastracode/hooks.json",
       scope: "project",
       level: "official",
@@ -203,7 +209,7 @@ export default class MastraCode extends Harness {
       format: "json",
       key: ["mcpServers"],
       dialect: "mastracode",
-      note: "Claude Code's project file, read between the user file and .mastracode/mcp.json.",
+      note: "Claude Code's project file, read between the user file and .mastracode/mcp.json. Project writes go to .mastracode/mcp.json, this one is Claude's to edit.",
     },
   ];
   readonly detection = {
