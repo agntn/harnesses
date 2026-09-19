@@ -212,6 +212,29 @@ function normalizePrime(name: string, raw: Readonly<Record<string, unknown>>): M
 }
 
 /**
+ * Stdio from `command`, HTTP from `url`, SSE settled at connect time: `type` says nothing here.
+ *
+ * @param name - Server name from the containing map.
+ * @param raw - Raw Mastra Code server entry.
+ * @returns {McpServerConfig} The normalized server entry.
+ */
+function normalizeMastracode(
+  name: string,
+  raw: Readonly<Record<string, unknown>>,
+): McpServerConfig {
+  const url = stringField(raw, "url");
+  return compact({
+    name,
+    transport: url ? ("http" as const) : ("stdio" as const),
+    command: stringField(raw, "command"),
+    args: asStringArray(raw.args),
+    env: asStringRecord(raw.env),
+    url,
+    headers: asStringRecord(raw.headers),
+  });
+}
+
+/**
  * Maps one raw config entry to the normalized shape, per dialect.
  *
  * @param name - Server name from the containing map.
@@ -225,6 +248,7 @@ function normalizeEntry(
   dialect: McpConfigFile["dialect"],
 ): McpServerConfig {
   if (dialect === "antigravity") return normalizeAntigravity(name, raw);
+  if (dialect === "mastracode") return normalizeMastracode(name, raw);
   if (dialect === "opencode") return normalizeOpenCode(name, raw);
   if (dialect === "prime") return normalizePrime(name, raw);
   return normalizeStandard(name, raw);
@@ -253,6 +277,15 @@ function denormalizeOpenCode(server: McpServerConfig): Record<string, unknown> {
     command: [server.command ?? "", ...(server.args ?? [])],
     environment: server.env,
     enabled: server.enabled,
+  });
+}
+
+function denormalizeMastracode(server: McpServerConfig): Record<string, unknown> {
+  if (server.url) return compact({ url: server.url, headers: server.headers });
+  return compact({
+    command: server.command,
+    args: server.args?.length ? server.args : undefined,
+    env: server.env,
   });
 }
 
@@ -340,6 +373,22 @@ function resolveEnvReferences(
 }
 
 /**
+ * Env references per {@link resolveEnvReferences}, and for Mastra Code `sse` folded into `http`.
+ *
+ * @param server - Normalized server from the master list or a caller.
+ * @param dialect - Target harness config dialect.
+ * @returns {McpServerConfig} The server as the dialect can hold it.
+ */
+function shapeForDialect(
+  server: McpServerConfig,
+  dialect: McpConfigFile["dialect"],
+): McpServerConfig {
+  const shaped = resolveEnvReferences(server, dialect);
+  if (dialect !== "mastracode" || shaped.transport !== "sse") return shaped;
+  return { ...shaped, transport: "http" };
+}
+
+/**
  * Converts a normalized server back to the raw shape one dialect expects.
  *
  * @param server - Normalized server configuration.
@@ -351,6 +400,7 @@ function denormalizeEntry(
   dialect: McpConfigFile["dialect"],
 ): Record<string, unknown> {
   if (dialect === "antigravity") return denormalizeAntigravity(server);
+  if (dialect === "mastracode") return denormalizeMastracode(server);
   if (dialect === "opencode") return denormalizeOpenCode(server);
   if (dialect === "prime") return denormalizePrime(server);
   return denormalizeStandard(server);
@@ -588,7 +638,7 @@ export function addMcpServer(
   options: ResolveOptions = {},
 ): { path: string; replaced: boolean } {
   const { entry, path } = writableConfig(harness, scope, options);
-  const resolved = resolveEnvReferences(server, entry.dialect);
+  const resolved = shapeForDialect(server, entry.dialect);
 
   if (entry.format === "toml") {
     return { path, replaced: addTomlServer(path, entry.key, resolved) };
@@ -898,7 +948,7 @@ function syncIncludedHarness(
   const { dialect } = writableConfig(harness, "user", options).entry;
   for (const server of master.servers) {
     try {
-      const resolved = resolveEnvReferences(server, dialect);
+      const resolved = shapeForDialect(server, dialect);
       if (existing.get(server.name) === canonical(resolved)) {
         results.push({ name: server.name, action: "unchanged" });
         continue;

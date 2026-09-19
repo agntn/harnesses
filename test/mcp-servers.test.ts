@@ -208,7 +208,7 @@ describe("listMcpServers", () => {
     }
   });
 
-  it("reads Mastra Code mcp.json at both scopes", () => {
+  it("reads Mastra Code mcp.json at both scopes and by keys, not type", () => {
     const dirs = fixtureDirs();
     const userDir = join(dirs.homeDir, ".mastracode");
     const projectDir = join(dirs.projectRoot, ".mastracode");
@@ -218,7 +218,7 @@ describe("listMcpServers", () => {
       join(userDir, "mcp.json"),
       JSON.stringify({
         mcpServers: {
-          registries: { command: "node", args: ["cli.mjs", "mcp"], env: { A: "1" } },
+          registries: { type: "sse", command: "node", args: ["cli.mjs", "mcp"], env: { A: "1" } },
           remote: { url: "https://example.com/mcp", headers: { Authorization: "Bearer x" } },
         },
       }),
@@ -457,6 +457,35 @@ describe("addMcpServer / removeMcpServer", () => {
     });
   });
 
+  it("writes the Mastra Code shape without a type field", () => {
+    const dirs = fixtureDirs();
+    const mastracode = getHarness("mastracode");
+
+    addMcpServer(
+      mastracode,
+      { name: "events", transport: "sse", url: "https://example.com/sse", enabled: true },
+      "project",
+      dirs,
+    );
+    addMcpServer(
+      mastracode,
+      { name: "local", transport: "stdio", command: "node", args: ["srv.mjs"], env: { K: "v" } },
+      "project",
+      dirs,
+    );
+
+    const raw = nestedRecord(
+      parseJsonRecord(join(dirs.projectRoot, ".mastracode", "mcp.json")),
+      "mcpServers",
+    );
+    expect(raw.events).toEqual({ url: "https://example.com/sse" });
+    expect(raw.local).toEqual({ command: "node", args: ["srv.mjs"], env: { K: "v" } });
+    expect(listMcpServers(mastracode, dirs)[1]?.servers.map((s) => s.transport)).toEqual([
+      "http",
+      "stdio",
+    ]);
+  });
+
   it("adds and removes a TOML server while preserving comments byte-for-byte", () => {
     const dirs = fixtureDirs();
     const grok = getHarness("grok");
@@ -677,6 +706,34 @@ describe("syncMcpServers", () => {
         "unchanged",
         "unchanged",
         "skipped",
+      ]);
+    } finally {
+      if (previousXdg !== undefined) process.env.XDG_CONFIG_HOME = previousXdg;
+    }
+  });
+
+  it("syncs an sse master entry into Mastra Code once", () => {
+    const dirs = fixtureDirs();
+    const previousXdg = process.env.XDG_CONFIG_HOME;
+    delete process.env.XDG_CONFIG_HOME;
+    try {
+      writeMaster(
+        dirs.homeDir,
+        JSON.stringify({
+          mcpServers: { events: { type: "sse", url: "https://example.com/sse" } },
+        }),
+      );
+
+      const first = syncMcpServers([getHarness("mastracode")], dirs);
+      expect(targetResults(first.targets, "mastracode")).toEqual([
+        { name: "events", action: "added" },
+      ]);
+      const raw = parseJsonRecord(join(dirs.homeDir, ".mastracode", "mcp.json"));
+      expect(nestedRecord(raw, "mcpServers").events).toEqual({ url: "https://example.com/sse" });
+
+      const second = syncMcpServers([getHarness("mastracode")], dirs);
+      expect(targetResults(second.targets, "mastracode")).toEqual([
+        { name: "events", action: "unchanged" },
       ]);
     } finally {
       if (previousXdg !== undefined) process.env.XDG_CONFIG_HOME = previousXdg;

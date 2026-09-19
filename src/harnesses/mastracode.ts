@@ -184,7 +184,7 @@ export default class MastraCode extends Harness {
       level: "official",
       format: "json",
       key: ["mcpServers"],
-      dialect: "standard",
+      dialect: "mastracode",
       note: "An entry with command is stdio and one with url is HTTP, type is ignored. mcpServers from the project's .claude/settings.local.json load too, below both mcp.json files.",
     },
     {
@@ -193,7 +193,7 @@ export default class MastraCode extends Harness {
       level: "official",
       format: "json",
       key: ["mcpServers"],
-      dialect: "standard",
+      dialect: "mastracode",
       note: "Overrides the user file entry by entry.",
     },
   ];
