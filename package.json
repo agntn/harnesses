@@ -101,6 +101,7 @@
   "pi": {
     "extensions": [
       "./packages/pi/extensions/harnesses.ts"
-    ]
+    ],
+    "image": "https://harnesses.agntn.dev/image.png"
   }
 }
