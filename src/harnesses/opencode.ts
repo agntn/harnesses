@@ -93,7 +93,21 @@ export default class OpenCode extends Harness {
     },
     { path: "~/.agents/skills/", scope: "user", level: "official" },
   ];
-  readonly commands: Harness["commands"] = [];
+  readonly commands: Harness["commands"] = [
+    {
+      path: ".opencode/commands/",
+      scope: "project",
+      level: "official",
+      note: "Markdown prompt commands; also configurable through command entries in opencode.json.",
+    },
+    {
+      path: "~/.config/opencode/commands/",
+      scope: "user",
+      level: "official",
+      note: "Global Markdown prompt commands.",
+    },
+  ];
+  override readonly promptTemplates = this.commands;
   readonly hooks: Harness["hooks"] = [];
   readonly invocation: Harness["invocation"] = {
     args: ["run", "{prompt}"],

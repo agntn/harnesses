@@ -112,6 +112,7 @@ export default class Claude extends Harness {
       note: "Legacy global slash commands.",
     },
   ];
+  override readonly promptTemplates = this.commands;
   readonly hooks: Harness["hooks"] = [
     { path: ".claude/hooks/", scope: "project", level: "official" },
     {

@@ -93,6 +93,7 @@ export default class Gemini extends Harness {
       note: "Global custom commands in TOML format.",
     },
   ];
+  override readonly promptTemplates = this.commands;
   readonly hooks: Harness["hooks"] = [];
   readonly invocation: Harness["invocation"] = {
     args: ["-p", "{prompt}"],

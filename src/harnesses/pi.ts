@@ -155,6 +155,7 @@ export default class Pi extends Harness {
       note: "Global user-level prompt templates.",
     },
   ];
+  override readonly promptTemplates = this.commands;
   readonly hooks: Harness["hooks"] = [];
   readonly invocation: Harness["invocation"] = {
     args: ["-p", "{prompt}"],

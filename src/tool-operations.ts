@@ -72,6 +72,7 @@ export interface HarnessMetadata {
   instructions: PathCandidate[];
   skills: PathCandidate[];
   commands: PathCandidate[];
+  promptTemplates: PathCandidate[];
   hooks: PathCandidate[];
   persistence: StorageDescriptor[];
   detection: HarnessDetection;
@@ -306,6 +307,7 @@ function harnessInfoResult(id: string): HarnessInfoResult {
     instructions: harness.instructions,
     skills: harness.skills,
     commands: harness.commands,
+    promptTemplates: harness.promptTemplates,
     hooks: harness.hooks,
     persistence: harness.persistence,
     detection: harness.detection,
@@ -315,7 +317,10 @@ function harnessInfoResult(id: string): HarnessInfoResult {
 
 /** One lookup as the model reads it: every path list once, in {@link HarnessMetadata.resolved}. */
 type HarnessInfoText =
-  | Omit<HarnessMetadata, "config" | "sessions" | "instructions" | "skills" | "commands" | "hooks">
+  | Omit<
+      HarnessMetadata,
+      "config" | "sessions" | "instructions" | "skills" | "commands" | "promptTemplates" | "hooks"
+    >
   | UnknownHarness;
 
 /**

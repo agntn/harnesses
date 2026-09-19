@@ -90,7 +90,15 @@ export default class Codex extends Harness {
       platforms: ["linux", "darwin"],
     },
   ];
-  readonly commands: Harness["commands"] = [];
+  readonly commands: Harness["commands"] = [
+    {
+      path: "~/.codex/prompts/",
+      scope: "user",
+      level: "official",
+      note: "Deprecated Markdown prompts invoked as /prompts:name. Top-level files only; use skills for shared prompts. Base directory follows CODEX_HOME.",
+    },
+  ];
+  override readonly promptTemplates = this.commands;
   readonly hooks: Harness["hooks"] = [];
   readonly invocation: Harness["invocation"] = {
     args: ["exec", "--skip-git-repo-check", "{prompt}"],

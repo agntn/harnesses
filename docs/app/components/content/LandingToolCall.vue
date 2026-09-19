@@ -35,7 +35,7 @@ const binaries = computed(() => JSON.stringify(props.sample.binaries));
   <span class="tok-key">"invocationModes"</span>: <span class="tok-str">{{ modes }}</span>,
   <span class="tok-key">"modelListing"</span>: <span class="tok-kw">{{ sample.modelListing !== null }}</span>,
   <span class="tok-key">"agentsFile"</span>: <span :class="sample.agentsFile ? 'tok-str' : 'tok-kw'">{{ sample.agentsFile ? `"${sample.agentsFile}"` : "null" }}</span>,
-  <span class="tok-key">"paths"</span>: <span class="tok-cm">{ config, sessions, instructions, skills, commands, hooks }</span>
+  <span class="tok-key">"paths"</span>: <span class="tok-cm">{ config, sessions, instructions, skills, commands, promptTemplates, hooks }</span>
 }</code></pre>
       </div>
     </div>

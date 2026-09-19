@@ -196,6 +196,7 @@ const info = defineCommand({
           instructions: harness.instructions,
           skills: harness.skills,
           commands: harness.commands,
+          promptTemplates: harness.promptTemplates,
           hooks: harness.hooks,
           persistence: harness.persistence,
           detection: harness.detection,
@@ -240,6 +241,7 @@ const info = defineCommand({
     renderPathSection("Instructions", harness.instructions);
     renderPathSection("Skills", harness.skills);
     renderPathSection("Commands", harness.commands);
+    renderPathSection("Prompt templates", harness.promptTemplates);
     renderPathSection("Hooks", harness.hooks);
 
     if (harness.persistence.length) {
@@ -270,6 +272,7 @@ const paths = defineCommand({
     renderResolvedPathSection("Instructions", resolved.instructions);
     renderResolvedPathSection("Skills", resolved.skills);
     renderResolvedPathSection("Commands", resolved.commands);
+    renderResolvedPathSection("Prompt templates", resolved.promptTemplates);
     renderResolvedPathSection("Hooks", resolved.hooks);
 
     consola.log("");
