@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { decode as fromToon } from "@toon-format/toon";
 import { getEventListeners } from "node:events";
 import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -660,6 +661,91 @@ describe("runHarness tool operation", () => {
     expect(outcome.stdout.trim()).toBe("advisor:ping");
     expect(outcome.exitCode).toBe(0);
     expect(outcome.tools).toBe(false);
+  });
+
+  it("hands the model the output as plain text under the status block", async () => {
+    const answer = [
+      "- **200 OK**: the request went through.",
+      "",
+      "```bash",
+      'curl -X POST "https://api.example.com/items" \\',
+      '  -d "{\\"name\\": \\"test\\"}"',
+      "```",
+      "",
+    ].join("\n");
+    registerHarness(
+      class extends FakeCursor {
+        override readonly invocation: Harness["invocation"] = {
+          args: ["-e", `process.stdout.write(${JSON.stringify(answer)})`],
+          level: "inferred",
+        };
+      },
+    );
+
+    try {
+      const result = await runHarness("cursor", "x", { tools: true });
+
+      expect(result.isError).toBeUndefined();
+      const content = result.content[0]?.text ?? "";
+      const [status, output, ...rest] = content.split("\n\nstdout:\n");
+      expect(rest).toEqual([]);
+      expect(fromToon(status ?? "")).toMatchObject({ id: "cursor", exitCode: 0, tools: true });
+      expect(output).toBe(answer);
+      expect(content).not.toContain('stdout: "');
+    } finally {
+      registerHarness(Cursor);
+    }
+  });
+
+  it("keeps terminal controls out of the text and in the details", async () => {
+    registerHarness(
+      class extends FakeCursor {
+        override readonly invocation: Harness["invocation"] = {
+          args: [
+            "-e",
+            "process.stdout.write('\\u001B[31mred\\u001B[0m line\\r\\nbell\\u0007 end\\n')",
+          ],
+          level: "inferred",
+        };
+      },
+    );
+
+    try {
+      const result = await runHarness("cursor", "x", { tools: true });
+
+      const content = result.content[0]?.text ?? "";
+      expect(content).toContain("\n\nstdout:\nred line\nbell  end\n");
+      for (const control of ["\u001B", "\u0007", "\r"]) expect(content).not.toContain(control);
+      expect(result.details).toMatchObject({
+        stdout: "\u001B[31mred\u001B[0m line\r\nbell\u0007 end\n",
+      });
+    } finally {
+      registerHarness(Cursor);
+    }
+  });
+
+  it("labels both streams when the run fails", async () => {
+    registerHarness(
+      class extends FakeCursor {
+        override readonly invocation: Harness["invocation"] = {
+          args: ["-e", "console.log('partial'); console.error('boom'); process.exit(2)"],
+          level: "inferred",
+        };
+      },
+    );
+
+    try {
+      const result = await runHarness("cursor", "x", { tools: true });
+
+      expect(result.isError).toBe(true);
+      const content = result.content[0]?.text ?? "";
+      expect(content).toContain("exitCode: 2\n");
+      expect(content).toContain("\n\nstdout:\npartial\n");
+      expect(content).toContain("\n\nstderr:\nboom\n");
+      expect(content).not.toContain('stdout: "');
+    } finally {
+      registerHarness(Cursor);
+    }
   });
 
   it("keeps successful stderr out of content sent to the model", async () => {

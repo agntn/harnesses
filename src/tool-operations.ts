@@ -3,8 +3,10 @@
  *
  * Each executor returns the text a caller reads plus the structured details a
  * harness can attach to the call. The text is TOON-encoded so the model sees
- * the same compact shape the CLI's --toon flag prints.
+ * the same compact shape the CLI's --toon flag prints. A run's output is the
+ * exception: it follows the status block as plain text, not as one TOON string.
  */
+import { stripVTControlCharacters } from "node:util";
 import { encode as toToon } from "@toon-format/toon";
 import { getAllHarnesses, getHarness, isHarnessId, listHarnesses } from "./registry.ts";
 import {
@@ -174,13 +176,51 @@ function invocationRetry(
     : undefined;
 }
 
+/** The run as its status block shows it: everything but the two streams. */
+type RunStatus = Readonly<Omit<RunOutcome, "args" | "stdout" | "stderr">> & {
+  readonly args: readonly string[];
+};
+
+type RunStreams = Readonly<Partial<Pick<RunOutcome, "stdout" | "stderr">>>;
+
+// oxlint-disable-next-line no-control-regex -- Terminal control bytes are precisely what this boundary removes.
+const OUTPUT_CONTROLS = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F]/g;
+
+/**
+ * Strips what TOON quoting used to escape: terminal sequences and control bytes; CRLF becomes LF.
+ *
+ * @param output - One capped stream.
+ * @returns {string} The stream as plain text.
+ */
+function plainOutput(output: string): string {
+  return stripVTControlCharacters(output).replaceAll("\r\n", "\n").replace(OUTPUT_CONTROLS, " ");
+}
+
+/**
+ * Lays the run out for the model: the TOON status block, then each stream under
+ * its name as plain text, since quoting a markdown answer into one TOON string
+ * escaped every code block and cost about a tenth more tokens.
+ *
+ * @param outcome - The run without its output.
+ * @param streams - The capped streams; empty ones are left out.
+ * @returns {Array<{ type: "text"; text: string }>} The text handed to the model.
+ */
+function runText(outcome: RunStatus, streams: RunStreams): Array<{ type: "text"; text: string }> {
+  const blocks = [toToon(outcome)];
+  for (const name of ["stdout", "stderr"] as const) {
+    const output = streams[name];
+    if (output !== undefined && output.length > 0) blocks.push(`${name}:\n${plainOutput(output)}`);
+  }
+  return [{ type: "text", text: blocks.join("\n\n") }];
+}
+
 function completedRun(
   harness: Harness,
   result: InvokeResult,
   options: RunInvocationOptions,
   templateArgs: readonly string[],
 ): ToolResult<RunOutcome> {
-  const contentOutcome: Omit<RunOutcome, "stderr"> = {
+  const contentOutcome: Omit<RunOutcome, "stdout" | "stderr"> = {
     id: harness.id,
     command: result.command,
     args: [...templateArgs],
@@ -191,15 +231,15 @@ function completedRun(
     exitCode: result.exitCode,
     timedOut: result.timedOut,
     aborted: result.aborted,
-    stdout: truncate(result.stdout),
   };
+  const stdout = truncate(result.stdout);
   const stderr = truncate(result.stderr);
-  const details: RunOutcome = { ...contentOutcome, args: result.args, stderr };
+  const details: RunOutcome = { ...contentOutcome, args: result.args, stdout, stderr };
   if (result.timedOut || result.exitCode !== 0) {
-    return { content: text({ ...contentOutcome, stderr }), details, isError: true };
+    return { content: runText(contentOutcome, { stdout, stderr }), details, isError: true };
   }
   return {
-    content: text(result.stdout.length > 0 ? contentOutcome : { ...contentOutcome, stderr }),
+    content: runText(contentOutcome, stdout.length > 0 ? { stdout } : { stderr }),
     details,
   };
 }
