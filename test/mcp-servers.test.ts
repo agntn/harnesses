@@ -227,12 +227,17 @@ describe("listMcpServers", () => {
       join(projectDir, "mcp.json"),
       JSON.stringify({ mcpServers: { registries: { command: "pnpm", args: ["mcp"] } } }),
     );
+    writeFileSync(
+      join(dirs.projectRoot, ".mcp.json"),
+      JSON.stringify({ mcpServers: { shared: { type: "stdio", command: "npx", args: ["srv"] } } }),
+    );
 
     const listings = listMcpServers(getHarness("mastracode"), dirs);
 
     expect(listings.map((l) => [l.scope, l.path])).toEqual([
       ["user", join(userDir, "mcp.json")],
       ["project", join(projectDir, "mcp.json")],
+      ["project", join(dirs.projectRoot, ".mcp.json")],
     ]);
     expect(listings[0]?.servers).toEqual([
       {
@@ -251,6 +256,9 @@ describe("listMcpServers", () => {
     ]);
     expect(listings[1]?.servers).toEqual([
       { name: "registries", transport: "stdio", command: "pnpm", args: ["mcp"] },
+    ]);
+    expect(listings[2]?.servers).toEqual([
+      { name: "shared", transport: "stdio", command: "npx", args: ["srv"] },
     ]);
   });
 
@@ -712,7 +720,7 @@ describe("syncMcpServers", () => {
     }
   });
 
-  it("syncs an sse master entry into Mastra Code once", () => {
+  it("syncs an sse master entry with enabled into Mastra Code once", () => {
     const dirs = fixtureDirs();
     const previousXdg = process.env.XDG_CONFIG_HOME;
     delete process.env.XDG_CONFIG_HOME;
@@ -720,7 +728,7 @@ describe("syncMcpServers", () => {
       writeMaster(
         dirs.homeDir,
         JSON.stringify({
-          mcpServers: { events: { type: "sse", url: "https://example.com/sse" } },
+          mcpServers: { events: { type: "sse", url: "https://example.com/sse", enabled: false } },
         }),
       );
 

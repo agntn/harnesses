@@ -373,7 +373,7 @@ function resolveEnvReferences(
 }
 
 /**
- * Env references per {@link resolveEnvReferences}, and for Mastra Code `sse` folded into `http`.
+ * Env references per {@link resolveEnvReferences}, minus `sse` and `enabled` for Mastra Code.
  *
  * @param server - Normalized server from the master list or a caller.
  * @param dialect - Target harness config dialect.
@@ -384,8 +384,12 @@ function shapeForDialect(
   dialect: McpConfigFile["dialect"],
 ): McpServerConfig {
   const shaped = resolveEnvReferences(server, dialect);
-  if (dialect !== "mastracode" || shaped.transport !== "sse") return shaped;
-  return { ...shaped, transport: "http" };
+  if (dialect !== "mastracode") return shaped;
+  return compact({
+    ...shaped,
+    transport: shaped.url ? ("http" as const) : ("stdio" as const),
+    enabled: undefined,
+  });
 }
 
 /**
