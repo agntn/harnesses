@@ -177,6 +177,26 @@ export default class MastraCode extends Harness {
     },
   ];
   readonly invocation: Harness["invocation"] = null;
+  override readonly mcpConfigs: Harness["mcpConfigs"] = [
+    {
+      path: "~/.mastracode/mcp.json",
+      scope: "user",
+      level: "official",
+      format: "json",
+      key: ["mcpServers"],
+      dialect: "standard",
+      note: "An entry with command is stdio and one with url is HTTP, type is ignored. mcpServers from the project's .claude/settings.local.json load too, below both mcp.json files.",
+    },
+    {
+      path: ".mastracode/mcp.json",
+      scope: "project",
+      level: "official",
+      format: "json",
+      key: ["mcpServers"],
+      dialect: "standard",
+      note: "Overrides the user file entry by entry.",
+    },
+  ];
   readonly detection = {
     envVars: [],
     projectMarkers: [".mastracode"],

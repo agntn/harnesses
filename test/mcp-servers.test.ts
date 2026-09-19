@@ -208,6 +208,52 @@ describe("listMcpServers", () => {
     }
   });
 
+  it("reads Mastra Code mcp.json at both scopes", () => {
+    const dirs = fixtureDirs();
+    const userDir = join(dirs.homeDir, ".mastracode");
+    const projectDir = join(dirs.projectRoot, ".mastracode");
+    mkdirSync(userDir, { recursive: true });
+    mkdirSync(projectDir, { recursive: true });
+    writeFileSync(
+      join(userDir, "mcp.json"),
+      JSON.stringify({
+        mcpServers: {
+          registries: { command: "node", args: ["cli.mjs", "mcp"], env: { A: "1" } },
+          remote: { url: "https://example.com/mcp", headers: { Authorization: "Bearer x" } },
+        },
+      }),
+    );
+    writeFileSync(
+      join(projectDir, "mcp.json"),
+      JSON.stringify({ mcpServers: { registries: { command: "pnpm", args: ["mcp"] } } }),
+    );
+
+    const listings = listMcpServers(getHarness("mastracode"), dirs);
+
+    expect(listings.map((l) => [l.scope, l.path])).toEqual([
+      ["user", join(userDir, "mcp.json")],
+      ["project", join(projectDir, "mcp.json")],
+    ]);
+    expect(listings[0]?.servers).toEqual([
+      {
+        name: "registries",
+        transport: "stdio",
+        command: "node",
+        args: ["cli.mjs", "mcp"],
+        env: { A: "1" },
+      },
+      {
+        name: "remote",
+        transport: "http",
+        url: "https://example.com/mcp",
+        headers: { Authorization: "Bearer x" },
+      },
+    ]);
+    expect(listings[1]?.servers).toEqual([
+      { name: "registries", transport: "stdio", command: "pnpm", args: ["mcp"] },
+    ]);
+  });
+
   it("normalizes the Antigravity serverUrl dialect", () => {
     const dirs = fixtureDirs();
     const configDir = join(dirs.homeDir, ".gemini", "config");
