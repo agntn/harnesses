@@ -108,6 +108,12 @@ export default class OpenCode extends Harness {
     },
   ];
   override readonly promptTemplates = this.commands;
+  override readonly promptTemplateSyncTarget: Harness["promptTemplateSyncTarget"] = {
+    path: "~/.config/opencode/commands/",
+    scope: "user",
+    level: "official",
+    format: "markdown",
+  };
   readonly hooks: Harness["hooks"] = [];
   readonly invocation: Harness["invocation"] = {
     args: ["run", "{prompt}"],

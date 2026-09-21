@@ -4,6 +4,7 @@ export type {
   EvidenceLevel,
   Platform,
   PathCandidate,
+  PromptTemplateSyncTarget,
   StorageDescriptor,
   HarnessCapabilities,
   HarnessDetection,
@@ -33,7 +34,7 @@ export {
   detectHarnessFromEnv,
   detectProjectHarnesses,
 } from "./registry.ts";
-export { resolvePathTemplate } from "./resolve.ts";
+export { agntnDataDir, agntnConfigDir, resolvePathTemplate } from "./resolve.ts";
 export {
   listMcpServers,
   addMcpServer,
@@ -53,6 +54,13 @@ export type {
   AgentsSyncReport,
   AgentsTargetResult,
 } from "./agents-sync.ts";
+export { syncPromptTemplates } from "./prompt-sync.ts";
+export type {
+  PromptSyncAction,
+  PromptSyncReport,
+  PromptSyncTargetResult,
+  PromptTemplateTargetResult,
+} from "./prompt-sync.ts";
 
 export type {
   ClaudeContentBlock,

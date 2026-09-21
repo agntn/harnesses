@@ -99,6 +99,12 @@ export default class Codex extends Harness {
     },
   ];
   override readonly promptTemplates = this.commands;
+  override readonly promptTemplateSyncTarget: Harness["promptTemplateSyncTarget"] = {
+    path: "~/.codex/prompts/",
+    scope: "user",
+    level: "official",
+    format: "markdown",
+  };
   readonly hooks: Harness["hooks"] = [];
   readonly invocation: Harness["invocation"] = {
     args: ["exec", "--skip-git-repo-check", "{prompt}"],

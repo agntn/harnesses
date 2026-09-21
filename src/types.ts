@@ -27,6 +27,11 @@ export interface PathCandidate {
   note?: string;
 }
 
+/** One stable user-scope destination used by prompt template synchronization. */
+export interface PromptTemplateSyncTarget extends PathCandidate {
+  format: "markdown" | "gemini-toml";
+}
+
 export interface StorageDescriptor {
   format: string;
   level: EvidenceLevel;
@@ -195,5 +200,6 @@ export interface ResolvedPaths {
   skills: PathCandidate[];
   commands: PathCandidate[];
   promptTemplates: PathCandidate[];
+  promptTemplateSyncTarget: PromptTemplateSyncTarget | null;
   hooks: PathCandidate[];
 }

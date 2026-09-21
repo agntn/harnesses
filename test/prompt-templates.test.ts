@@ -19,6 +19,13 @@ describe("prompt template locations", () => {
       "/home/fixture/.omp/agent/commands/",
     ]);
     expect(omp.promptTemplates.map((entry) => entry.path)).toContain("~/.omp/agent/prompts/");
+    expect(omp.promptTemplateSyncTarget).toEqual({
+      path: "~/.omp/agent/prompts/",
+      scope: "user",
+      level: "official",
+      format: "markdown",
+    });
+    expect(paths.promptTemplateSyncTarget?.path).toBe("/home/fixture/.omp/agent/prompts/");
   });
 
   it("applies platform filters and preserves evidence on custom template locations", () => {

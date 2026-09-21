@@ -240,6 +240,24 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
   });
 
   pi.registerTool({
+    name: "harnesses_prompts_sync",
+    label: HARNESS_TOOL_LABELS.harnesses_prompts_sync,
+    description:
+      "Sync canonical Markdown prompt templates from the agntn XDG data directory into supported harnesses; Gemini receives generated TOML. Diverged files are backed up. Pass check to only report",
+    parameters: schemas.promptsSync,
+    approval: HARNESS_TOOL_APPROVALS.harnesses_prompts_sync,
+    async execute(
+      _toolCallId,
+      params: Readonly<HarnessSchemas.PromptsSyncParams>,
+    ): Promise<AgentToolResult<HarnessTools.PromptSyncReport | HarnessTools.RunFailure>> {
+      const { promptsSync } = await loadToolOperations();
+      const { content, details } = promptsSync(params.id, params.check === true);
+      return { content, details };
+    },
+    ...statusRenderers("harnesses_prompts_sync"),
+  });
+
+  pi.registerTool({
     name: "harnesses_mcp_remove",
     label: HARNESS_TOOL_LABELS.harnesses_mcp_remove,
     description:

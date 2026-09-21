@@ -94,6 +94,12 @@ export default class Gemini extends Harness {
     },
   ];
   override readonly promptTemplates = this.commands;
+  override readonly promptTemplateSyncTarget: Harness["promptTemplateSyncTarget"] = {
+    path: "~/.gemini/commands/",
+    scope: "user",
+    level: "official",
+    format: "gemini-toml",
+  };
   readonly hooks: Harness["hooks"] = [];
   readonly invocation: Harness["invocation"] = {
     args: ["-p", "{prompt}"],

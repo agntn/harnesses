@@ -199,6 +199,12 @@ export default class MastraCode extends Harness {
     },
   ];
   override readonly promptTemplates = this.commands;
+  override readonly promptTemplateSyncTarget: Harness["promptTemplateSyncTarget"] = {
+    path: "~/.mastracode/commands/",
+    scope: "user",
+    level: "official",
+    format: "markdown",
+  };
   readonly hooks: Harness["hooks"] = [
     {
       path: ".mastracode/hooks.json",

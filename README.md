@@ -24,8 +24,9 @@ The rest of it sits on [harnesses.agntn.dev](https://harnesses.agntn.dev).
 - ▶️ **Headless runs with real modes.** Advisor without tools, full agent, or a native read-only sandbox. A mode the CLI cannot enforce is rejected.
 - 🔌 **MCP across the dialects.** One master list at `~/.config/agntn/mcp.jsonc`. TOML edits keep the comments.
 - 🔗 **One AGENTS.md behind the global files.** Symlinks, so an edit through Claude or Gemini is the same bytes.
+- 🗂️ **One prompt folder, every harness.** Markdown lives under XDG data; Gemini TOML is generated from it.
 - 📜 **Session types when the format is stable.** JSONL, SQLite, JSON. Unstable shapes stay `unknown`.
-- 🤖 **Nine tools, three doors.** MCP, Pi and OMP call the same executors.
+- 🤖 **Ten tools, three doors.** MCP, Pi and OMP call the same executors.
 
 ## 📦 Install
 
@@ -72,23 +73,25 @@ harnesses run claude "review this design"
 harnesses run codex --read-only "review this"
 harnesses mcp-servers list
 harnesses agents sync --check
+harnesses prompts sync --check
 ```
 
 `run` without `--tools` is the advisor. `--tools` is the full agent. `--read-only` asks the CLI for a sandbox and implies tools. Timeouts, `--cwd` and `--model` sit in the [CLI guide](https://harnesses.agntn.dev/guide/cli).
 
 ### Commands
 
-| Command       | What it does                                           | Example                                     |
-| ------------- | ------------------------------------------------------ | ------------------------------------------- |
-| `list`        | Every known harness, id and name                       | `harnesses list`                            |
-| `detect`      | Which ones are installed, with versions                | `harnesses detect`                          |
-| `info`        | Registry entry: modes, capabilities, path templates    | `harnesses info claude`                     |
-| `paths`       | Those templates expanded for this machine              | `harnesses paths pi`                        |
-| `models`      | Models the harness can use, through its native listing | `harnesses models pi`                       |
-| `run`         | One prompt through headless mode                       | `harnesses run claude "review this design"` |
-| `mcp-servers` | MCP servers across the config dialects                 | `harnesses mcp-servers list`                |
-| `agents sync` | Link global instructions files to one master           | `harnesses agents sync --check`             |
-| `mcp`         | The MCP server on stdio                                | `harnesses mcp`                             |
+| Command        | What it does                                           | Example                                     |
+| -------------- | ------------------------------------------------------ | ------------------------------------------- |
+| `list`         | Every known harness, id and name                       | `harnesses list`                            |
+| `detect`       | Which ones are installed, with versions                | `harnesses detect`                          |
+| `info`         | Registry entry: modes, capabilities, path templates    | `harnesses info claude`                     |
+| `paths`        | Those templates expanded for this machine              | `harnesses paths pi`                        |
+| `models`       | Models the harness can use, through its native listing | `harnesses models pi`                       |
+| `run`          | One prompt through headless mode                       | `harnesses run claude "review this design"` |
+| `mcp-servers`  | MCP servers across the config dialects                 | `harnesses mcp-servers list`                |
+| `agents sync`  | Link global instructions files to one master           | `harnesses agents sync --check`             |
+| `prompts sync` | Sync one Markdown prompt directory across harnesses    | `harnesses prompts sync --check`            |
+| `mcp`          | The MCP server on stdio                                | `harnesses mcp`                             |
 
 `list`, `detect`, `info`, `paths` and `models` take `--json` or `--toon`. `run --json` is different: that one is the harness's own structured output.
 
@@ -111,15 +114,22 @@ That's most of it, really. `getHarness` wants an exact id. `detectHarness` uses 
 
 ### Prompt templates
 
-`getHarness("pi").promptTemplates` lists reusable prompt file locations.
-`resolve().promptTemplates` expands their paths. CLI `info` and `paths`, and the
-`harnesses_info` agent tool expose them. These are metadata, not a template engine: the package
-doesn't read, expand or execute prompt files.
+Put canonical Markdown templates in `$XDG_DATA_HOME/agntn/prompts/`, or
+`~/.local/share/agntn/prompts/` when `XDG_DATA_HOME` is unset. Then sync every
+supported harness:
 
-Pi, OMP and Prime Agent have prompt directories. Gemini, OpenCode, Mastra Code
-and Claude Code expose equivalent custom commands; Codex still documents its
-deprecated local prompts. `commands` remains the broader category, so some paths
-belong to both. Formats and CLI versus IDE limits are in the
+```bash
+harnesses prompts sync --check
+harnesses prompts sync
+```
+
+Markdown harnesses receive symlinks to those files. Gemini receives generated
+TOML commands, with `$ARGUMENTS` translated to `{{args}}`. Unmanaged files at a
+managed name are backed up under the same XDG data tree before replacement.
+
+`getHarness("pi").promptTemplates` still lists every verified reusable prompt
+location. `promptTemplateSyncTarget` is the single stable user destination the
+sync owns for that harness. Formats, frontmatter and CLI limits are in the
 [registry guide](https://harnesses.agntn.dev/guide/registry#prompt-templates).
 
 ## 🗺️ Harnesses
@@ -158,7 +168,7 @@ omp install @agntn/harnesses
 }
 ```
 
-Nine tools, the same nine on MCP, Pi and OMP. `harnesses_detect`, `harnesses_info` and `harnesses_mcp_list` only read. `harnesses_run` is the one that can spend tokens. `tools` is required, so the model has to pick advisor or agent. What each call returns is on the [Agents page](https://harnesses.agntn.dev/guide/agents).
+Ten tools, the same ten on MCP, Pi and OMP. `harnesses_detect`, `harnesses_info` and `harnesses_mcp_list` only read. `harnesses_run` is the one that can spend tokens. `tools` is required, so the model has to pick advisor or agent. What each call returns is on the [Agents page](https://harnesses.agntn.dev/guide/agents).
 
 ## 🚫 What this does not do
 

@@ -271,6 +271,11 @@ export const TOOLS = [
   { name: "harnesses_mcp_remove", kind: "write", does: "Remove one MCP server" },
   { name: "harnesses_mcp_sync", kind: "write", does: "Reset user configs to mcp.jsonc" },
   { name: "harnesses_agents_sync", kind: "write", does: "Link global instructions to one master" },
+  {
+    name: "harnesses_prompts_sync",
+    kind: "write",
+    does: "Sync canonical Markdown prompts into harness destinations",
+  },
 ] as const;
 
 export const SCOPE_LABEL: Record<Scope, string> = {

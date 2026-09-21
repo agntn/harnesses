@@ -16,6 +16,7 @@ import {
   mcpRemove,
   mcpSync,
   agentsSync,
+  promptsSync,
   runHarness,
   type McpServerParams,
   type ToolResult,
@@ -154,6 +155,15 @@ const tools: ToolDefinition[] = [
     inputSchema: schemas.agentsSync,
     annotations: CONFIG_WRITE,
     execute: (args) => agentsSync(args.id as string | undefined, args.check === true),
+  },
+  {
+    name: "harnesses_prompts_sync",
+    title: "Harnesses Prompts Sync",
+    description:
+      "Sync canonical Markdown prompt templates from the agntn XDG data directory into every supported harness. Markdown targets use links; Gemini receives generated TOML. Diverged files are backed up. Pass check to only report.",
+    inputSchema: schemas.promptsSync,
+    annotations: CONFIG_WRITE,
+    execute: (args) => promptsSync(args.id as string | undefined, args.check === true),
   },
   {
     name: "harnesses_mcp_remove",

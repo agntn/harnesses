@@ -9,6 +9,7 @@ export const HARNESS_TOOL_LABELS = {
   harnesses_mcp_add: "Harnesses MCP Add",
   harnesses_mcp_sync: "Harnesses MCP Sync",
   harnesses_agents_sync: "Harnesses Agents Sync",
+  harnesses_prompts_sync: "Harnesses Prompts Sync",
   harnesses_mcp_remove: "Harnesses MCP Remove",
 } as const;
 
@@ -23,6 +24,7 @@ export const HARNESS_TOOL_APPROVALS: Record<HarnessToolName, "read" | "exec" | "
   harnesses_mcp_add: "write",
   harnesses_mcp_sync: "write",
   harnesses_agents_sync: "write",
+  harnesses_prompts_sync: "write",
   harnesses_mcp_remove: "write",
 };
 
@@ -150,6 +152,7 @@ const CALL_DESCRIPTIONS: Record<HarnessToolName, CallDescriptionRenderer> = {
   harnesses_mcp_add: mutationDescription,
   harnesses_mcp_sync: idDescription,
   harnesses_agents_sync: agentsDescription,
+  harnesses_prompts_sync: agentsDescription,
   harnesses_mcp_remove: mutationDescription,
 };
 
@@ -267,6 +270,15 @@ function agentsSyncMeta(details: ResultDetails): string[] {
   return [`${changed} targets`];
 }
 
+function promptsSyncMeta(details: ResultDetails): string[] {
+  const templates = listLength(details, "templates");
+  const targets = listLength(details, "targets");
+  return compactStrings([
+    templates === undefined ? undefined : `${templates} templates`,
+    targets === undefined ? undefined : `${targets} harnesses`,
+  ]);
+}
+
 const RESULT_META: Record<HarnessToolName, ResultMetaRenderer> = {
   harnesses_detect: detectMeta,
   harnesses_info: infoMeta,
@@ -276,6 +288,7 @@ const RESULT_META: Record<HarnessToolName, ResultMetaRenderer> = {
   harnesses_mcp_add: mutationMeta,
   harnesses_mcp_sync: mcpSyncMeta,
   harnesses_agents_sync: agentsSyncMeta,
+  harnesses_prompts_sync: promptsSyncMeta,
   harnesses_mcp_remove: mutationMeta,
 };
 
