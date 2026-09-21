@@ -1,48 +1,8 @@
-import { stripVTControlCharacters } from "node:util";
 import { defineCommand } from "citty";
 import { consola } from "consola";
-import { encode as toToon } from "@toon-format/toon";
 import { isHarnessId, listHarnesses } from "../registry.ts";
-import { mcpAdd, mcpList, mcpRemove, mcpSync, type ToolResult } from "../tool-operations.ts";
-
-const formatArgs = {
-  json: { type: "boolean" as const, description: "Output as JSON" },
-  toon: { type: "boolean" as const, description: "Output as TOON" },
-};
-
-// MCP listings echo values read from project-controlled config files, so a
-// malicious server name could smuggle ANSI/OSC sequences into the terminal.
-// oxlint-disable-next-line no-control-regex -- Terminal control bytes are precisely what this boundary removes.
-const UNSAFE_TERMINAL_CONTROLS = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F]/g;
-
-function sanitize(text: string | undefined): string {
-  return stripVTControlCharacters(text ?? "").replace(UNSAFE_TERMINAL_CONTROLS, " ");
-}
-
-/**
- * Emits one tool result: machine format when asked, sanitized text otherwise.
- *
- * @param result - Tool result to emit.
- * @param args - Selected output-format flags.
- */
-function report(
-  result: ToolResult<unknown>,
-  args: Readonly<{ json?: boolean; toon?: boolean }>,
-): void {
-  if (result.isError) {
-    consola.error(sanitize(result.content[0]?.text));
-    process.exit(1);
-  }
-  if (args.json) {
-    console.log(JSON.stringify(result.details, null, 2));
-    return;
-  }
-  if (args.toon) {
-    console.log(toToon(result.details));
-    return;
-  }
-  console.log(sanitize(result.content[0]?.text));
-}
+import { mcpAdd, mcpList, mcpRemove, mcpSync } from "../tool-operations.ts";
+import { formatArgs, report } from "./output.ts";
 
 function requireHarnessId(id: string): string {
   if (!isHarnessId(id)) {

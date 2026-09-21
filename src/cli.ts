@@ -393,6 +393,7 @@ const main = defineCommand({
     run,
     "mcp-servers": () => import("./commands/mcp-servers.ts").then((m) => m.default),
     agents: () => import("./commands/agents.ts").then((m) => m.default),
+    prompts: () => import("./commands/prompts.ts").then((m) => m.default),
     mcp: () => import("./commands/mcp.ts").then((m) => m.default),
   },
 });

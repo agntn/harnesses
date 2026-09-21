@@ -226,11 +226,11 @@ const activeId = computed(() => current.value.id);
 
     <LandingFeature
       eyebrow="Agents"
-      title="Nine tools, three hosts"
+      title="Ten tools, three hosts"
       to="/guide/agents"
       link="MCP, Pi and OMP"
       :checks="[
-        'harnesses_detect, harnesses_info, harnesses_models, harnesses_run, and five for MCP lists and AGENTS.md',
+        'harnesses_detect, harnesses_info, harnesses_models, harnesses_run, and six for MCP configuration, AGENTS.md, and prompts',
         'harnesses_run makes the model choose tools explicitly; unsupported modes never widen access',
         'The host\'s own request signal cancels a run, not a JSON argument the model could forget',
       ]"

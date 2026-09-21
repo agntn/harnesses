@@ -26,6 +26,7 @@ export type HarnessRecord = Pick<
   | "skills"
   | "commands"
   | "promptTemplates"
+  | "promptTemplateSyncTarget"
   | "hooks"
   | "mcpConfigs"
   | "agentsFile"

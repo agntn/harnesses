@@ -21,7 +21,10 @@ import { readAgentsConfig, syncAgentsFiles } from "./agents-sync.ts";
 import type { AgentsSyncReport } from "./agents-sync.ts";
 export type { AgentsSyncReport } from "./agents-sync.ts";
 export type { SyncReport } from "./mcp-servers.ts";
+export type { PromptSyncReport } from "./prompt-sync.ts";
 export type { HarnessInvocationModes } from "./types.ts";
+import { syncPromptTemplates } from "./prompt-sync.ts";
+import type { PromptSyncReport } from "./prompt-sync.ts";
 import type { Harness } from "./harness.ts";
 import type {
   AvailableModel,
@@ -33,6 +36,7 @@ import type {
   ListModelsResult,
   McpServerConfig,
   PathCandidate,
+  PromptTemplateSyncTarget,
   ResolvedPaths,
   StorageDescriptor,
 } from "./types.ts";
@@ -73,6 +77,7 @@ export interface HarnessMetadata {
   skills: PathCandidate[];
   commands: PathCandidate[];
   promptTemplates: PathCandidate[];
+  promptTemplateSyncTarget: PromptTemplateSyncTarget | null;
   hooks: PathCandidate[];
   persistence: StorageDescriptor[];
   detection: HarnessDetection;
@@ -308,6 +313,7 @@ function harnessInfoResult(id: string): HarnessInfoResult {
     skills: harness.skills,
     commands: harness.commands,
     promptTemplates: harness.promptTemplates,
+    promptTemplateSyncTarget: harness.promptTemplateSyncTarget,
     hooks: harness.hooks,
     persistence: harness.persistence,
     detection: harness.detection,
@@ -319,7 +325,14 @@ function harnessInfoResult(id: string): HarnessInfoResult {
 type HarnessInfoText =
   | Omit<
       HarnessMetadata,
-      "config" | "sessions" | "instructions" | "skills" | "commands" | "promptTemplates" | "hooks"
+      | "config"
+      | "sessions"
+      | "instructions"
+      | "skills"
+      | "commands"
+      | "promptTemplates"
+      | "promptTemplateSyncTarget"
+      | "hooks"
     >
   | UnknownHarness;
 
@@ -755,6 +768,28 @@ export function agentsSync(id?: string, check = false): ToolResult<AgentsSyncRep
       return { content: text(details), details, isError: true };
     }
     const details = syncAgentsFiles(
+      id !== undefined && isHarnessId(id) ? [getHarness(id)] : getAllHarnesses(),
+      check,
+    );
+    return { content: text(details), details };
+  } catch (error) {
+    const details: RunFailure = { error: errorMessage(error) };
+    return { content: text(details), details, isError: true };
+  }
+}
+
+/**
+ * Synchronizes canonical Markdown prompt templates into harness destinations.
+ *
+ * @param id - Optional harness id; omission targets every harness.
+ * @param check - Report intended changes without writing them.
+ * @returns {ToolResult<PromptSyncReport | RunFailure>} The sync report or failure.
+ */
+export function promptsSync(id?: string, check = false): ToolResult<PromptSyncReport | RunFailure> {
+  if (id !== undefined && !isHarnessId(id)) return unknownHarness(id);
+
+  try {
+    const details = syncPromptTemplates(
       id !== undefined && isHarnessId(id) ? [getHarness(id)] : getAllHarnesses(),
       check,
     );

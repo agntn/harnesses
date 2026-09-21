@@ -1,5 +1,7 @@
 import { spawnSync, type SpawnSyncReturns } from "node:child_process";
-import { resolve } from "node:path";
+import { mkdirSync, mkdtempSync, readlinkSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 import { describe, expect, it } from "vitest";
 
@@ -11,15 +13,18 @@ const hook = resolve(root, "test/record-loads.ts");
  * Runs `src/cli.ts` under the load hook; citty exits the process itself, so the hook reports at exit.
  * @param args - CLI arguments after the bin name.
  * @param input - Text handed to the child's stdin before it closes.
+ * @param environment - Environment entries added to the child process.
  * @returns {SpawnSyncReturns<string> & { loaded: string[] }} The spawn result plus every module URL the child loaded.
  */
 function runCli(
   args: readonly string[],
   input = "",
+  environment: Readonly<Record<string, string>> = {},
 ): SpawnSyncReturns<string> & { loaded: string[] } {
   const result = spawnSync(process.execPath, ["--import", hook, cli, ...args], {
     cwd: root,
     encoding: "utf8",
+    env: { ...process.env, ...environment },
     input,
     timeout: 20_000,
   });
@@ -55,6 +60,48 @@ describe("harnesses usage paths", () => {
     expect(loadedFrom(result.loaded, "/node_modules/@modelcontextprotocol/")).toEqual([]);
     expect(loadedFrom(result.loaded, "/node_modules/typebox/")).toEqual([]);
     expect(result.loaded.filter((url) => url.endsWith("/src/mcp.ts"))).toEqual([]);
+  });
+
+  it("harnesses prompts sync links the canonical Markdown source", () => {
+    const temporaryRoot = mkdtempSync(join(tmpdir(), "harnesses-cli-prompts-"));
+    const homeDir = join(temporaryRoot, "home");
+    const xdgDataDir = join(temporaryRoot, "data");
+    const source = join(xdgDataDir, "agntn", "prompts", "review.md");
+    mkdirSync(resolve(source, ".."), { recursive: true });
+    writeFileSync(source, "Review $ARGUMENTS.\n");
+
+    try {
+      const result = runCli(["prompts", "sync", "pi", "--json"], "", {
+        HOME: homeDir,
+        USERPROFILE: homeDir,
+        XDG_DATA_HOME: xdgDataDir,
+      });
+
+      expect(result.status).toBe(0);
+      expect(JSON.parse(result.stdout)).toMatchObject({
+        templates: ["review"],
+        targets: [{ id: "pi", templates: [{ name: "review", action: "linked" }] }],
+      });
+      expect(readlinkSync(join(homeDir, ".pi", "agent", "prompts", "review.md"))).toBe(source);
+    } finally {
+      rmSync(temporaryRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("harnesses prompts sync formats failures as JSON", () => {
+    const result = runCli(["prompts", "sync", "unknown", "--json"]);
+
+    expect(result.status).toBe(1);
+    expect(JSON.parse(result.stdout)).toMatchObject({ error: "Unknown harness: unknown" });
+  });
+
+  it("harnesses prompts sync sanitizes Unicode formatting in human errors", () => {
+    const bidiOverride = String.fromCodePoint(0x202e);
+    const result = runCli(["prompts", "sync", `bad${bidiOverride}id`]);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Unknown harness: bad id");
+    expect(result.stderr).not.toContain(bidiOverride);
   });
 
   it("harnesses mcp serves the server over stdio", () => {

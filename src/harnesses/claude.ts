@@ -113,6 +113,12 @@ export default class Claude extends Harness {
     },
   ];
   override readonly promptTemplates = this.commands;
+  override readonly promptTemplateSyncTarget: Harness["promptTemplateSyncTarget"] = {
+    path: "~/.claude/commands/",
+    scope: "user",
+    level: "official",
+    format: "markdown",
+  };
   readonly hooks: Harness["hooks"] = [
     { path: ".claude/hooks/", scope: "project", level: "official" },
     {

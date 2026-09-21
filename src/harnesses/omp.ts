@@ -144,6 +144,12 @@ export default class Omp extends Harness {
       note: "Global Markdown prompt templates, separate from executable commands.",
     },
   ];
+  override readonly promptTemplateSyncTarget: Harness["promptTemplateSyncTarget"] = {
+    path: "~/.omp/agent/prompts/",
+    scope: "user",
+    level: "official",
+    format: "markdown",
+  };
   readonly hooks: Harness["hooks"] = [];
   readonly invocation: Harness["invocation"] = {
     args: ["-p", "{prompt}"],

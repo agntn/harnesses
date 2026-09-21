@@ -1,16 +1,14 @@
 import { defineCommand } from "citty";
-import { consola } from "consola";
-import { isHarnessId, listHarnesses } from "../registry.ts";
-import { agentsSync } from "../tool-operations.ts";
+import { promptsSync } from "../tool-operations.ts";
 import { formatArgs, report } from "./output.ts";
 
 export default defineCommand({
-  meta: { description: "Manage the shared global instructions file across harnesses" },
+  meta: { description: "Manage shared prompt templates across harnesses" },
   subCommands: {
     sync: defineCommand({
       meta: {
         description:
-          "Link global instructions and declared companions (agents.jsonc: source, companions, excludes)",
+          "Sync Markdown templates from the agntn XDG data directory into harness destinations",
       },
       args: {
         id: { type: "positional" as const, description: "Harness id", required: false },
@@ -22,11 +20,7 @@ export default defineCommand({
       },
       run({ args }) {
         const id = args.id === undefined ? undefined : (args.id as string);
-        if (id !== undefined && !isHarnessId(id)) {
-          consola.error(`Unknown harness: ${id}\nKnown: ${listHarnesses().join(", ")}`);
-          process.exit(1);
-        }
-        report(agentsSync(id, args.check === true), args);
+        report(promptsSync(id, args.check === true), args);
       },
     }),
   },

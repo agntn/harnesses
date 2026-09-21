@@ -112,6 +112,7 @@ describe("harnesses MCP server", () => {
       "harnesses_mcp_add",
       "harnesses_mcp_sync",
       "harnesses_agents_sync",
+      "harnesses_prompts_sync",
       "harnesses_mcp_remove",
     ]);
     const runTool = response.tools.find((tool) => tool.name === "harnesses_run");

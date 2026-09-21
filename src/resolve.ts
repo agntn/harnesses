@@ -32,3 +32,17 @@ export function agntnConfigDir(options: ResolveOptions = {}): string {
       : join(options.homeDir ?? os.homedir(), ".config");
   return join(base, "agntn");
 }
+
+/**
+ * The agntn data directory: $XDG_DATA_HOME/agntn or ~/.local/share/agntn.
+ *
+ * @param options - Path-resolution overrides.
+ * @returns {string} The resolved agntn data directory.
+ */
+export function agntnDataDir(options: ResolveOptions = {}): string {
+  const base =
+    process.env.XDG_DATA_HOME && process.env.XDG_DATA_HOME !== ""
+      ? process.env.XDG_DATA_HOME
+      : join(options.homeDir ?? os.homedir(), ".local", "share");
+  return join(base, "agntn");
+}
