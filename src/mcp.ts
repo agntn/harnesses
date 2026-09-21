@@ -7,20 +7,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { Type, type TSchema } from "typebox";
 import { Value } from "typebox/value";
-import {
-  detectHarnesses,
-  harnessInfo,
-  listHarnessModels,
-  mcpAdd,
-  mcpList,
-  mcpRemove,
-  mcpSync,
-  agentsSync,
-  promptsSync,
-  runHarness,
-  type McpServerParams,
-  type ToolResult,
-} from "./tool-operations.ts";
+import type { McpServerParams, ToolResult } from "./tool-operations.ts";
 import { harnessToolSchemas } from "./tool-schemas.ts";
 import { version } from "./types.ts";
 
@@ -31,6 +18,7 @@ interface ToolDefinition {
   inputSchema: TSchema;
   annotations: Tool["annotations"];
   execute(
+    operations: Readonly<typeof import("./tool-operations.ts")>,
     args: Readonly<Record<string, unknown>>,
     signal: AbortSignal,
   ): ToolResult<unknown> | Promise<ToolResult<unknown>>;
@@ -58,6 +46,7 @@ const CONFIG_WRITE: Tool["annotations"] = {
 };
 
 const schemas = harnessToolSchemas<TSchema, TSchema>(Type);
+let operationsPromise: Promise<typeof import("./tool-operations.ts")> | undefined;
 
 const tools: ToolDefinition[] = [
   {
@@ -66,7 +55,7 @@ const tools: ToolDefinition[] = [
     description: "List every known AI coding harness with its install state and version.",
     inputSchema: schemas.detect,
     annotations: READ_ONLY,
-    execute: () => detectHarnesses(),
+    execute: ({ detectHarnesses }) => detectHarnesses(),
   },
   {
     name: "harnesses_info",
@@ -75,7 +64,7 @@ const tools: ToolDefinition[] = [
       "Full metadata for one or more AI coding harnesses, including supported invocation and model operations, configuration, sessions, instructions, skills, commands, prompt templates, hooks, and resolved paths.",
     inputSchema: schemas.info,
     annotations: READ_ONLY,
-    execute: (args) => harnessInfo(args.id as string | string[]),
+    execute: ({ harnessInfo }, args) => harnessInfo(args.id as string | string[]),
   },
   {
     name: "harnesses_models",
@@ -84,7 +73,7 @@ const tools: ToolDefinition[] = [
       "List the models currently available to one AI coding harness through its native CLI, normalized across providers. An optional search filter is passed to harnesses that support it. The command may load project configuration and extensions.",
     inputSchema: schemas.models,
     annotations: EXEC_READ,
-    execute: (args, signal) =>
+    execute: ({ listHarnessModels }, args, signal) =>
       listHarnessModels(args.id as string, {
         search: args.search as string | undefined,
         cwd: args.cwd as string | undefined,
@@ -104,7 +93,7 @@ const tools: ToolDefinition[] = [
       idempotentHint: false,
       openWorldHint: true,
     },
-    execute: (args, signal) =>
+    execute: ({ runHarness }, args, signal) =>
       runHarness(args.id as string, args.prompt as string, {
         cwd: args.cwd as string | undefined,
         model: args.model as string | undefined,
@@ -122,7 +111,7 @@ const tools: ToolDefinition[] = [
       "List the MCP servers configured in each harness's config files, normalized across dialects. Omit id to scan every harness.",
     inputSchema: schemas.mcpList,
     annotations: READ_ONLY,
-    execute: (args) => mcpList(args.id as string | undefined),
+    execute: ({ mcpList }, args) => mcpList(args.id as string | undefined),
   },
   {
     name: "harnesses_mcp_add",
@@ -131,7 +120,7 @@ const tools: ToolDefinition[] = [
       "Add or replace one MCP server in a harness config. JSON configs are rewritten; TOML configs get a surgical, comment-preserving edit.",
     inputSchema: schemas.mcpAdd,
     annotations: CONFIG_WRITE,
-    execute: (args) =>
+    execute: ({ mcpAdd }, args) =>
       mcpAdd(
         args.id as string,
         args as unknown as McpServerParams,
@@ -145,7 +134,7 @@ const tools: ToolDefinition[] = [
       "Reset every harness's user-scope MCP config to exactly the master list from ~/.config/agntn/mcp.jsonc: servers are added, replaced, and extras removed. Excluded harnesses keep their own servers, but master-listed names are withdrawn from them.",
     inputSchema: schemas.mcpSync,
     annotations: CONFIG_WRITE,
-    execute: (args) => mcpSync(args.id as string | undefined),
+    execute: ({ mcpSync }, args) => mcpSync(args.id as string | undefined),
   },
   {
     name: "harnesses_agents_sync",
@@ -154,7 +143,8 @@ const tools: ToolDefinition[] = [
       "Link every harness's global instructions file and declared companions to the master bundle, so edits made through any harness land in one place. Diverged copies are backed up and relinked. Pass check to only report.",
     inputSchema: schemas.agentsSync,
     annotations: CONFIG_WRITE,
-    execute: (args) => agentsSync(args.id as string | undefined, args.check === true),
+    execute: ({ agentsSync }, args) =>
+      agentsSync(args.id as string | undefined, args.check === true),
   },
   {
     name: "harnesses_prompts_sync",
@@ -163,7 +153,8 @@ const tools: ToolDefinition[] = [
       "Sync canonical Markdown prompt templates from the agntn XDG data directory into every supported harness. Markdown targets use links; Gemini receives generated TOML. Diverged files are backed up. Pass check to only report.",
     inputSchema: schemas.promptsSync,
     annotations: CONFIG_WRITE,
-    execute: (args) => promptsSync(args.id as string | undefined, args.check === true),
+    execute: ({ promptsSync }, args) =>
+      promptsSync(args.id as string | undefined, args.check === true),
   },
   {
     name: "harnesses_mcp_remove",
@@ -172,7 +163,7 @@ const tools: ToolDefinition[] = [
       "Remove one MCP server from a harness config. JSON configs are rewritten; TOML configs get a surgical, comment-preserving edit.",
     inputSchema: schemas.mcpRemove,
     annotations: CONFIG_WRITE,
-    execute: (args) =>
+    execute: ({ mcpRemove }, args) =>
       mcpRemove(
         args.id as string,
         args.name as string,
@@ -265,7 +256,10 @@ export function createMcpServer(): Server {
     }
 
     try {
-      return toCallToolResult(await tool.execute(args, extra.signal));
+      operationsPromise ??= import("./tool-operations.ts");
+      const operations = await operationsPromise;
+      extra.signal.throwIfAborted();
+      return toCallToolResult(await tool.execute(operations, args, extra.signal));
     } catch (error) {
       return errorResult(
         `${tool.name} failed: ${error instanceof Error ? error.message : String(error)}`,
