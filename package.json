@@ -58,7 +58,7 @@
     "yaml": "2.9.1"
   },
   "devDependencies": {
-    "@agntn/ox": "^0.1.0",
+    "@agntn/ox": "0.1.0",
     "@earendil-works/pi-coding-agent": "0.85.1",
     "@earendil-works/pi-tui": "0.85.1",
     "@oh-my-pi/omptype": "18.2.5",
