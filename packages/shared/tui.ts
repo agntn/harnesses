@@ -95,8 +95,16 @@ function listLength(record: Readonly<Record<string, unknown>>, key: string): num
 
 function resultText(result: RenderedToolResult): string {
   const parts: string[] = [];
+  let length = 0;
   for (const part of result.content ?? []) {
-    if (isRecord(part) && typeof part.text === "string") parts.push(part.text);
+    if (!isRecord(part) || typeof part.text !== "string") continue;
+    const separator = parts.length === 0 ? 0 : 1;
+    const remaining = RESULT_BODY_LIMIT + 1 - length - separator;
+    if (remaining < 0) break;
+    const text = part.text.slice(0, remaining);
+    parts.push(text);
+    length += separator + text.length;
+    if (length > RESULT_BODY_LIMIT) break;
   }
   return parts.join("\n");
 }

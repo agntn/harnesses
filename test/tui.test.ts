@@ -136,6 +136,52 @@ describe("shared extension TUI", () => {
     expect(expanded).toContain(marker);
   });
 
+  it("stops reading content after the expanded body limit", () => {
+    const content = [
+      { text: "x".repeat(16001) },
+      {
+        get text(): string {
+          throw new Error("Content beyond the limit was read");
+        },
+      },
+    ];
+    const expanded = renderToolResult(
+      "harnesses_info",
+      { content },
+      false,
+      { expanded: true },
+      plainTheme,
+    );
+    expect(expanded).toBe(`✓ (read)\n  ${"x".repeat(15999)}…`);
+  });
+
+  it.each([
+    ["x".repeat(16000)],
+    ["x".repeat(16000), ""],
+    ["", "x".repeat(15999)],
+    ["x".repeat(15998), "😀tail"],
+    ["x".repeat(15998) + "😀tail"],
+    ["", "", "first", "", "second"],
+  ])("preserves joined preview boundaries for %#", (...texts) => {
+    const joined = texts.join("\n");
+    const whole = renderToolResult(
+      "harnesses_info",
+      { content: [{ text: joined }] },
+      false,
+      { expanded: true },
+      plainTheme,
+    );
+    const split = renderToolResult(
+      "harnesses_info",
+      { content: texts.map((text) => ({ text })) },
+      false,
+      { expanded: true },
+      plainTheme,
+    );
+    expect(split).toBe(whole);
+    expect(split).not.toContain("�");
+  });
+
   it("marks no-op mutations as unsuccessful", () => {
     const line = renderToolResult(
       "harnesses_mcp_remove",
