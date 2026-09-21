@@ -251,8 +251,8 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       params: Readonly<HarnessSchemas.PromptsSyncParams>,
     ): Promise<AgentToolResult<HarnessTools.PromptSyncReport | HarnessTools.RunFailure>> {
       const { promptsSync } = await loadToolOperations();
-      const { content, details } = promptsSync(params.id, params.check === true);
-      return { content, details };
+      const { content, details, isError } = promptsSync(params.id, params.check === true);
+      return { content, details, isError };
     },
     ...statusRenderers("harnesses_prompts_sync"),
   });

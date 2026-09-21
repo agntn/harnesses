@@ -282,7 +282,12 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       params: Readonly<HarnessSchemas.PromptsSyncParams>,
     ): Promise<AgentToolResult<HarnessTools.PromptSyncReport | HarnessTools.RunFailure>> {
       const { promptsSync } = await loadToolOperations();
-      const { content, details } = promptsSync(params.id, params.check === true);
+      const { content, details, isError } = promptsSync(params.id, params.check === true);
+      if (isError) {
+        throw new Error(
+          "error" in details ? details.error : (content[0]?.text ?? "Prompt sync failed"),
+        );
+      }
       return { content, details };
     },
   });

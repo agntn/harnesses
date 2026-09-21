@@ -73,6 +73,7 @@ describe("harnesses usage paths", () => {
     try {
       const result = runCli(["prompts", "sync", "pi", "--json"], "", {
         HOME: homeDir,
+        USERPROFILE: homeDir,
         XDG_DATA_HOME: xdgDataDir,
       });
 
@@ -85,6 +86,22 @@ describe("harnesses usage paths", () => {
     } finally {
       rmSync(temporaryRoot, { recursive: true, force: true });
     }
+  });
+
+  it("harnesses prompts sync formats failures as JSON", () => {
+    const result = runCli(["prompts", "sync", "unknown", "--json"]);
+
+    expect(result.status).toBe(1);
+    expect(JSON.parse(result.stdout)).toMatchObject({ error: "Unknown harness: unknown" });
+  });
+
+  it("harnesses prompts sync sanitizes Unicode formatting in human errors", () => {
+    const bidiOverride = String.fromCodePoint(0x202e);
+    const result = runCli(["prompts", "sync", `bad${bidiOverride}id`]);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Unknown harness: bad id");
+    expect(result.stderr).not.toContain(bidiOverride);
   });
 
   it("harnesses mcp serves the server over stdio", () => {

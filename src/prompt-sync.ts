@@ -85,7 +85,7 @@ const GEMINI_BACKUP: Record<DestinationState["kind"], boolean> = {
   missing: false,
   "correct-link": true,
   "wrong-link": true,
-  "owned-file": false,
+  "owned-file": true,
   "unmanaged-file": true,
   unsupported: false,
 };
@@ -126,6 +126,17 @@ function readTemplates(sourceDir: string, check: boolean): PromptTemplate[] {
   return templates;
 }
 
+function generatedSource(content: string): string | null {
+  const firstLine = content.split("\n", 1)[0] ?? "";
+  if (!firstLine.startsWith(GENERATED_MARKER)) return null;
+  try {
+    const source: unknown = JSON.parse(firstLine.slice(GENERATED_MARKER.length));
+    return typeof source === "string" ? source : null;
+  } catch {
+    return null;
+  }
+}
+
 function inspectDestination(path: string, source?: string): DestinationState {
   let stats;
   try {
@@ -144,7 +155,7 @@ function inspectDestination(path: string, source?: string): DestinationState {
   if (!stats.isFile()) return { kind: "unsupported" };
 
   const content = readFileSync(path, "utf8");
-  if (content.startsWith(GENERATED_MARKER)) return { kind: "owned-file", content };
+  if (generatedSource(content) !== null) return { kind: "owned-file", content };
   return { kind: "unmanaged-file" };
 }
 
@@ -159,11 +170,10 @@ function linkTemplate(path: string, source: string): void {
   renameSync(temp, path);
 }
 
-function writeTemplate(path: string, content: string, replace: boolean): void {
+function writeTemplate(path: string, content: string): void {
   mkdirSync(dirname(path), { recursive: true });
   const temp = tempPath(path, "prompt-write");
   writeFileSync(temp, content);
-  if (replace) unlinkSync(path);
   renameSync(temp, path);
 }
 
@@ -171,12 +181,17 @@ function backupDestination(id: string, path: string, options: ResolveOptions): s
   const backupDir = join(agntnDataDir(options), "diverged", "prompts", id);
   mkdirSync(backupDir, { recursive: true });
   const backup = join(backupDir, `${basename(path)}-${Date.now()}-${randomUUID()}`);
+  if (lstatSync(path).isSymbolicLink()) {
+    const target = readlinkSync(path);
+    symlinkSync(isAbsolute(target) ? target : resolve(dirname(path), target), backup);
+    unlinkSync(path);
+    return backup;
+  }
   try {
     renameSync(path, backup);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "EXDEV") throw error;
-    if (lstatSync(path).isSymbolicLink()) symlinkSync(readlinkSync(path), backup);
-    else copyFileSync(path, backup);
+    copyFileSync(path, backup);
     unlinkSync(path);
   }
   return backup;
@@ -249,11 +264,10 @@ function parseMarkdownTemplate(template: PromptTemplate): {
     prompt: template.content.slice(match[0].length).replaceAll("$ARGUMENTS", "{{args}}"),
   };
 }
-
 function geminiContent(template: PromptTemplate): string {
   const parsed = parseMarkdownTemplate(template);
   const fields = [
-    `${GENERATED_MARKER}${template.path}`,
+    `${GENERATED_MARKER}${JSON.stringify(template.path)}`,
     ...(parsed.description === undefined
       ? []
       : [`description = ${JSON.stringify(parsed.description)}`]),
@@ -293,7 +307,7 @@ function syncGeminiTemplate(
 
   let detail: string | undefined;
   if (GEMINI_BACKUP[state.kind]) detail = backupDestination(id, path, options);
-  writeTemplate(path, content, state.kind === "owned-file");
+  writeTemplate(path, content);
   return { name: template.name, source: template.path, path, action, detail };
 }
 
@@ -324,9 +338,8 @@ function staleGeminiSource(path: string, sourceDir: string): string | null {
   } catch {
     return null;
   }
-  const firstLine = content.split("\n", 1)[0] ?? "";
-  if (!firstLine.startsWith(GENERATED_MARKER)) return null;
-  const source = firstLine.slice(GENERATED_MARKER.length);
+  const source = generatedSource(content);
+  if (source === null) return null;
   return isInsideDirectory(source, sourceDir) ? source : null;
 }
 

@@ -6,11 +6,12 @@ import {
   readFileSync,
   readlinkSync,
   symlinkSync,
+  unlinkSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { parse as parseToml } from "smol-toml";
 import { afterEach, describe, expect, it } from "vitest";
 import { getHarness, syncPromptTemplates } from "../src/index.ts";
@@ -97,6 +98,14 @@ describe("syncPromptTemplates", () => {
         "unchanged",
         "replaced",
       ]);
+      const replaced = third.targets[1]?.templates[0];
+      if (replaced?.detail === undefined) {
+        throw new Error("Missing backup for replaced Gemini template");
+      }
+      expect(parseToml(readFileSync(replaced.detail, "utf8"))).toEqual({
+        description: "Review the current change",
+        prompt: "Review {{args}} carefully.\n",
+      });
       expect(parseToml(readFileSync(geminiPath, "utf8"))).toEqual({
         description: "Review the update",
         prompt: "Inspect {{args}} again.\n",
@@ -143,6 +152,32 @@ describe("syncPromptTemplates", () => {
     });
   });
 
+  it("preserves the referent when backing up a relative Gemini symlink", () => {
+    withoutXdgData(() => {
+      const { homeDir, sourceDir } = fixture();
+      writeFileSync(join(sourceDir, "review.md"), "Review this.\n");
+      const customDir = join(homeDir, ".gemini", "custom");
+      const targetDir = join(homeDir, ".gemini", "commands");
+      const custom = join(customDir, "review.toml");
+      const target = join(targetDir, "review.toml");
+      mkdirSync(customDir, { recursive: true });
+      mkdirSync(targetDir, { recursive: true });
+      writeFileSync(custom, 'prompt = "local"\n');
+      symlinkSync("../custom/review.toml", target);
+
+      const report = syncPromptTemplates([getHarness("gemini")], false, {
+        homeDir,
+        platform: "linux",
+      });
+      const adopted = report.targets[0]?.templates[0];
+      if (adopted?.detail === undefined) throw new Error("Missing backup for adopted template");
+      const backupTarget = readlinkSync(adopted.detail);
+
+      expect(resolve(dirname(adopted.detail), backupTarget)).toBe(custom);
+      expect(readFileSync(adopted.detail, "utf8")).toBe('prompt = "local"\n');
+    });
+  });
+
   it("uses XDG_DATA_HOME for canonical prompts and divergence backups", () => {
     const previous = process.env.XDG_DATA_HOME;
     const root = temporaryRoot("harnesses-prompts-xdg-");
@@ -165,6 +200,40 @@ describe("syncPromptTemplates", () => {
       expect(report.source).toBe(sourceDir);
       expect(adopted?.action).toBe("adopted");
       expect(adopted?.detail).toContain(join(xdgData, "agntn", "diverged", "prompts", "pi"));
+    } finally {
+      if (previous === undefined) delete process.env.XDG_DATA_HOME;
+      else process.env.XDG_DATA_HOME = previous;
+    }
+  });
+
+  it("encodes XDG paths safely in Gemini ownership markers", () => {
+    const previous = process.env.XDG_DATA_HOME;
+    const root = temporaryRoot("harnesses-prompts-marker-");
+    const homeDir = join(root, "home");
+    const xdgData = join(root, "data\nhome");
+    const sourceDir = join(xdgData, "agntn", "prompts");
+    const source = join(sourceDir, "review.md");
+    const target = join(homeDir, ".gemini", "commands", "review.toml");
+    mkdirSync(sourceDir, { recursive: true });
+    writeFileSync(source, "Review this.\n");
+    process.env.XDG_DATA_HOME = xdgData;
+
+    try {
+      syncPromptTemplates([getHarness("gemini")], false, {
+        homeDir,
+        platform: "linux",
+      });
+      expect(parseToml(readFileSync(target, "utf8"))).toMatchObject({
+        prompt: "Review this.\n",
+      });
+
+      unlinkSync(source);
+      const report = syncPromptTemplates([getHarness("gemini")], false, {
+        homeDir,
+        platform: "linux",
+      });
+      expect(report.targets[0]?.templates[0]?.action).toBe("removed");
+      expect(existsSync(target)).toBe(false);
     } finally {
       if (previous === undefined) delete process.env.XDG_DATA_HOME;
       else process.env.XDG_DATA_HOME = previous;

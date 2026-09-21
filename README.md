@@ -24,7 +24,7 @@ The rest of it sits on [harnesses.agntn.dev](https://harnesses.agntn.dev).
 - ▶️ **Headless runs with real modes.** Advisor without tools, full agent, or a native read-only sandbox. A mode the CLI cannot enforce is rejected.
 - 🔌 **MCP across the dialects.** One master list at `~/.config/agntn/mcp.jsonc`. TOML edits keep the comments.
 - 🔗 **One AGENTS.md behind the global files.** Symlinks, so an edit through Claude or Gemini is the same bytes.
-- 🗂️ **One prompt folder, every harness.** Markdown lives under XDG data; Gemini TOML is generated from it.
+- 🗂️ **One prompt folder, supported harnesses.** Markdown lives under XDG data; Gemini TOML is generated from it.
 - 📜 **Session types when the format is stable.** JSONL, SQLite, JSON. Unstable shapes stay `unknown`.
 - 🤖 **Ten tools, three doors.** MCP, Pi and OMP call the same executors.
 
