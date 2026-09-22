@@ -131,8 +131,16 @@ export default class Claude extends Harness {
   readonly invocation: Harness["invocation"] = {
     args: ["-p", "{prompt}"],
     jsonArgs: ["-p", "--output-format", "json", "{prompt}"],
-    noToolsArgs: ["-p", "{prompt}", "--tools", ""],
-    noToolsJsonArgs: ["-p", "--output-format", "json", "{prompt}", "--tools", ""],
+    noToolsArgs: ["-p", "{prompt}", "--strict-mcp-config", "--tools", ""],
+    noToolsJsonArgs: [
+      "-p",
+      "--output-format",
+      "json",
+      "{prompt}",
+      "--strict-mcp-config",
+      "--tools",
+      "",
+    ],
     readOnlyArgs: ["-p", "{prompt}", "--strict-mcp-config", "--tools", "Read,Glob,Grep"],
     readOnlyJsonArgs: [
       "-p",
@@ -146,7 +154,7 @@ export default class Claude extends Harness {
     readOnlyMinVersion: "2.1.175",
     modelArgs: ["--model", "{model}"],
     level: "official",
-    note: "Headless print mode; add --output-format json for structured output. Read-only runs keep the built-in Read, Glob and Grep tools and --strict-mcp-config drops every configured MCP server, so no write tool exists whatever permission mode the settings carry; verified on 2.1.175 and 2.1.268. --permission-mode plan does not qualify: its shell commands run through the auto mode classifier, which let a file write through.",
+    note: "Headless print mode; add --output-format json for structured output. --tools only covers the built-in set, so every mode without the full agent adds --strict-mcp-config to drop configured MCP servers too; without it an advisor still sees every user and project MCP tool, checked on 2.1.280. Read-only runs keep the built-in Read, Glob and Grep tools, so no write tool exists whatever permission mode the settings carry; verified on 2.1.175 and 2.1.268. --permission-mode plan does not qualify: its shell commands run through the auto mode classifier, which let a file write through.",
   };
   override readonly mcpConfigs: Harness["mcpConfigs"] = [
     {

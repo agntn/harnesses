@@ -82,19 +82,19 @@ describe("normalized invocation", () => {
     expect(JSON.parse(result.stdout)).toEqual({ advisor: prompt });
   });
 
-  it("keeps the Claude advisor prompt outside the variadic tools option", () => {
+  it("keeps Claude advisor runs free of built-in and MCP tools", () => {
     const claude = getHarness("claude");
     expect(claude.buildInvocation("answer this")).toEqual({
       command: "claude",
-      args: ["-p", "answer this", "--tools", ""],
+      args: ["-p", "answer this", "--strict-mcp-config", "--tools", ""],
     });
     expect(claude.buildInvocation("answer this", { structured: true })).toEqual({
       command: "claude",
-      args: ["-p", "--output-format", "json", "answer this", "--tools", ""],
+      args: ["-p", "--output-format", "json", "answer this", "--strict-mcp-config", "--tools", ""],
     });
     expect(claude.buildInvocation("answer this", { model: "sonnet" })).toEqual({
       command: "claude",
-      args: ["-p", "answer this", "--tools", "", "--model", "sonnet"],
+      args: ["-p", "answer this", "--strict-mcp-config", "--tools", "", "--model", "sonnet"],
     });
   });
 
