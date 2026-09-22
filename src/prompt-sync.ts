@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import {
-  copyFileSync,
   lstatSync,
   mkdirSync,
   readFileSync,
@@ -13,6 +12,7 @@ import {
 } from "node:fs";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
+import { moveFile } from "./agents-sync.ts";
 import type { Harness } from "./harness.ts";
 import { agntnDataDir } from "./resolve.ts";
 import type { PromptTemplateSyncTarget, ResolveOptions } from "./types.ts";
@@ -187,13 +187,7 @@ function backupDestination(id: string, path: string, options: ResolveOptions): s
     unlinkSync(path);
     return backup;
   }
-  try {
-    renameSync(path, backup);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "EXDEV") throw error;
-    copyFileSync(path, backup);
-    unlinkSync(path);
-  }
+  moveFile(path, backup);
   return backup;
 }
 
