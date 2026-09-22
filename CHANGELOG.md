@@ -1,6 +1,39 @@
 # Changelog
 
 
+## v0.2.1
+
+[compare changes](https://github.com/agntn/harnesses/compare/v0.2.0...v0.2.1)
+
+### 🚀 Enhancements
+
+- **mastracode:** Map the MCP config files ([#59](https://github.com/agntn/harnesses/pull/59))
+- Expose prompt template locations ([#61](https://github.com/agntn/harnesses/pull/61))
+- Sync prompt templates ([#63](https://github.com/agntn/harnesses/pull/63))
+
+### 🔥 Performance
+
+- Reduce tool surface overhead ([#65](https://github.com/agntn/harnesses/pull/65))
+
+### 🩹 Fixes
+
+- **cli:** Stop --help pulling in the MCP SDK ([#58](https://github.com/agntn/harnesses/pull/58))
+- **run:** Hand the model the output as plain text ([#60](https://github.com/agntn/harnesses/pull/60))
+- Exclude MCP from Claude advisor mode ([#72](https://github.com/agntn/harnesses/pull/72))
+- Back up diverged files across filesystems ([#73](https://github.com/agntn/harnesses/pull/73))
+
+### 🏡 Chore
+
+- Add `renovate.json` ([78aa79c](https://github.com/agntn/harnesses/commit/78aa79c))
+- Add `pi` image ([efab72a](https://github.com/agntn/harnesses/commit/efab72a))
+- Add `pi` image ([d031fec](https://github.com/agntn/harnesses/commit/d031fec))
+
+### ❤️ Contributors
+
+- Aeitwoen ([@aeitwoen](https://github.com/aeitwoen))
+- Ori ([@oritwoen](https://github.com/oritwoen))
+- Aei ([@aeitwoen](https://github.com/aeitwoen))
+
 ## v0.2.0
 
 [compare changes](https://github.com/agntn/harnesses/compare/v0.1.1...v0.2.0)
