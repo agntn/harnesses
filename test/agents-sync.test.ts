@@ -10,8 +10,28 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, sep } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { getHarness, syncAgentsFiles } from "../src/index.ts";
+
+// Rename failures by destination directory, standing in for a mount point.
+const renameErrors = vi.hoisted(() => new Map<string, string>());
+
+vi.mock("node:fs", async (importOriginal) => {
+  const fs = await importOriginal<typeof import("node:fs")>();
+  return {
+    ...fs,
+    renameSync: (from: string, to: string) => {
+      for (const [dir, code] of renameErrors) {
+        if (to.startsWith(dir)) {
+          throw Object.assign(new Error(`${code}: simulated rename failure`), { code });
+        }
+      }
+      fs.renameSync(from, to);
+    },
+  };
+});
+
+afterEach(() => renameErrors.clear());
 
 function fixture(): { homeDir: string } {
   const root = mkdtempSync(join(tmpdir(), "harnesses-agents-"));
@@ -306,6 +326,38 @@ describe("syncAgentsFiles", () => {
       expect(() => syncAgentsFiles([getHarness("claude")], false, { homeDir })).toThrow(
         /duplicate companion paths/,
       );
+    });
+  });
+
+  it("adopts a diverged file when the backup directory is on another filesystem", () => {
+    withoutXdg(() => {
+      const { homeDir } = fixture();
+      const master = join(homeDir, ".config", "agntn", "AGENTS.md");
+      writeFileSync(master, "# master\n");
+      const target = join(homeDir, ".claude", "CLAUDE.md");
+      mkdirSync(join(homeDir, ".claude"), { recursive: true });
+      writeFileSync(target, "# local drift\n");
+      renameErrors.set(join(homeDir, ".config", "agntn", "diverged"), "EXDEV");
+
+      const [result] = syncAgentsFiles([getHarness("claude")], false, { homeDir }).targets;
+
+      expect(result?.action).toBe("adopted");
+      expect(readlinkSync(target)).toBe(master);
+      expect(readFileSync(result?.detail ?? "", "utf8")).toBe("# local drift\n");
+    });
+  });
+
+  it("propagates backup errors other than EXDEV", () => {
+    withoutXdg(() => {
+      const { homeDir } = fixture();
+      writeFileSync(join(homeDir, ".config", "agntn", "AGENTS.md"), "# master\n");
+      const target = join(homeDir, ".claude", "CLAUDE.md");
+      mkdirSync(join(homeDir, ".claude"), { recursive: true });
+      writeFileSync(target, "# local drift\n");
+      renameErrors.set(join(homeDir, ".config", "agntn", "diverged"), "EACCES");
+
+      expect(() => syncAgentsFiles([getHarness("claude")], false, { homeDir })).toThrow(/EACCES/);
+      expect(readFileSync(target, "utf8")).toBe("# local drift\n");
     });
   });
 });

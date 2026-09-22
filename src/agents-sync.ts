@@ -11,6 +11,7 @@
  * only reports.
  */
 import {
+  copyFileSync,
   lstatSync,
   mkdirSync,
   readFileSync,
@@ -223,6 +224,23 @@ function relink(path: string, source: string): void {
   renameSync(temp, path);
 }
 
+/**
+ * Moves a regular file, falling back to copy and unlink when `to` sits on
+ * another filesystem, where a bare rename fails with EXDEV.
+ *
+ * @param from - File to move.
+ * @param to - Destination path.
+ */
+export function moveFile(from: string, to: string): void {
+  try {
+    renameSync(from, to);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EXDEV") throw error;
+    copyFileSync(from, to);
+    unlinkSync(from);
+  }
+}
+
 type AgentsFileResult = Omit<AgentsCompanionTargetResult, "source">;
 
 const CHECK_ACTION: Record<LinkState["kind"], AgentsFileResult["action"]> = {
@@ -244,7 +262,7 @@ function applyFileTarget(
     const backupDir = join(agntnConfigDir(options), "diverged");
     mkdirSync(backupDir, { recursive: true });
     const backup = join(backupDir, `${id}-${basename(path)}-${Date.now()}.md`);
-    renameSync(path, backup);
+    moveFile(path, backup);
     relink(path, source);
     return { path, action: "adopted", detail: backup };
   }
