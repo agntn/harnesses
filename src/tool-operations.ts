@@ -492,7 +492,7 @@ export interface RunOptions {
   structured?: boolean;
   /** Enable tools; defaults to a native advisor without tools invocation. */
   tools?: boolean;
-  /** Require native enforcement of read-only tool access. Implies tools. */
+  /** Require native enforcement of read-only tool access. Implies tools when `tools` is omitted; `tools: false` rejects the run. */
   readOnly?: boolean;
 }
 
@@ -528,7 +528,7 @@ function normalizedRunAccess(options: Readonly<RunOptions>): {
   readOnly: boolean;
 } {
   const readOnly = options.readOnly ?? false;
-  return { readOnly, tools: readOnly ? true : (options.tools ?? false) };
+  return { readOnly, tools: options.tools ?? readOnly };
 }
 
 /**

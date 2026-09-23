@@ -246,6 +246,27 @@ describe("normalized invocation", () => {
     );
   });
 
+  it("rejects read-only access with tools explicitly disabled", () => {
+    const conflict = { tools: false, readOnly: true };
+    const claude = getHarness("claude");
+
+    expect(claude.buildInvocation("review this", conflict)).toBeNull();
+    expect(claude.invocationError(conflict)).toBe(
+      "Harness claude cannot run readOnly with tools: false, since read-only access still uses tools; " +
+        "retry with tools: true to keep its read-only tools, or with readOnly: false to use its advisor without tools",
+    );
+    expect(claude.buildInvocation("review this", { readOnly: true })).not.toBeNull();
+    expect(getHarness("codex").invocationError(conflict)).toMatch(
+      /; retry with tools: true to keep its read-only tools$/,
+    );
+    expect(getHarness("prime-agent").invocationError(conflict)).toMatch(
+      /; retry with readOnly: false to use its advisor without tools$/,
+    );
+    expect(getHarness("cursor").invocationError(conflict)).toBe(
+      "Harness cursor cannot run readOnly with tools: false, since read-only access still uses tools",
+    );
+  });
+
   it("returns null for a harness without a headless mode", () => {
     expect(getHarness("mastracode").buildInvocation("x")).toBeNull();
     expect(getHarness("freebuff").buildInvocation("x")).toBeNull();
@@ -833,14 +854,50 @@ describe("runHarness tool operation", () => {
       },
     );
 
-    const result = await runHarness("cursor", "review", { tools: false, readOnly: true });
+    try {
+      const result = await runHarness("cursor", "review", { readOnly: true });
 
-    expect(result.isError).toBeUndefined();
-    expect(result.details).toMatchObject({
-      stdout: "read:review\n",
-      tools: true,
-      readOnly: true,
-    });
+      expect(result.isError).toBeUndefined();
+      expect(result.details).toMatchObject({
+        stdout: "read:review\n",
+        tools: true,
+        readOnly: true,
+      });
+    } finally {
+      registerHarness(Cursor);
+    }
+  });
+
+  it("refuses read-only runs with tools disabled before spawning anything", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "harnesses-read-only-"));
+    const marker = join(dir, "spawned");
+    registerHarness(
+      class extends FakeCursor {
+        override readonly invocation: Harness["invocation"] = {
+          args: ["-e", "console.log('write')"],
+          noToolsArgs: ["-e", "console.log('advisor')"],
+          readOnlyArgs: ["-e", "require('node:fs').writeFileSync(process.argv[1], '')", marker],
+          level: "inferred",
+        };
+      },
+    );
+
+    try {
+      const result = await runHarness("cursor", "review", { tools: false, readOnly: true });
+
+      expect(result.isError).toBe(true);
+      expect(result.details).not.toHaveProperty("exitCode");
+      expect(result.content[0]?.text).toContain(
+        "retry with tools: true to keep its read-only tools, or with readOnly: false",
+      );
+      expect(await readdir(dir)).toEqual([]);
+
+      const advisor = await runHarness("cursor", "review", { tools: false });
+      expect(advisor.details).toMatchObject({ stdout: "advisor\n", tools: false, readOnly: false });
+    } finally {
+      registerHarness(Cursor);
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it("refuses read-only runs below the verified CLI version", async () => {

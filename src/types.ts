@@ -122,7 +122,7 @@ export interface InvokeOptions {
   model?: string;
   /** Enable the spawned harness's tools; defaults to advisor without tools mode. */
   tools?: boolean;
-  /** Require native enforcement of read-only tool access. Implies `tools: true`. */
+  /** Require native enforcement of read-only tool access. Implies `tools: true` when `tools` is omitted; `tools: false` rejects the run. */
   readOnly?: boolean;
   /** Milliseconds before cleanup starts. Unset or 0 disables the deadline. */
   timeoutMs?: number;
