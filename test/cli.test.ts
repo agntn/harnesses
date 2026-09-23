@@ -80,9 +80,9 @@ describe("harnesses usage paths", () => {
       expect(result.status).toBe(0);
       expect(JSON.parse(result.stdout)).toMatchObject({
         templates: ["review"],
-        targets: [{ id: "pi", templates: [{ name: "review", action: "linked" }] }],
+        targets: [{ id: "pi", action: "linked", templates: [] }],
       });
-      expect(readlinkSync(join(homeDir, ".pi", "agent", "prompts", "review.md"))).toBe(source);
+      expect(readlinkSync(join(homeDir, ".pi", "agent", "prompts"))).toBe(resolve(source, ".."));
     } finally {
       rmSync(temporaryRoot, { recursive: true, force: true });
     }

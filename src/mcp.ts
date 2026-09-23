@@ -150,7 +150,7 @@ const tools: ToolDefinition[] = [
     name: "harnesses_prompts_sync",
     title: "Harnesses Prompts Sync",
     description:
-      "Sync canonical Markdown prompt templates from the agntn XDG data directory into every supported harness. Markdown targets use links; Gemini receives generated TOML. Diverged files are backed up. Pass check to only report.",
+      "Sync canonical Markdown prompt templates from the agntn XDG data directory into every supported harness. Each Markdown target directory becomes one link to the canonical directory; Gemini's directory holds only generated TOML. Anything else there is backed up first. Pass check to only report.",
     inputSchema: schemas.promptsSync,
     annotations: CONFIG_WRITE,
     execute: ({ promptsSync }, args) =>

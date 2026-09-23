@@ -12,11 +12,13 @@
  */
 import {
   copyFileSync,
+  cpSync,
   lstatSync,
   mkdirSync,
   readFileSync,
   readlinkSync,
   renameSync,
+  rmSync,
   symlinkSync,
   unlinkSync,
 } from "node:fs";
@@ -225,10 +227,10 @@ function relink(path: string, source: string): void {
 }
 
 /**
- * Moves a regular file, falling back to copy and unlink when `to` sits on
- * another filesystem, where a bare rename fails with EXDEV.
+ * Moves a regular file or directory, falling back to copy and delete when `to`
+ * sits on another filesystem, where a bare rename fails with EXDEV.
  *
- * @param from - File to move.
+ * @param from - File or directory to move.
  * @param to - Destination path.
  */
 export function moveFile(from: string, to: string): void {
@@ -236,6 +238,11 @@ export function moveFile(from: string, to: string): void {
     renameSync(from, to);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "EXDEV") throw error;
+    if (lstatSync(from).isDirectory()) {
+      cpSync(from, to, { recursive: true, verbatimSymlinks: true });
+      rmSync(from, { recursive: true });
+      return;
+    }
     copyFileSync(from, to);
     unlinkSync(from);
   }

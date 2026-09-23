@@ -123,9 +123,11 @@ harnesses prompts sync --check
 harnesses prompts sync
 ```
 
-Markdown harnesses receive symlinks to those files. Gemini receives generated
-TOML commands, with `$ARGUMENTS` translated to `{{args}}`. Unmanaged files at a
-managed name are backed up under the same XDG data tree before replacement.
+For a Markdown harness, the whole prompt directory becomes one symlink to that
+directory, so a template added through any harness shows up in all of them.
+Gemini gets generated TOML commands, with `$ARGUMENTS` translated to `{{args}}`,
+and its commands directory keeps nothing else. Whatever was there before is
+backed up under the same XDG data tree first.
 
 `getHarness("pi").promptTemplates` still lists every verified reusable prompt
 location. `promptTemplateSyncTarget` is the single stable user destination the

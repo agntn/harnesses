@@ -6,6 +6,7 @@ import {
   readdirSync,
   readlinkSync,
   renameSync,
+  rmdirSync,
   symlinkSync,
   unlinkSync,
   writeFileSync,
@@ -45,6 +46,9 @@ export interface PromptSyncTargetResult {
   readonly id: string;
   readonly path?: string;
   readonly format?: PromptTemplateSyncTarget["format"];
+  /** Outcome for a Markdown destination, which is one link to the whole source directory. */
+  readonly action?: PromptSyncAction;
+  /** Backup path, skip reason, or a check-mode note. */
   readonly detail?: string;
   readonly templates: readonly PromptTemplateTargetResult[];
 }
@@ -66,16 +70,12 @@ interface PromptTemplate {
 
 type DestinationState =
   | { readonly kind: "missing" }
-  | { readonly kind: "correct-link" }
-  | { readonly kind: "wrong-link" }
   | { readonly kind: "owned-file"; readonly content: string }
   | { readonly kind: "unmanaged-file" }
   | { readonly kind: "unsupported" };
 
 const GEMINI_ACTION: Record<DestinationState["kind"], PromptSyncAction> = {
   missing: "generated",
-  "correct-link": "adopted",
-  "wrong-link": "adopted",
   "owned-file": "replaced",
   "unmanaged-file": "adopted",
   unsupported: "skipped",
@@ -83,8 +83,6 @@ const GEMINI_ACTION: Record<DestinationState["kind"], PromptSyncAction> = {
 
 const GEMINI_BACKUP: Record<DestinationState["kind"], boolean> = {
   missing: false,
-  "correct-link": true,
-  "wrong-link": true,
   "owned-file": true,
   "unmanaged-file": true,
   unsupported: false,
@@ -137,7 +135,12 @@ function generatedSource(content: string): string | null {
   }
 }
 
-function inspectDestination(path: string, source?: string): DestinationState {
+function linkTarget(path: string): string {
+  const target = readlinkSync(path);
+  return isAbsolute(target) ? target : resolve(dirname(path), target);
+}
+
+function inspectDestination(path: string): DestinationState {
   let stats;
   try {
     stats = lstatSync(path);
@@ -146,12 +149,7 @@ function inspectDestination(path: string, source?: string): DestinationState {
     throw error;
   }
 
-  if (stats.isSymbolicLink()) {
-    if (source === undefined) return { kind: "unmanaged-file" };
-    const target = readlinkSync(path);
-    const resolved = isAbsolute(target) ? target : resolve(dirname(path), target);
-    return resolved === source ? { kind: "correct-link" } : { kind: "wrong-link" };
-  }
+  if (stats.isSymbolicLink()) return { kind: "unmanaged-file" };
   if (!stats.isFile()) return { kind: "unsupported" };
 
   const content = readFileSync(path, "utf8");
@@ -163,10 +161,11 @@ function tempPath(path: string, kind: string): string {
   return join(dirname(path), `.${basename(path)}-${randomUUID()}.${kind}.tmp`);
 }
 
-function linkTemplate(path: string, source: string): void {
+function linkDirectory(path: string, source: string): void {
   mkdirSync(dirname(path), { recursive: true });
   const temp = tempPath(path, "prompt-link");
-  symlinkSync(source, temp);
+  // Junctions let Windows link a directory without symlink privileges.
+  symlinkSync(source, temp, "junction");
   renameSync(temp, path);
 }
 
@@ -182,8 +181,7 @@ function backupDestination(id: string, path: string, options: ResolveOptions): s
   mkdirSync(backupDir, { recursive: true });
   const backup = join(backupDir, `${basename(path)}-${Date.now()}-${randomUUID()}`);
   if (lstatSync(path).isSymbolicLink()) {
-    const target = readlinkSync(path);
-    symlinkSync(isAbsolute(target) ? target : resolve(dirname(path), target), backup);
+    symlinkSync(linkTarget(path), backup);
     unlinkSync(path);
     return backup;
   }
@@ -195,41 +193,85 @@ function checkDetail(): string {
   return "check mode: not applied";
 }
 
-function syncMarkdownTemplate(
+function isInsideDirectory(path: string, directory: string): boolean {
+  const remainder = relative(directory, path);
+  return remainder !== "" && !remainder.startsWith("..") && !isAbsolute(remainder);
+}
+
+function isLegacyTemplateLink(path: string, sourceDir: string): boolean {
+  return lstatSync(path).isSymbolicLink() && isInsideDirectory(linkTarget(path), sourceDir);
+}
+
+type DirectoryState =
+  | { readonly kind: "missing" | "correct-link" | "wrong-link" | "local-files" | "not-directory" }
+  | { readonly kind: "legacy-links"; readonly entries: readonly string[] };
+
+const DIRECTORY_ACTION: Record<DirectoryState["kind"], PromptSyncAction> = {
+  missing: "linked",
+  "correct-link": "unchanged",
+  "wrong-link": "relinked",
+  "legacy-links": "relinked",
+  "local-files": "adopted",
+  "not-directory": "skipped",
+};
+
+function inspectDirectory(targetDir: string, sourceDir: string): DirectoryState {
+  let stats;
+  try {
+    stats = lstatSync(targetDir);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { kind: "missing" };
+    throw error;
+  }
+
+  if (stats.isSymbolicLink()) {
+    return { kind: linkTarget(targetDir) === sourceDir ? "correct-link" : "wrong-link" };
+  }
+  if (!stats.isDirectory()) return { kind: "not-directory" };
+
+  // Per-template links from earlier releases carry nothing worth a backup.
+  const entries = readdirSync(targetDir).map((entry) => join(targetDir, entry));
+  return entries.every((entry) => isLegacyTemplateLink(entry, sourceDir))
+    ? { kind: "legacy-links", entries }
+    : { kind: "local-files" };
+}
+
+function clearDirectory(
   id: string,
   targetDir: string,
-  template: PromptTemplate,
+  state: DirectoryState,
+  options: ResolveOptions,
+): string | undefined {
+  if (state.kind === "wrong-link" || state.kind === "local-files") {
+    return backupDestination(id, targetDir, options);
+  }
+  if (state.kind === "legacy-links") {
+    for (const entry of state.entries) unlinkSync(entry);
+    rmdirSync(targetDir);
+  }
+  return undefined;
+}
+
+// A Markdown destination becomes one link to the whole source directory, so a
+// template any harness adds or edits lands in the shared source.
+function syncMarkdownDirectory(
+  id: string,
+  targetDir: string,
+  sourceDir: string,
   check: boolean,
   options: ResolveOptions,
-): PromptTemplateTargetResult {
-  const path = join(targetDir, `${template.name}.md`);
-  const state = inspectDestination(path, template.path);
-  if (state.kind === "correct-link") {
-    return { name: template.name, source: template.path, path, action: "unchanged" };
+): Pick<PromptSyncTargetResult, "action" | "detail"> {
+  const state = inspectDirectory(targetDir, sourceDir);
+  const action = DIRECTORY_ACTION[state.kind];
+  if (state.kind === "correct-link") return { action };
+  if (state.kind === "not-directory") {
+    return { action, detail: "destination exists and is not a directory or symlink" };
   }
-  if (state.kind === "unsupported") {
-    return {
-      name: template.name,
-      source: template.path,
-      path,
-      action: "skipped",
-      detail: "destination exists and is not a file or symlink",
-    };
-  }
+  if (check) return { action, detail: checkDetail() };
 
-  const action: PromptSyncAction =
-    state.kind === "missing" ? "linked" : state.kind === "wrong-link" ? "relinked" : "adopted";
-  if (check) {
-    return { name: template.name, source: template.path, path, action, detail: checkDetail() };
-  }
-
-  let detail: string | undefined;
-  if (state.kind === "wrong-link") unlinkSync(path);
-  if (state.kind === "owned-file" || state.kind === "unmanaged-file") {
-    detail = backupDestination(id, path, options);
-  }
-  linkTemplate(path, template.path);
-  return { name: template.name, source: template.path, path, action, detail };
+  const detail = clearDirectory(id, targetDir, state, options);
+  linkDirectory(targetDir, sourceDir);
+  return { action, detail };
 }
 
 function frontmatterDescription(raw: string, path: string): string | undefined {
@@ -305,26 +347,6 @@ function syncGeminiTemplate(
   return { name: template.name, source: template.path, path, action, detail };
 }
 
-function isInsideDirectory(path: string, directory: string): boolean {
-  const remainder = relative(directory, path);
-  return remainder !== "" && !remainder.startsWith("..") && !isAbsolute(remainder);
-}
-
-function staleMarkdownSource(path: string, sourceDir: string): string | null {
-  const state = inspectDestination(path);
-  if (state.kind !== "unmanaged-file") return null;
-  let stats;
-  try {
-    stats = lstatSync(path);
-  } catch {
-    return null;
-  }
-  if (!stats.isSymbolicLink()) return null;
-  const target = readlinkSync(path);
-  const resolved = isAbsolute(target) ? target : resolve(dirname(path), target);
-  return isInsideDirectory(resolved, sourceDir) ? resolved : null;
-}
-
 function staleGeminiSource(path: string, sourceDir: string): string | null {
   let content: string;
   try {
@@ -337,39 +359,44 @@ function staleGeminiSource(path: string, sourceDir: string): string | null {
   return isInsideDirectory(source, sourceDir) ? source : null;
 }
 
-function pruneTarget(
+// The Gemini directory keeps only commands generated from the source. Stale
+// generated files are deleted; anything else is moved to a backup.
+function pruneGeminiTarget(
+  id: string,
   targetDir: string,
-  format: PromptTemplateSyncTarget["format"],
   sourceDir: string,
-  activeSources: ReadonlySet<string>,
+  activeNames: ReadonlySet<string>,
   check: boolean,
+  options: ResolveOptions,
 ): PromptTemplateTargetResult[] {
   let entries;
   try {
-    entries = readdirSync(targetDir, { withFileTypes: true });
+    entries = readdirSync(targetDir);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
     throw error;
   }
 
-  const extension = format === "markdown" ? ".md" : ".toml";
-  const staleSource = format === "markdown" ? staleMarkdownSource : staleGeminiSource;
   return entries
-    .filter((entry) => entry.name.toLowerCase().endsWith(extension))
-    .flatMap((entry): PromptTemplateTargetResult[] => {
-      const path = join(targetDir, entry.name);
-      const source = staleSource(path, sourceDir);
-      if (source === null || activeSources.has(source)) return [];
-      if (!check) unlinkSync(path);
-      return [
-        {
-          name: basename(entry.name, extension),
-          source,
+    .filter((entry) => !activeNames.has(entry))
+    .map((entry): PromptTemplateTargetResult => {
+      const path = join(targetDir, entry);
+      const name = basename(entry, extname(entry));
+      const source = staleGeminiSource(path, sourceDir);
+      if (check) {
+        return {
+          name,
+          ...(source === null ? {} : { source }),
           path,
           action: "removed",
-          ...(check ? { detail: checkDetail() } : {}),
-        },
-      ];
+          detail: checkDetail(),
+        };
+      }
+      if (source !== null) {
+        unlinkSync(path);
+        return { name, source, path, action: "removed" };
+      }
+      return { name, path, action: "removed", detail: backupDestination(id, path, options) };
     });
 }
 
@@ -397,13 +424,23 @@ function syncTarget(
       templates: [],
     };
   }
-  const targetDir = resolved.path;
-  const syncTemplate = resolved.format === "markdown" ? syncMarkdownTemplate : syncGeminiTemplate;
+  // Registry paths end in a separator, which a directory symlink cannot carry.
+  const targetDir = resolve(resolved.path);
+  if (resolved.format === "markdown") {
+    return {
+      id: harness.id,
+      path: targetDir,
+      format: resolved.format,
+      ...syncMarkdownDirectory(harness.id, targetDir, sourceDir, check, options),
+      templates: [],
+    };
+  }
+
   const results = templates.map((template) =>
-    syncTemplate(harness.id, targetDir, template, check, options),
+    syncGeminiTemplate(harness.id, targetDir, template, check, options),
   );
-  const activeSources = new Set(templates.map((template) => template.path));
-  results.push(...pruneTarget(targetDir, resolved.format, sourceDir, activeSources, check));
+  const activeNames = new Set(templates.map((template) => `${template.name}.toml`));
+  results.push(...pruneGeminiTarget(harness.id, targetDir, sourceDir, activeNames, check, options));
   return {
     id: harness.id,
     path: targetDir,
@@ -414,8 +451,10 @@ function syncTarget(
 
 /**
  * Synchronizes canonical Markdown prompt templates into each harness's stable
- * user-scope destination. Markdown harnesses receive symlinks; Gemini receives
- * generated TOML commands. In check mode nothing is written.
+ * user-scope destination. A Markdown harness's destination becomes one symlink
+ * to the source directory; Gemini's directory holds only TOML commands
+ * generated from it. Anything else found there is backed up first. In check
+ * mode nothing is written.
  *
  * @param harnesses - Harnesses to inspect or update.
  * @param check - Report intended changes without writing them.
