@@ -14,7 +14,11 @@ interface ClaudeStreamEvent {
 function parseStreamLine(line: string): ClaudeStreamEvent | undefined {
   try {
     const parsed: unknown = JSON.parse(line);
-    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+    // Every protocol message carries a string type; any other JSON is output to keep.
+    return typeof parsed === "object" &&
+      parsed !== null &&
+      "type" in parsed &&
+      typeof parsed.type === "string"
       ? (parsed as ClaudeStreamEvent)
       : undefined;
   } catch {

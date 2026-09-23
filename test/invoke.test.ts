@@ -400,6 +400,13 @@ describe("Claude stream folding", () => {
     );
   });
 
+  it("keeps JSON output that is not a protocol message", () => {
+    const warning = '{"warning":"using fallback model"}';
+    expect(foldClaudeStream(`${warning}\n${CLAUDE_STREAM_START}`, true)).toBe(
+      `${warning}\nRivers flow.\n`,
+    );
+  });
+
   it("returns nothing for a run stopped before any text", () => {
     expect(
       foldClaudeStream(`${JSON.stringify({ type: "system", subtype: "init" })}\n`, false),
@@ -468,6 +475,28 @@ describe("streamed invocation", () => {
       const idleMs = "idleMs" in result.details ? result.details.idleMs : undefined;
       expect(idleMs).toBeGreaterThanOrEqual(250);
       expect(result.content[0]?.text).toContain(`idleMs: ${idleMs}`);
+    } finally {
+      registerHarness(Cursor);
+    }
+  });
+
+  it("reports the idle time of a model listing that timed out", async () => {
+    registerHarness(
+      class extends FakeCursor {
+        override readonly binaries = [process.execPath];
+        override readonly modelListing: Harness["modelListing"] = {
+          args: ["-e", "setTimeout(() => {}, 60000)"],
+          level: "inferred",
+        };
+      },
+    );
+    try {
+      const result = await listHarnessModels("cursor", { timeoutSeconds: 0.3 });
+
+      expect(result.details).toMatchObject({ timedOut: true });
+      expect("idleMs" in result.details ? result.details.idleMs : undefined).toBeGreaterThanOrEqual(
+        250,
+      );
     } finally {
       registerHarness(Cursor);
     }
