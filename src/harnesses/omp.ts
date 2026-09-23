@@ -183,7 +183,7 @@ export default class Omp extends Harness {
       scope: "user",
       level: "official",
       relocates: ["config", "sessions", "instructions", "skills", "commands", "promptTemplates"],
-      note: "Ignored under a named profile (OMP_PROFILE). On Linux, data migrated by omp config migrate follows $XDG_*_HOME/omp instead.",
+      note: "Ignored under a named profile (OMP_PROFILE). On Linux, after omp config init-xdg, data, state and cache live under $XDG_*_HOME/omp instead.",
     },
   ];
   override readonly agentsFile = "~/.omp/agent/AGENTS.md";
