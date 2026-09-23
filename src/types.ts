@@ -88,7 +88,10 @@ export interface HarnessInvocationModes {
 export interface HarnessModelListing {
   /** Arguments used when no search filter is supplied. */
   args: string[];
-  /** Optional argument template for a search filter; every "{search}" is replaced. */
+  /**
+   * Optional argument template for a native search filter; every "{search}" is replaced.
+   * Without it, a search runs `args` and keeps the ids containing the filter, ignoring case.
+   */
   searchArgs?: string[];
   level: EvidenceLevel;
   note?: string;
@@ -98,10 +101,13 @@ export interface HarnessModelListing {
 export interface AvailableModel {
   provider: string;
   id: string;
-  contextWindow: number;
-  maxOutputTokens: number;
-  thinking: boolean;
-  images: boolean;
+  /** Absent when the native listing prints only ids, like Grok's. */
+  contextWindow?: number;
+  maxOutputTokens?: number;
+  thinking?: boolean;
+  images?: boolean;
+  /** Set on the model the harness picks when no model is given, when the listing marks one. */
+  default?: boolean;
 }
 
 /** Options for querying the models available to one harness. */

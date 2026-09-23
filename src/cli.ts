@@ -99,11 +99,15 @@ function modelFailureMessage(details: ModelsOutcome | RunFailure): string {
 }
 
 function modelDescription(model: Readonly<AvailableModel>): string {
+  const parts: string[] = [];
+  if (model.default) parts.push("default");
+  if (model.contextWindow !== undefined) parts.push(`${model.contextWindow} context`);
+  if (model.maxOutputTokens !== undefined) parts.push(`${model.maxOutputTokens} max-out`);
   const features: string[] = [];
   if (model.thinking) features.push("thinking");
   if (model.images) features.push("images");
-  const suffix = features.length > 0 ? ` · ${features.join(", ")}` : "";
-  return `${model.contextWindow} context · ${model.maxOutputTokens} max-out${suffix}`;
+  if (features.length > 0) parts.push(features.join(", "));
+  return parts.join(" · ");
 }
 
 function renderModels(details: ModelsOutcome): void {

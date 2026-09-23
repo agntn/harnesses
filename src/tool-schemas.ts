@@ -65,7 +65,8 @@ export function harnessToolSchemas<I, S>(Type: McpSchemaBuilder<I, S>) {
       id: harnessId("Harness id"),
       search: Type.Optional(
         Type.String({
-          description: "Optional native model search filter",
+          description:
+            "Optional model search filter; without a native one, ids match ignoring case",
           minLength: 1,
           maxLength: 1024,
         }),

@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { getHarness, registerHarness } from "../src/index.ts";
+import Grok, { parseGrokModels } from "../src/harnesses/grok.ts";
 import Pi, { parsePiModelTable } from "../src/harnesses/pi.ts";
 import PrimeAgent from "../src/harnesses/prime-agent.ts";
 import { listHarnessModels, runHarness } from "../src/tool-operations.ts";
@@ -8,6 +9,26 @@ const MODELS_OUTPUT = `provider      model                context  max-out  thin
 openai-codex  gpt-5.4              272K     128K     yes       yes
 xai           grok-4.3             1M       30K      yes       no
 `;
+
+// Verbatim `grok models` output from grok 1.0.41.
+const GROK_MODELS_OUTPUT = `You are logged in with grok.com.
+
+Default model: grok-4.7
+
+Available models:
+  * grok-4.7 (default)
+  - grok-4.7-build-fast
+  - grok-4.6
+  - grok-4.5
+`;
+
+class FakeGrok extends Grok {
+  override readonly binaries = ["node"];
+  override readonly modelListing: Grok["modelListing"] = {
+    args: ["-e", `process.stdout.write(${JSON.stringify(GROK_MODELS_OUTPUT)})`],
+    level: "inferred",
+  };
+}
 
 class FakePi extends Pi {
   override readonly binaries = ["node"];
@@ -33,6 +54,7 @@ class FakePi extends Pi {
 describe("model listing", () => {
   beforeAll(() => {
     registerHarness(FakePi);
+    registerHarness(FakeGrok);
   });
 
   it("exposes the Pi model-listing command", () => {
@@ -142,6 +164,52 @@ describe("model listing", () => {
     })();
 
     await expect(pi.listModels()).rejects.toThrow("Unexpected empty Pi model-list output");
+  });
+
+  it("exposes the Grok model-listing command without a native filter", () => {
+    const grok = new Grok();
+
+    expect(grok.buildModelListInvocation()).toEqual({ command: "grok", args: ["models"] });
+    expect(grok.buildModelListInvocation("4.7")).toEqual({ command: "grok", args: ["models"] });
+  });
+
+  it("parses the Grok model list and flags the default", () => {
+    expect(parseGrokModels(GROK_MODELS_OUTPUT)).toEqual([
+      { provider: "xai", id: "grok-4.7", default: true },
+      { provider: "xai", id: "grok-4.7-build-fast" },
+      { provider: "xai", id: "grok-4.6" },
+      { provider: "xai", id: "grok-4.5" },
+    ]);
+    expect(parseGrokModels("Available models:\n")).toEqual([]);
+  });
+
+  it("rejects Grok output it does not recognize", () => {
+    expect(() => parseGrokModels("Not logged in.\n")).toThrow("Unexpected Grok model-list output");
+    expect(() => parseGrokModels("Available models:\n  + grok-4.7\n")).toThrow(
+      "Unexpected Grok model-list row",
+    );
+  });
+
+  it("filters a listing without native search by id, ignoring case", async () => {
+    const result = await getHarness("grok").listModels({ search: "GROK-4.7" });
+
+    expect(result.args).not.toContain("GROK-4.7");
+    expect(result.models.map((model) => model.id)).toEqual(["grok-4.7", "grok-4.7-build-fast"]);
+    expect((await getHarness("grok").listModels({ search: "grok-5" })).models).toEqual([]);
+  });
+
+  it("returns Grok models through the shared tool operation", async () => {
+    const result = await listHarnessModels("grok", { search: "4.7" });
+
+    expect(result.isError).toBeUndefined();
+    expect(result.details).toMatchObject({
+      id: "grok",
+      search: "4.7",
+      models: [
+        { provider: "xai", id: "grok-4.7", default: true },
+        { provider: "xai", id: "grok-4.7-build-fast" },
+      ],
+    });
   });
 
   it("rejects listing models for an unsupported harness", async () => {
