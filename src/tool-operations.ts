@@ -128,14 +128,6 @@ function truncate(output: string): string {
   return `${output.slice(0, RUN_MAX_OUTPUT_CHARS)}\n[truncated ${output.length - RUN_MAX_OUTPUT_CHARS} of ${output.length} characters]`;
 }
 
-function modelListingUnavailable(harness: Harness, id: string): RunFailure {
-  return {
-    error: harness.modelListing
-      ? `Harness ${id} does not support filtering its model listing`
-      : `Harness ${id} does not support model listing`,
-  };
-}
-
 type RunInvocationOptions = Readonly<{
   model?: string;
   structured: boolean;
@@ -442,7 +434,7 @@ export async function listHarnessModels(
   const harness = getHarness(id);
   const built = harness.buildModelListInvocation(options.search);
   if (!built) {
-    const details = modelListingUnavailable(harness, id);
+    const details: RunFailure = { error: `Harness ${id} does not support model listing` };
     return { content: text(details), details, isError: true };
   }
 

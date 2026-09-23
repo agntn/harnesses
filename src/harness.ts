@@ -484,15 +484,18 @@ export abstract class Harness {
   /**
    * Expands the native model-listing recipe without spawning anything.
    *
-   * @param search - Optional native model search filter.
+   * @param search - Optional model search filter; without native `searchArgs` it is applied
+   *   to the parsed output instead, so the command is the unfiltered one.
    * @returns {{ command: string, args: string[] } | null} The command, or null when unsupported.
    */
   buildModelListInvocation(search?: string): { command: string; args: string[] } | null {
     if (!this.modelListing) return null;
     const command = this.binaries[0];
     if (!command) return null;
-    const template = search === undefined ? this.modelListing.args : this.modelListing.searchArgs;
-    if (!template) return null;
+    const template =
+      search === undefined
+        ? this.modelListing.args
+        : (this.modelListing.searchArgs ?? this.modelListing.args);
     return {
       command,
       args: template.map((arg) => arg.replaceAll("{search}", () => search ?? "")),
@@ -508,22 +511,16 @@ export abstract class Harness {
    */
   async listModels(options: ListModelsOptions = {}): Promise<ListModelsResult> {
     const built = this.buildModelListInvocation(options.search);
-    if (!built) {
-      throw new Error(
-        this.modelListing
-          ? `Harness ${this.id} does not support filtering its model listing`
-          : `Harness ${this.id} does not support model listing`,
-      );
-    }
+    if (!built) throw new Error(`Harness ${this.id} does not support model listing`);
 
     const result = await executeCommand(built.command, built.args, options);
-    return {
-      ...result,
-      models:
-        !result.timedOut && !result.aborted && result.exitCode === 0
-          ? this.parseModelListingOutput(result.stdout)
-          : [],
-    };
+    if (result.timedOut || result.aborted || result.exitCode !== 0)
+      return { ...result, models: [] };
+
+    const models = this.parseModelListingOutput(result.stdout);
+    if (options.search === undefined || this.modelListing?.searchArgs) return { ...result, models };
+    const search = options.search.toLowerCase();
+    return { ...result, models: models.filter((model) => model.id.toLowerCase().includes(search)) };
   }
 
   /**

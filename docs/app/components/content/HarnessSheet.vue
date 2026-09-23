@@ -77,7 +77,8 @@ const modes = computed(() =>
       ><template v-if="harness.modelListing.searchArgs">
         and <ProseCode>{{ harness.modelListing.searchArgs.join(" ") }}</ProseCode> with a
         filter</template
-      >. {{ harness.modelListing.note }}
+      ><template v-else>, and a filter matches the ids locally</template>.
+      {{ harness.modelListing.note }}
     </ProseP>
 
     <ProseH2 id="paths">Paths</ProseH2>

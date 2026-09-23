@@ -1,4 +1,28 @@
+import { stripVTControlCharacters } from "node:util";
 import { Harness } from "../harness.ts";
+import type { AvailableModel } from "../types.ts";
+
+/**
+ * Parses `grok models`: a login line, the default model, then an
+ * `Available models:` list with `*` on the default and `-` on the rest.
+ *
+ * @param stdout - Native model-listing output.
+ * @returns {AvailableModel[]} The listed xAI models, the default one flagged.
+ */
+export function parseGrokModels(stdout: string): AvailableModel[] {
+  const lines = stripVTControlCharacters(stdout)
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const start = lines.indexOf("Available models:");
+  if (start === -1) throw new Error(`Unexpected Grok model-list output: ${JSON.stringify(stdout)}`);
+
+  return lines.slice(start + 1).map((line) => {
+    const match = /^([*-])\s+(\S+)(?:\s+\(default\))?$/.exec(line);
+    if (!match?.[2]) throw new Error(`Unexpected Grok model-list row: ${JSON.stringify(line)}`);
+    return { provider: "xai", id: match[2], ...(match[1] === "*" ? { default: true } : {}) };
+  });
+}
 
 export default class Grok extends Harness {
   readonly id = "grok";
@@ -114,6 +138,11 @@ export default class Grok extends Harness {
     level: "official",
     note: "-p is short for --single; add --output-format json for structured output. --sandbox read-only is kernel-enforced (Landlock, Seatbelt) regardless of the inherited permission mode and still allows writes to ~/.grok and temp dirs; verified on Linux with 1.0.13 and 1.0.25.",
   };
+  override readonly modelListing: Harness["modelListing"] = {
+    args: ["models"],
+    level: "official",
+    note: "Prints bare ids with the default marked; verified with 1.0.41.",
+  };
   override readonly mcpConfigs: Harness["mcpConfigs"] = [
     {
       path: "~/.grok/config.toml",
@@ -137,4 +166,8 @@ export default class Grok extends Harness {
     envVars: ["GROK_SESSION_ID", "GROK_WORKSPACE_ROOT", "GROK_HOME"],
     projectMarkers: [".grok"],
   };
+
+  protected override parseModelListingOutput(stdout: string): AvailableModel[] {
+    return parseGrokModels(stdout);
+  }
 }
