@@ -70,6 +70,12 @@ export interface HarnessInvocation {
   readOnlyMinVersion?: string;
   /** Arguments appended when a model is selected; every "{model}" is replaced. */
   modelArgs?: string[];
+  /**
+   * Arguments appended to a plain text run so a CLI that holds its answer until
+   * the end reports it as events instead; `invoke` folds them back into that text,
+   * so a stopped run keeps what the model had already written.
+   */
+  streamArgs?: string[];
   level: EvidenceLevel;
   note?: string;
 }
@@ -148,6 +154,8 @@ export interface InvokeResult {
   timedOut: boolean;
   /** True when caller cancellation wins over the deadline or completion. */
   aborted: boolean;
+  /** Milliseconds without output on either stream before a deadline or cancellation stopped the process. */
+  idleMs?: number;
 }
 
 /** Result of one native model-listing command. */

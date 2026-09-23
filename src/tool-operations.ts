@@ -229,6 +229,7 @@ function completedRun(
     exitCode: result.exitCode,
     timedOut: result.timedOut,
     aborted: result.aborted,
+    ...(result.idleMs === undefined ? {} : { idleMs: result.idleMs }),
   };
   const stdout = truncate(result.stdout);
   const stderr = truncate(result.stderr);
@@ -501,6 +502,8 @@ export interface RunOutcome {
   exitCode: number | null;
   timedOut: boolean;
   aborted: boolean;
+  /** Milliseconds without output before the run was stopped; absent when it exited on its own. */
+  idleMs?: number;
   stdout: string;
   stderr: string;
 }

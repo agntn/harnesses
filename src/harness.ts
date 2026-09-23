@@ -222,6 +222,8 @@ function executeCommand(
     let stdout = "";
     let stderr = "";
     let stopped: "timeout" | "abort" | undefined;
+    let lastOutputAt = performance.now();
+    let idleMs: number | undefined;
     let settled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let abortListener: ReturnType<typeof addAbortListener> | undefined;
@@ -247,10 +249,12 @@ function executeCommand(
     /* oxlint-disable-next-line typescript/prefer-readonly-parameter-types */
     child.stdout.on("data", (chunk: Buffer) => {
       stdout += chunk.toString("utf8");
+      lastOutputAt = performance.now();
     });
     /* oxlint-disable-next-line typescript/prefer-readonly-parameter-types */
     child.stderr.on("data", (chunk: Buffer) => {
       stderr += chunk.toString("utf8");
+      lastOutputAt = performance.now();
     });
     child.on("error", fail);
     child.on("close", (code) => {
@@ -272,6 +276,7 @@ function executeCommand(
     function stop(reason: "timeout" | "abort"): void {
       if (settled || stopped !== undefined) return;
       stopped = reason;
+      idleMs = Math.round(performance.now() - lastOutputAt);
       cleanup();
       if (child.pid === undefined) return;
       void terminateCommand(child.pid).then(
@@ -300,6 +305,7 @@ function executeCommand(
         exitCode: stopped === undefined ? code : null,
         timedOut: stopped === "timeout",
         aborted: stopped === "abort",
+        ...(idleMs === undefined ? {} : { idleMs }),
       });
     }
   });
@@ -460,7 +466,26 @@ export abstract class Harness {
     const versionError = this.readOnlyVersionError(invocationOptions);
     if (versionError) return Promise.reject(new Error(versionError));
 
-    return executeCommand(built.command, built.args, options);
+    const streamArgs = options.structured ? undefined : this.invocation?.streamArgs;
+    if (!streamArgs) return executeCommand(built.command, built.args, options);
+    return executeCommand(built.command, [...built.args, ...streamArgs], options).then(
+      (result) => ({
+        ...result,
+        stdout: this.foldStreamOutput(result.stdout, !result.timedOut && !result.aborted),
+      }),
+    );
+  }
+
+  /**
+   * Turns the events a `streamArgs` run printed back into the text the plain
+   * run would have printed.
+   *
+   * @param _stdout - Event output as captured, possibly cut short.
+   * @param _complete - False when a deadline or cancellation stopped the run.
+   * @returns {string} The answer text, or what the model had written so far.
+   */
+  protected foldStreamOutput(_stdout: string, _complete: boolean): string {
+    throw new Error(`Harness ${this.id} does not implement stream output folding`);
   }
 
   /**

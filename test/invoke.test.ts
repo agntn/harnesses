@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getHarness, registerHarness } from "../src/index.ts";
 import { Harness } from "../src/harness.ts";
+import Claude, { foldClaudeStream } from "../src/harnesses/claude.ts";
 import Cursor from "../src/harnesses/cursor.ts";
 import {
   harnessInfo,
@@ -324,6 +325,158 @@ describe("normalized invocation", () => {
     await expect(getHarness("mastracode").invoke("x")).rejects.toThrow(
       "no non-interactive invocation",
     );
+  });
+});
+
+/**
+ * Builds one Claude `stream-json` line in the shape 2.1.280 prints, trimmed to the fields the fold reads.
+ *
+ * @param event - The inner stream event.
+ * @returns {string} The event line.
+ */
+function claudeEvent(event: object): string {
+  return `${JSON.stringify({ type: "stream_event", event })}\n`;
+}
+
+const CLAUDE_STREAM_START =
+  `${JSON.stringify({ type: "system", subtype: "init" })}\n` +
+  claudeEvent({ type: "message_start" }) +
+  claudeEvent({ type: "content_block_start", index: 0, content_block: { type: "thinking" } }) +
+  claudeEvent({ type: "content_block_delta", index: 0, delta: { type: "thinking_delta" } }) +
+  claudeEvent({
+    type: "content_block_start",
+    index: 1,
+    content_block: { type: "text", text: "" },
+  }) +
+  claudeEvent({
+    type: "content_block_delta",
+    index: 1,
+    delta: { type: "text_delta", text: "Rivers " },
+  }) +
+  claudeEvent({
+    type: "content_block_delta",
+    index: 1,
+    delta: { type: "text_delta", text: "flow." },
+  });
+
+describe("Claude stream folding", () => {
+  it("returns the result text exactly as plain print mode prints it", () => {
+    const stdout =
+      CLAUDE_STREAM_START +
+      `${JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "Rivers flow." })}\n`;
+
+    expect(foldClaudeStream(stdout, true)).toBe("Rivers flow.\n");
+  });
+
+  it("keeps an error result, which plain print mode also prints on stdout", () => {
+    const message = "There's an issue with the selected model (nonexistent-xyz).";
+    const stdout = `${JSON.stringify({ type: "result", subtype: "success", is_error: true, result: message })}\n`;
+
+    expect(foldClaudeStream(stdout, true)).toBe(`${message}\n`);
+  });
+
+  it("returns the text streamed before a stop and drops the event it cut", () => {
+    const stdout =
+      CLAUDE_STREAM_START +
+      claudeEvent({ type: "content_block_start", index: 2, content_block: { type: "tool_use" } }) +
+      claudeEvent({
+        type: "content_block_start",
+        index: 3,
+        content_block: { type: "text", text: "" },
+      }) +
+      claudeEvent({
+        type: "content_block_delta",
+        index: 3,
+        delta: { type: "text_delta", text: "Then" },
+      }) +
+      '{"type":"stream_event","event":{"type":"content_block_delta","index":3,"delta":{"type":"text_';
+
+    expect(foldClaudeStream(stdout, false)).toBe("Rivers flow.\n\nThen\n");
+  });
+
+  it("passes through lines that are not events", () => {
+    expect(foldClaudeStream(`Error: something broke\n${CLAUDE_STREAM_START}`, true)).toBe(
+      "Error: something broke\nRivers flow.\n",
+    );
+  });
+
+  it("returns nothing for a run stopped before any text", () => {
+    expect(
+      foldClaudeStream(`${JSON.stringify({ type: "system", subtype: "init" })}\n`, false),
+    ).toBe("");
+  });
+
+  it("streams plain runs only", () => {
+    const claude = new Claude();
+    expect(claude.invocation?.streamArgs).toEqual([
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--include-partial-messages",
+    ]);
+    expect(claude.buildInvocation("x")?.args).not.toContain("stream-json");
+  });
+});
+
+describe("streamed invocation", () => {
+  const events = JSON.stringify(CLAUDE_STREAM_START);
+  const script = `process.stdout.write(${events}); if (process.argv.includes('stream-json')) setTimeout(() => {}, 60000);`;
+
+  class StreamingCursor extends FakeCursor {
+    override readonly binaries = [process.execPath];
+    override readonly invocation: Harness["invocation"] = {
+      args: ["-e", script],
+      jsonArgs: ["-e", "console.log('{}')"],
+      streamArgs: ["stream-json"],
+      level: "inferred",
+    };
+    protected override foldStreamOutput(stdout: string, complete: boolean): string {
+      return foldClaudeStream(stdout, complete);
+    }
+  }
+
+  it("keeps the text written before a timeout, with the time since the last output", async () => {
+    const result = await new StreamingCursor().invoke("x", { tools: true, timeoutMs: 400 });
+
+    expect(result).toMatchObject({ timedOut: true, exitCode: null, stdout: "Rivers flow.\n" });
+    expect(result.args).toContain("stream-json");
+    expect(result.idleMs).toBeGreaterThan(0);
+    expect(result.idleMs).toBeLessThanOrEqual(400);
+  });
+
+  it("leaves structured runs unstreamed", async () => {
+    const result = await new StreamingCursor().invoke("x", { tools: true, structured: true });
+
+    expect(result.stdout).toBe("{}\n");
+    expect(result.args).not.toContain("stream-json");
+  });
+
+  it("reports the idle time of a run that printed nothing", async () => {
+    registerHarness(
+      class extends FakeCursor {
+        override readonly binaries = [process.execPath];
+        override readonly invocation: Harness["invocation"] = {
+          args: ["-e", "setTimeout(() => {}, 60000)"],
+          level: "inferred",
+        };
+      },
+    );
+    try {
+      const result = await runHarness("cursor", "x", { tools: true, timeoutSeconds: 0.3 });
+
+      expect(result.details).toMatchObject({ timedOut: true, stdout: "" });
+      const idleMs = "idleMs" in result.details ? result.details.idleMs : undefined;
+      expect(idleMs).toBeGreaterThanOrEqual(250);
+      expect(result.content[0]?.text).toContain(`idleMs: ${idleMs}`);
+    } finally {
+      registerHarness(Cursor);
+    }
+  });
+
+  it("leaves idleMs out when the run exits on its own", async () => {
+    const result = await new StreamingCursor().invoke("x", { tools: true, structured: true });
+
+    expect(result).not.toHaveProperty("idleMs");
   });
 });
 
