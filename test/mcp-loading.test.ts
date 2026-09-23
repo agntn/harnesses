@@ -38,6 +38,7 @@ try {
   assert.notEqual(response.isError, true);
   assert.match(response.content[0].text, /Pi/);
   assert.equal(loaded.some(url => /\/tool-operations\.[tm]/.test(url)), true);
+  assert.equal(loaded.some(url => url.includes('/node_modules/yaml/')), false);
 } finally {
   await Promise.all([client.close(), server.close()]);
 }
