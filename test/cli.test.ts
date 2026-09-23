@@ -59,6 +59,7 @@ describe("harnesses usage paths", () => {
     expect(result.loaded.some((url) => url.endsWith("/src/commands/mcp.ts"))).toBe(true);
     expect(loadedFrom(result.loaded, "/node_modules/@modelcontextprotocol/")).toEqual([]);
     expect(loadedFrom(result.loaded, "/node_modules/typebox/")).toEqual([]);
+    expect(loadedFrom(result.loaded, "/node_modules/yaml/")).toEqual([]);
     expect(result.loaded.filter((url) => url.endsWith("/src/mcp.ts"))).toEqual([]);
   });
 
@@ -83,6 +84,7 @@ describe("harnesses usage paths", () => {
         targets: [{ id: "pi", action: "linked", templates: [] }],
       });
       expect(readlinkSync(join(homeDir, ".pi", "agent", "prompts"))).toBe(resolve(source, ".."));
+      expect(loadedFrom(result.loaded, "/node_modules/yaml/")).toEqual([]);
     } finally {
       rmSync(temporaryRoot, { recursive: true, force: true });
     }

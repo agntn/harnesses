@@ -11,8 +11,8 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
+import { createRequire } from "node:module";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
-import { parse as parseYaml } from "yaml";
 import { moveFile } from "./agents-sync.ts";
 import type { Harness } from "./harness.ts";
 import { agntnDataDir } from "./resolve.ts";
@@ -272,6 +272,14 @@ function syncMarkdownDirectory(
   const detail = clearDirectory(id, targetDir, state, options);
   linkDirectory(targetDir, sourceDir);
   return { action, detail };
+}
+
+// yaml is most of the modules a package import loads, and only Gemini's
+// frontmatter needs it. A lazy require keeps the sync API synchronous.
+function parseYaml(raw: string): unknown {
+  const load = createRequire(import.meta.url);
+  const yaml = load("yaml") as typeof import("yaml");
+  return yaml.parse(raw);
 }
 
 function frontmatterDescription(raw: string, path: string): string | undefined {
