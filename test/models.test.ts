@@ -280,6 +280,15 @@ describe("model listing", () => {
     );
   });
 
+  it("selects Antigravity models by bare id and Pi models by provider and id", () => {
+    expect(new Antigravity().modelSelector({ provider: "google", id: "gemini-3.1-pro-low" })).toBe(
+      "gemini-3.1-pro-low",
+    );
+    expect(new Pi().modelSelector({ provider: "openai-codex", id: "gpt-5.4" })).toBe(
+      "openai-codex/gpt-5.4",
+    );
+  });
+
   it("lists Antigravity models past the stderr progress line and filters them locally", async () => {
     const antigravity = getHarness("antigravity");
 

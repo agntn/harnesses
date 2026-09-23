@@ -162,4 +162,14 @@ export default class Antigravity extends Harness {
   protected override parseModelListingOutput(stdout: string): AvailableModel[] {
     return parseAntigravityModels(stdout);
   }
+
+  /**
+   * `agy --model` refuses `google/<id>`, so the bare id is the selector.
+   *
+   * @param model - A model returned by {@link listModels}.
+   * @returns {string} The model id.
+   */
+  override modelSelector(model: Readonly<AvailableModel>): string {
+    return model.id;
+  }
 }
