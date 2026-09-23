@@ -42,12 +42,17 @@ function onlyTextContent(content: unknown): string {
   return part.text;
 }
 
+const CANCEL_ARGUMENTS = {
+  harnesses_run: { id: "cursor", prompt: "x", tools: true },
+  harnesses_models: { id: "cursor" },
+};
+
 afterEach(async () => {
   await Promise.all(openConnections.splice(0).map((connection) => connection.close()));
 });
 
 describe("harnesses MCP server", () => {
-  it.each(["harnesses_run", "harnesses_models"])(
+  it.each(["harnesses_run", "harnesses_models"] as const)(
     "cancels the owned command for %s",
     async (name) => {
       let execution: Promise<InvokeResult> | undefined;
@@ -75,7 +80,7 @@ describe("harnesses MCP server", () => {
       try {
         const client = await connectTestClient();
         const request = client
-          .callTool({ name, arguments: { id: "cursor", prompt: "x", tools: true } }, undefined, {
+          .callTool({ name, arguments: CANCEL_ARGUMENTS[name] }, undefined, {
             signal: controller.signal,
           })
           .then(
@@ -227,5 +232,19 @@ describe("harnesses MCP server", () => {
 
     expect(response.isError).toBe(true);
     expect(onlyTextContent(response.content)).toContain("Invalid arguments");
+  });
+
+  it("names an argument the schema does not know instead of dropping it", async () => {
+    const client = await connectTestClient();
+
+    const response = await client.callTool({
+      name: "harnesses_run",
+      arguments: { id: "missing", prompt: "inspect", tools: true, read_only: true },
+    });
+
+    expect(response.isError).toBe(true);
+    expect(onlyTextContent(response.content)).toBe(
+      "Invalid arguments at /: unknown property read_only",
+    );
   });
 });

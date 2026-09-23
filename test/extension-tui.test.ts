@@ -222,6 +222,28 @@ describe("Pi and OMP extension renderers", () => {
     }
   });
 
+  it("rejects arguments the schema does not declare in both hosts", () => {
+    const stray = { id: "claude", prompt: "inspect", tools: true, read_only: true };
+    const piRun = tool(piTools, "harnesses_run").parameters;
+    const ompRun = tool(ompTools, "harnesses_run").parameters;
+    if (!IsSchema(piRun)) throw new TypeError("Missing parameter schema");
+    if (typeof ompRun !== "function" || !("allows" in ompRun)) {
+      throw new TypeError("Missing OMP parameter schema");
+    }
+    const { allows } = ompRun;
+    if (typeof allows !== "function") throw new TypeError("Missing OMP validator");
+
+    expect(Value.Check(piRun, stray)).toBe(false);
+    expect(Reflect.apply(allows, ompRun, [stray])).toBe(false);
+    const { read_only: _, ...declared } = stray;
+    expect(Value.Check(piRun, declared)).toBe(true);
+    expect(Reflect.apply(allows, ompRun, [declared])).toBe(true);
+
+    const detect = tool(piTools, "harnesses_detect").parameters;
+    if (!IsSchema(detect)) throw new TypeError("Missing parameter schema");
+    expect(Value.Check(detect, { _: "" })).toBe(true);
+  });
+
   it("renders bounded terminal-safe call rows in both hosts", () => {
     const piLine = renderCall(tool(piTools, "harnesses_run"), false);
     const ompLine = renderCall(tool(ompTools, "harnesses_run"), true);
