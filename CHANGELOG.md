@@ -1,6 +1,42 @@
 # Changelog
 
 
+## v0.3.0
+
+[compare changes](https://github.com/agntn/harnesses/compare/v0.2.1...v0.3.0)
+
+### 🚀 Enhancements
+
+- **prompts:** ⚠️  Link whole prompt directories ([#78](https://github.com/agntn/harnesses/pull/78))
+- **grok:** ⚠️  List models through grok models ([#80](https://github.com/agntn/harnesses/pull/80))
+- Keep Claude's partial output on timeout ([#81](https://github.com/agntn/harnesses/pull/81))
+- **antigravity:** Expose the agy model list ([#87](https://github.com/agntn/harnesses/pull/87))
+- Catalog env overrides and temp roots ([#88](https://github.com/agntn/harnesses/pull/88))
+
+### 🔥 Performance
+
+- Load yaml only for Gemini prompts ([#82](https://github.com/agntn/harnesses/pull/82))
+
+### 🩹 Fixes
+
+- Refuse read-only runs without tools ([#77](https://github.com/agntn/harnesses/pull/77))
+- Stop ignoring unknown tool arguments ([#83](https://github.com/agntn/harnesses/pull/83))
+- Tell a missing cwd from a missing binary ([#85](https://github.com/agntn/harnesses/pull/85))
+
+### 📖 Documentation
+
+- Refresh the AGENTS.md codebase map ([#84](https://github.com/agntn/harnesses/pull/84))
+
+#### ⚠️ Breaking Changes
+
+- **prompts:** ⚠️  Link whole prompt directories ([#78](https://github.com/agntn/harnesses/pull/78))
+- **grok:** ⚠️  List models through grok models ([#80](https://github.com/agntn/harnesses/pull/80))
+
+### ❤️ Contributors
+
+- Aeitwoen ([@aeitwoen](https://github.com/aeitwoen))
+- Ori ([@oritwoen](https://github.com/oritwoen))
+
 ## v0.2.1
 
 [compare changes](https://github.com/agntn/harnesses/compare/v0.2.0...v0.2.1)
