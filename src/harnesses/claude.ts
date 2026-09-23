@@ -83,8 +83,9 @@ class ClaudeStreamFold {
  */
 export function foldClaudeStream(stdout: string, complete: boolean): string {
   const lines = stdout.split("\n");
-  // A stop can cut the last event in half, and a whole one always ends in a newline.
-  if (!complete && lines.at(-1)?.startsWith("{")) lines.pop();
+  // A stop can cut the last event in half; one that still parses stays.
+  const tail = lines.at(-1);
+  if (!complete && tail?.startsWith("{") && parseStreamLine(tail) === undefined) lines.pop();
   const fold = new ClaudeStreamFold();
   for (const line of lines) fold.add(line);
   return fold.text(complete);

@@ -246,14 +246,15 @@ function executeCommand(
     if (options.timeoutMs) timer = setTimeout(() => stop("timeout"), options.timeoutMs);
     if (options.signal) abortListener = addAbortListener(options.signal, () => stop("abort"));
 
-    /* oxlint-disable-next-line typescript/prefer-readonly-parameter-types */
-    child.stdout.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString("utf8");
+    // A stream decoder keeps a multibyte character split across two chunks whole.
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      stdout += chunk;
       lastOutputAt = performance.now();
     });
-    /* oxlint-disable-next-line typescript/prefer-readonly-parameter-types */
-    child.stderr.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString("utf8");
+    child.stderr.on("data", (chunk: string) => {
+      stderr += chunk;
       lastOutputAt = performance.now();
     });
     child.on("error", fail);

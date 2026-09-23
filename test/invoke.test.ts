@@ -407,6 +407,12 @@ describe("Claude stream folding", () => {
     );
   });
 
+  it("keeps a whole last event that a stop left without its newline", () => {
+    const stdout = CLAUDE_STREAM_START.slice(0, -1);
+
+    expect(foldClaudeStream(stdout, false)).toBe("Rivers flow.\n");
+  });
+
   it("returns nothing for a run stopped before any text", () => {
     expect(
       foldClaudeStream(`${JSON.stringify({ type: "system", subtype: "init" })}\n`, false),
@@ -429,7 +435,7 @@ describe("streamed invocation", () => {
   const events = JSON.stringify(CLAUDE_STREAM_START);
   const script = `process.stdout.write(${events}); if (process.argv.includes('stream-json')) setTimeout(() => {}, 60000);`;
 
-  class StreamingCursor extends FakeCursor {
+  class StreamingClaude extends Claude {
     override readonly binaries = [process.execPath];
     override readonly invocation: Harness["invocation"] = {
       args: ["-e", script],
@@ -437,13 +443,10 @@ describe("streamed invocation", () => {
       streamArgs: ["stream-json"],
       level: "inferred",
     };
-    protected override foldStreamOutput(stdout: string, complete: boolean): string {
-      return foldClaudeStream(stdout, complete);
-    }
   }
 
   it("keeps the text written before a timeout, with the time since the last output", async () => {
-    const result = await new StreamingCursor().invoke("x", { tools: true, timeoutMs: 400 });
+    const result = await new StreamingClaude().invoke("x", { tools: true, timeoutMs: 400 });
 
     expect(result).toMatchObject({ timedOut: true, exitCode: null, stdout: "Rivers flow.\n" });
     expect(result.args).toContain("stream-json");
@@ -452,7 +455,7 @@ describe("streamed invocation", () => {
   });
 
   it("leaves structured runs unstreamed", async () => {
-    const result = await new StreamingCursor().invoke("x", { tools: true, structured: true });
+    const result = await new StreamingClaude().invoke("x", { tools: true, structured: true });
 
     expect(result.stdout).toBe("{}\n");
     expect(result.args).not.toContain("stream-json");
@@ -502,8 +505,22 @@ describe("streamed invocation", () => {
     }
   });
 
+  it("keeps a multibyte character split across two writes", async () => {
+    const script =
+      "process.stdout.write(Buffer.from([0xc5])); setTimeout(() => process.stdout.write(Buffer.from([0x82, 0x0a])), 50)";
+    const fake = new (class extends FakeCursor {
+      override readonly binaries = [process.execPath];
+      override readonly invocation: Harness["invocation"] = {
+        args: ["-e", script],
+        level: "inferred",
+      };
+    })();
+
+    expect((await fake.invoke("x", { tools: true })).stdout).toBe("ł\n");
+  });
+
   it("leaves idleMs out when the run exits on its own", async () => {
-    const result = await new StreamingCursor().invoke("x", { tools: true, structured: true });
+    const result = await new StreamingClaude().invoke("x", { tools: true, structured: true });
 
     expect(result).not.toHaveProperty("idleMs");
   });
