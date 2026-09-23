@@ -108,9 +108,13 @@ const active = detectHarness();
 if (active) console.log(active.id);
 
 await getHarness("codex").invoke("Review this patch", { readOnly: true });
+
+const agy = getHarness("antigravity");
+const [model] = (await agy.listModels({ search: "gemini" })).models;
+if (model) await agy.invoke("Review this patch", { tools: true, model: agy.modelSelector(model) });
 ```
 
-That's most of it, really. `getHarness` wants an exact id. `detectHarness` uses env vars first, then a single project marker. `invoke()` talks to the CLI. A mode the CLI cannot run comes back as an error, not a quieter one. The rest: [Registry](https://harnesses.agntn.dev/guide/registry), [Invoke](https://harnesses.agntn.dev/guide/invoke), [MCP servers](https://harnesses.agntn.dev/guide/mcp-servers), [Instructions files](https://harnesses.agntn.dev/guide/agents-sync).
+That's most of it, really. `getHarness` wants an exact id. `detectHarness` uses env vars first, then a single project marker. `invoke()` talks to the CLI. `listModels()` asks it what it can run, and `modelSelector()` turns one of those into what `model` takes, since Pi wants `provider/id` and Antigravity the bare id. A mode the CLI cannot run comes back as an error, not a quieter one. The rest: [Registry](https://harnesses.agntn.dev/guide/registry), [Invoke](https://harnesses.agntn.dev/guide/invoke), [MCP servers](https://harnesses.agntn.dev/guide/mcp-servers), [Instructions files](https://harnesses.agntn.dev/guide/agents-sync).
 
 ### Prompt templates
 

@@ -104,6 +104,33 @@ describe("harnesses usage paths", () => {
     expect(result.stderr).toContain("Harness claude cannot run readOnly with tools: false");
   });
 
+  it("harnesses models prints the ids agy --model accepts", () => {
+    const binDir = mkdtempSync(join(tmpdir(), "harnesses-agy-"));
+    try {
+      writeFileSync(
+        join(binDir, "agy"),
+        [
+          "#!/bin/sh",
+          "echo 'Fetching available models...' >&2",
+          "printf 'gemini-3.8-flash-high\\tGemini 3.8 Flash (High)\\n'",
+          "",
+        ].join("\n"),
+        { mode: 0o755 },
+      );
+      // consola drops `log` under the inherited test environment, the level brings it back.
+      const result = runCli(["models", "antigravity"], "", {
+        CONSOLA_LEVEL: "3",
+        PATH: `${binDir}:${process.env.PATH ?? ""}`,
+      });
+
+      expect(result.status).toBe(0);
+      expect(stripVTControlCharacters(result.stdout)).toMatch(/\sgemini-3\.8-flash-high\s/u);
+      expect(result.stdout).not.toContain("google/");
+    } finally {
+      rmSync(binDir, { recursive: true, force: true });
+    }
+  });
+
   it("harnesses prompts sync sanitizes Unicode formatting in human errors", () => {
     const bidiOverride = String.fromCodePoint(0x202e);
     const result = runCli(["prompts", "sync", `bad${bidiOverride}id`]);

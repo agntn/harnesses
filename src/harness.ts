@@ -590,6 +590,17 @@ export abstract class Harness {
   }
 
   /**
+   * The value `model` takes for one listed model: `provider/id` unless the
+   * harness overrides it.
+   *
+   * @param model - A model returned by {@link listModels}.
+   * @returns {string} The selector this harness's `modelArgs` accept.
+   */
+  modelSelector(model: Readonly<AvailableModel>): string {
+    return `${model.provider}/${model.id}`;
+  }
+
+  /**
    * Converts a successful native model-listing response to the shared shape.
    *
    * @param _stdout - Native command output to parse.

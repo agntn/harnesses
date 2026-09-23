@@ -111,12 +111,11 @@ function modelDescription(model: Readonly<AvailableModel>): string {
 }
 
 function renderModels(details: ModelsOutcome): void {
+  const harness = getHarness(details.id);
   consola.log(header(`${details.id} models`));
   consola.log("");
   for (const model of details.models) {
-    consola.log(
-      entry(`${s.hi(`${model.provider}/${model.id}`)}  ${s.dim(modelDescription(model))}`),
-    );
+    consola.log(entry(`${s.hi(harness.modelSelector(model))}  ${s.dim(modelDescription(model))}`));
   }
   if (details.models.length === 0) consola.log(entry(s.dim("No models found")));
   consola.log("");
