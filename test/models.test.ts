@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getHarness, registerHarness } from "../src/index.ts";
 import Antigravity, { parseAntigravityModels } from "../src/harnesses/antigravity.ts";
 import Grok, { parseGrokModels } from "../src/harnesses/grok.ts";
@@ -78,6 +78,12 @@ describe("model listing", () => {
     registerHarness(FakePi);
     registerHarness(FakeGrok);
     registerHarness(FakeAntigravity);
+  });
+
+  afterAll(() => {
+    registerHarness(Pi);
+    registerHarness(Grok);
+    registerHarness(Antigravity);
   });
 
   it("exposes the Pi model-listing command", () => {
