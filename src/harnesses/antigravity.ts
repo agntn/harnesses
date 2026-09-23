@@ -1,4 +1,30 @@
+import { stripVTControlCharacters } from "node:util";
 import { Harness } from "../harness.ts";
+import type { AvailableModel } from "../types.ts";
+
+/**
+ * Parses `agy models`: one `id<TAB>label` row per model on stdout, while the
+ * `Fetching available models...` line goes to stderr. Every model runs through
+ * Google's Antigravity service, the Claude and GPT-OSS ones included, so they
+ * all carry the `google` provider.
+ *
+ * @param stdout - Native model-listing output.
+ * @returns {AvailableModel[]} The listed models, in the CLI's order.
+ */
+export function parseAntigravityModels(stdout: string): AvailableModel[] {
+  const lines = stripVTControlCharacters(stdout)
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length === 0) throw new Error("Unexpected empty Antigravity model-list output");
+
+  return lines.map((line) => {
+    const match = /^(\S+)\t.+$/.exec(line);
+    if (!match?.[1])
+      throw new Error(`Unexpected Antigravity model-list row: ${JSON.stringify(line)}`);
+    return { provider: "google", id: match[1] };
+  });
+}
 
 export default class Antigravity extends Harness {
   readonly id = "antigravity";
@@ -112,6 +138,11 @@ export default class Antigravity extends Harness {
     level: "official",
     note: "Non-interactive print mode.",
   };
+  override readonly modelListing: Harness["modelListing"] = {
+    args: ["models"],
+    level: "official",
+    note: "Prints one id and display name per row, with no default marked and no filter; verified with 1.2.5.",
+  };
   override readonly mcpConfigs: Harness["mcpConfigs"] = [
     {
       path: "~/.gemini/config/mcp_config.json",
@@ -127,4 +158,8 @@ export default class Antigravity extends Harness {
     envVars: [],
     projectMarkers: [".antigravitycli"],
   };
+
+  protected override parseModelListingOutput(stdout: string): AvailableModel[] {
+    return parseAntigravityModels(stdout);
+  }
 }

@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { getHarness, registerHarness } from "../src/index.ts";
+import Antigravity, { parseAntigravityModels } from "../src/harnesses/antigravity.ts";
 import Grok, { parseGrokModels } from "../src/harnesses/grok.ts";
 import Pi, { parsePiModelTable } from "../src/harnesses/pi.ts";
 import PrimeAgent from "../src/harnesses/prime-agent.ts";
@@ -21,6 +22,27 @@ Available models:
   - grok-4.6
   - grok-4.5
 `;
+
+// Verbatim `agy models` stdout from agy 1.2.5, trimmed to four rows.
+const AGY_MODELS_OUTPUT = [
+  "gemini-3.8-flash-high\tGemini 3.8 Flash (High)",
+  "gemini-3.1-pro-low\tGemini 3.1 Pro (Low)",
+  "claude-opus-4-6-thinking\tClaude Opus 4.6 (Thinking)",
+  "gpt-oss-120b-medium\tGPT-OSS 120B (Medium)",
+  "",
+].join("\n");
+
+class FakeAntigravity extends Antigravity {
+  override readonly binaries = ["node"];
+  override readonly modelListing: Antigravity["modelListing"] = {
+    args: [
+      "-e",
+      `process.stderr.write("Fetching available models...\\n");
+       process.stdout.write(${JSON.stringify(AGY_MODELS_OUTPUT)})`,
+    ],
+    level: "inferred",
+  };
+}
 
 class FakeGrok extends Grok {
   override readonly binaries = ["node"];
@@ -55,6 +77,7 @@ describe("model listing", () => {
   beforeAll(() => {
     registerHarness(FakePi);
     registerHarness(FakeGrok);
+    registerHarness(FakeAntigravity);
   });
 
   it("exposes the Pi model-listing command", () => {
@@ -227,5 +250,42 @@ describe("model listing", () => {
       expect.arrayContaining([expect.objectContaining({ id: "gpt-5.4" })]),
     );
     expect(result.content[0]?.text).toContain("gpt-5.4");
+  });
+
+  it("exposes the Antigravity model-listing command without a native filter", () => {
+    const antigravity = new Antigravity();
+
+    expect(antigravity.buildModelListInvocation()).toEqual({ command: "agy", args: ["models"] });
+    expect(antigravity.buildModelListInvocation("gemini")).toEqual({
+      command: "agy",
+      args: ["models"],
+    });
+  });
+
+  it("parses the Antigravity model list under the google provider", () => {
+    expect(parseAntigravityModels(AGY_MODELS_OUTPUT)).toEqual([
+      { provider: "google", id: "gemini-3.8-flash-high" },
+      { provider: "google", id: "gemini-3.1-pro-low" },
+      { provider: "google", id: "claude-opus-4-6-thinking" },
+      { provider: "google", id: "gpt-oss-120b-medium" },
+    ]);
+  });
+
+  it("rejects Antigravity output it does not recognize", () => {
+    expect(() => parseAntigravityModels("")).toThrow(
+      "Unexpected empty Antigravity model-list output",
+    );
+    expect(() => parseAntigravityModels("Fetching available models...\n")).toThrow(
+      "Unexpected Antigravity model-list row",
+    );
+  });
+
+  it("lists Antigravity models past the stderr progress line and filters them locally", async () => {
+    const antigravity = getHarness("antigravity");
+
+    expect((await antigravity.listModels()).models).toHaveLength(4);
+    expect((await antigravity.listModels({ search: "CLAUDE" })).models).toEqual([
+      { provider: "google", id: "claude-opus-4-6-thinking" },
+    ]);
   });
 });
