@@ -126,7 +126,11 @@ function finishInvocation(result: InvokeResult, timeoutSeconds: number | undefin
   if (result.stdout) process.stdout.write(result.stdout);
   if (result.stderr) process.stderr.write(result.stderr);
   if (result.timedOut) {
-    consola.error(`Timed out after ${timeoutSeconds}s`);
+    const idle =
+      result.idleMs === undefined
+        ? ""
+        : `; last output ${Math.round(result.idleMs / 1000)}s before`;
+    consola.error(`Timed out after ${timeoutSeconds}s${idle}`);
     process.exit(124);
   }
   process.exit(result.exitCode ?? 1);

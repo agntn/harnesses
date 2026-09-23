@@ -229,6 +229,7 @@ function completedRun(
     exitCode: result.exitCode,
     timedOut: result.timedOut,
     aborted: result.aborted,
+    ...(result.idleMs === undefined ? {} : { idleMs: result.idleMs }),
   };
   const stdout = truncate(result.stdout);
   const stderr = truncate(result.stderr);
@@ -415,6 +416,8 @@ export interface ModelsOutcome {
   exitCode: number | null;
   timedOut: boolean;
   aborted: boolean;
+  /** Milliseconds without output before the listing was stopped; absent when it exited on its own. */
+  idleMs?: number;
   stderr: string;
 }
 
@@ -452,15 +455,25 @@ export async function listHarnessModels(
     return { content: text(details), details, isError: true };
   }
 
+  return completedListing(harness.id, result, result.models, options.search);
+}
+
+function completedListing(
+  id: HarnessId,
+  result: InvokeResult,
+  models: readonly Readonly<AvailableModel>[],
+  search: string | undefined,
+): ToolResult<ModelsOutcome> {
   const details: ModelsOutcome = {
-    id: harness.id,
+    id,
     command: result.command,
-    args: result.args,
-    ...(options.search === undefined ? {} : { search: options.search }),
-    models: result.models,
+    args: [...result.args],
+    ...(search === undefined ? {} : { search }),
+    models: [...models],
     exitCode: result.exitCode,
     timedOut: result.timedOut,
     aborted: result.aborted,
+    ...(result.idleMs === undefined ? {} : { idleMs: result.idleMs }),
     stderr: truncate(result.stderr),
   };
 
@@ -501,6 +514,8 @@ export interface RunOutcome {
   exitCode: number | null;
   timedOut: boolean;
   aborted: boolean;
+  /** Milliseconds without output before the run was stopped; absent when it exited on its own. */
+  idleMs?: number;
   stdout: string;
   stderr: string;
 }

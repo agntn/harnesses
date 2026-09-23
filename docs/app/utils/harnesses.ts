@@ -216,7 +216,10 @@ export interface BuiltCommand {
   args: string[];
 }
 
-/** Mirrors `Harness.buildInvocation`: template first, model arguments appended. */
+/**
+ * Mirrors what `Harness.invoke` spawns: template first, model arguments appended,
+ * then `streamArgs` for a plain text run.
+ */
 export function buildCommand(
   harness: HarnessRecord,
   mode: ModeKey,
@@ -234,6 +237,7 @@ export function buildCommand(
   if (model && invocation.modelArgs) {
     args.push(...invocation.modelArgs.map((arg) => arg.replaceAll("{model}", model)));
   }
+  if (!mode.endsWith("Structured") && invocation.streamArgs) args.push(...invocation.streamArgs);
   return { command, args };
 }
 
