@@ -6,7 +6,7 @@ import type { ResolveOptions } from "./types.ts";
  * Every marker a path template can carry, matched in one pass so a substituted
  * value is never scanned for markers again.
  */
-const PATH_MARKERS = /^~(?=\/|$)|\$\{HOME\}|\$\{PROJECT_ROOT\}|%([^%]+)%/g;
+const PATH_MARKERS = /^~(?=\/|$)|\$\{HOME\}|\$\{PROJECT_ROOT\}|\$\{TMPDIR\}|%([^%]+)%/g;
 
 export function resolvePathTemplate(template: string, options: ResolveOptions = {}): string {
   const homeDir = options.homeDir ?? os.homedir();
@@ -14,6 +14,7 @@ export function resolvePathTemplate(template: string, options: ResolveOptions = 
 
   return template.replaceAll(PATH_MARKERS, (match: string, name: string | undefined) => {
     if (match === "${PROJECT_ROOT}") return projectRoot;
+    if (match === "${TMPDIR}") return options.tempDir ?? os.tmpdir();
     if (name === undefined) return homeDir;
     return process.env[name] ?? match;
   });

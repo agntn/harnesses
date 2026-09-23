@@ -84,7 +84,8 @@ const modes = computed(() =>
     <ProseH2 id="paths">Paths</ProseH2>
     <ProseP>
       Templates as the registry stores them. <ProseCode>~</ProseCode>,
-      <ProseCode>${HOME}</ProseCode> and <ProseCode>%VAR%</ProseCode> expand in
+      <ProseCode>${HOME}</ProseCode>, <ProseCode>${TMPDIR}</ProseCode> and
+      <ProseCode>%VAR%</ProseCode> expand in
       <ProseCode>resolve()</ProseCode>; entries tagged with a platform are dropped on the others.
       <ProseA :href="`/explorer?id=${harness.id}`">Open in the explorer</ProseA> to see them
       expanded for a home directory of your choice.
@@ -99,6 +100,30 @@ const modes = computed(() =>
         </p>
       </div>
     </div>
+
+    <template v-if="harness.envOverrides.length > 0">
+      <ProseH3 id="env-overrides">Env overrides</ProseH3>
+      <ProseP>
+        Variables the harness reads to move a root. The path is the default while the variable is
+        unset; <ProseCode>resolve()</ProseCode> applies a set one to <ProseCode>temp</ProseCode>.
+      </ProseP>
+      <div class="harnesses-frame not-prose my-5 divide-y divide-muted overflow-hidden rounded-xl">
+        <div
+          v-for="item in harness.envOverrides"
+          :key="`${item.variable}-${item.path}`"
+          class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-4 py-3"
+        >
+          <code class="font-mono text-[13px] break-all text-highlighted">{{ item.variable }}</code>
+          <code class="font-mono text-[13px] break-all text-muted">{{ item.path }}</code>
+          <span class="font-mono text-[10px] tracking-[0.08em] text-dimmed uppercase"
+            >{{ item.relocates.join(" · ") }}<template v-if="item.platforms">
+              · {{ item.platforms.join(", ") }}</template
+            ></span
+          >
+          <p v-if="item.note" class="basis-full text-xs text-muted">{{ item.note }}</p>
+        </div>
+      </div>
+    </template>
 
     <ProseH2 id="mcp">MCP servers</ProseH2>
     <div v-if="harness.mcpConfigs.length > 0" class="harnesses-frame not-prose my-5 divide-y divide-muted overflow-hidden rounded-xl">

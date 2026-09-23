@@ -110,6 +110,7 @@ export const PATH_GROUPS = [
   "commands",
   "promptTemplates",
   "hooks",
+  "temp",
 ] as const;
 export type PathGroup = (typeof PATH_GROUPS)[number];
 
@@ -121,7 +122,8 @@ export interface ResolveOptions {
 
 /**
  * Mirrors `resolvePathTemplate` in the library, without process.env: a `%VAR%` with no known
- * value stays as written, the same as the library does when the variable is unset.
+ * value stays as written, the same as the library does when the variable is unset, and
+ * `${TMPDIR}` takes the usual Linux or Windows temp dir in place of `os.tmpdir()`.
  */
 export function resolveTemplate(template: string, options: ResolveOptions): string {
   const windowsEnv: Record<string, string> = {
@@ -130,10 +132,17 @@ export function resolveTemplate(template: string, options: ResolveOptions): stri
     LOCALAPPDATA: `${options.homeDir}\\AppData\\Local`,
     USERPROFILE: options.homeDir,
   };
+  // macOS has a per-user temp dir with no fixed shape, so the marker stays there.
+  const tempDir = {
+    linux: "/tmp",
+    darwin: "${TMPDIR}",
+    win32: `${options.homeDir}\\AppData\\Local\\Temp`,
+  }[options.platform];
   return template
     .replace(/^~(?=\/|$)/u, options.homeDir)
     .replaceAll("${HOME}", options.homeDir)
     .replaceAll("${PROJECT_ROOT}", options.projectRoot)
+    .replaceAll("${TMPDIR}", tempDir)
     .replaceAll(/%([^%]+)%/gu, (match: string, name: string) =>
       options.platform === "win32" ? (windowsEnv[name] ?? match) : match,
     );

@@ -28,6 +28,7 @@ import type { PromptSyncReport } from "./prompt-sync.ts";
 import type { Harness } from "./harness.ts";
 import type {
   AvailableModel,
+  EnvOverride,
   HarnessCapabilities,
   HarnessDetection,
   HarnessId,
@@ -79,6 +80,8 @@ export interface HarnessMetadata {
   promptTemplates: PathCandidate[];
   promptTemplateSyncTarget: PromptTemplateSyncTarget | null;
   hooks: PathCandidate[];
+  temp: PathCandidate[];
+  envOverrides: EnvOverride[];
   persistence: StorageDescriptor[];
   detection: HarnessDetection;
   resolved: ResolvedPaths;
@@ -308,13 +311,19 @@ function harnessInfoResult(id: string): HarnessInfoResult {
     promptTemplates: harness.promptTemplates,
     promptTemplateSyncTarget: harness.promptTemplateSyncTarget,
     hooks: harness.hooks,
+    temp: harness.temp,
+    envOverrides: harness.envOverrides,
     persistence: harness.persistence,
     detection: harness.detection,
     resolved: harness.resolve(),
   };
 }
 
-/** One lookup as the model reads it: every path list once, in {@link HarnessMetadata.resolved}. */
+/**
+ * One lookup as the model reads it: every path list once, in
+ * {@link HarnessMetadata.resolved}, and the env overrides with their default
+ * roots resolved the same way.
+ */
 type HarnessInfoText =
   | Omit<
       HarnessMetadata,
@@ -326,12 +335,14 @@ type HarnessInfoText =
       | "promptTemplates"
       | "promptTemplateSyncTarget"
       | "hooks"
+      | "temp"
     >
   | UnknownHarness;
 
 /**
  * Leaves the path templates out of the text: `resolved` already carries each
- * of them for this machine, so they only doubled every answer.
+ * of them for this machine, so they only doubled every answer. Env overrides
+ * have no resolved copy, so their own roots are resolved in place.
  *
  * @param result - One lookup result.
  * @returns {HarnessInfoText} The lookup with its path lists shown once.
@@ -346,6 +357,7 @@ function harnessInfoText(result: HarnessInfoResult): HarnessInfoText {
     invocationModes,
     modelListing,
     modelSelection,
+    envOverrides,
     persistence,
     detection,
     resolved,
@@ -358,6 +370,7 @@ function harnessInfoText(result: HarnessInfoResult): HarnessInfoText {
     invocationModes,
     modelListing,
     modelSelection,
+    envOverrides: getHarness(id).resolveCandidates(envOverrides),
     persistence,
     detection,
     resolved,

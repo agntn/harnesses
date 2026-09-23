@@ -27,6 +27,27 @@ export interface PathCandidate {
   note?: string;
 }
 
+/** The path lists of a harness descriptor, as named in {@link ResolvedPaths}. */
+export type PathCategory =
+  | "config"
+  | "sessions"
+  | "instructions"
+  | "skills"
+  | "commands"
+  | "promptTemplates"
+  | "hooks"
+  | "temp";
+
+/**
+ * An environment variable the harness reads to move one of its roots. `path`
+ * is the default root, used while the variable is unset or empty.
+ */
+export interface EnvOverride extends PathCandidate {
+  variable: string;
+  /** Categories with entries under this root, which move with it. */
+  relocates: PathCategory[];
+}
+
 /** One stable user-scope destination used by prompt template synchronization. */
 export interface PromptTemplateSyncTarget extends PathCandidate {
   scope: "user";
@@ -206,6 +227,8 @@ export interface ResolveOptions {
   homeDir?: string;
   projectRoot?: string;
   platform?: Platform;
+  /** Replaces `os.tmpdir()` as the value of `${TMPDIR}`. */
+  tempDir?: string;
 }
 
 export interface ResolvedPaths {
@@ -217,4 +240,6 @@ export interface ResolvedPaths {
   promptTemplates: PathCandidate[];
   promptTemplateSyncTarget: PromptTemplateSyncTarget | null;
   hooks: PathCandidate[];
+  /** Temp roots, moved by a set `temp` override from {@link EnvOverride}. */
+  temp: PathCandidate[];
 }

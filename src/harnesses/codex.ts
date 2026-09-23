@@ -95,7 +95,7 @@ export default class Codex extends Harness {
       path: "~/.codex/prompts/",
       scope: "user",
       level: "official",
-      note: "Deprecated Markdown prompts invoked as /prompts:name. Top-level files only; use skills for shared prompts. Base directory follows CODEX_HOME.",
+      note: "Deprecated Markdown prompts invoked as /prompts:name. Top-level files only; use skills for shared prompts.",
     },
   ];
   override readonly promptTemplates = this.commands;
@@ -138,6 +138,15 @@ export default class Codex extends Harness {
       format: "toml",
       key: ["mcp_servers"],
       dialect: "standard",
+    },
+  ];
+  override readonly envOverrides: Harness["envOverrides"] = [
+    {
+      variable: "CODEX_HOME",
+      path: "~/.codex",
+      scope: "user",
+      level: "official",
+      relocates: ["config", "sessions", "instructions", "skills", "commands", "promptTemplates"],
     },
   ];
   override readonly agentsFile = "~/.codex/AGENTS.md";
