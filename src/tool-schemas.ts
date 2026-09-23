@@ -41,6 +41,15 @@ export function harnessToolSchemas<I, S>(Type: McpSchemaBuilder<I, S>) {
       description,
     });
 
+  /**
+   * A closed object rejects a stray `read_only` instead of quietly running with every tool.
+   *
+   * @param properties - Declared tool arguments.
+   * @returns {S} An object schema that refuses undeclared keys.
+   */
+  const closed = (properties: Readonly<Record<string, I>>) =>
+    Type.Object(properties, { additionalProperties: false });
+
   const scope = Type.Optional(
     Type.Union([Type.Literal("user"), Type.Literal("project")], {
       description: "Which config file to target (default user)",
@@ -48,8 +57,9 @@ export function harnessToolSchemas<I, S>(Type: McpSchemaBuilder<I, S>) {
   );
 
   return {
+    /** Open on purpose: nothing to misread, and some models send a placeholder `_` here. */
     detect: Type.Object({}),
-    info: Type.Object({
+    info: closed({
       id: Type.Union(
         [
           harnessId("Harness id"),
@@ -61,7 +71,7 @@ export function harnessToolSchemas<I, S>(Type: McpSchemaBuilder<I, S>) {
         { description: "Harness id, or a list of ids to inspect in one call" },
       ),
     }),
-    models: Type.Object({
+    models: closed({
       id: harnessId("Harness id"),
       search: Type.Optional(
         Type.String({
@@ -86,7 +96,7 @@ export function harnessToolSchemas<I, S>(Type: McpSchemaBuilder<I, S>) {
         }),
       ),
     }),
-    run: Type.Object({
+    run: closed({
       id: harnessId("Harness id"),
       prompt: Type.String({
         description: "Prompt to send to the harness",
@@ -130,25 +140,25 @@ export function harnessToolSchemas<I, S>(Type: McpSchemaBuilder<I, S>) {
         }),
       ),
     }),
-    mcpList: Type.Object({
+    mcpList: closed({
       id: Type.Optional(harnessId("Harness id; omit to list every harness")),
     }),
-    mcpSync: Type.Object({
+    mcpSync: closed({
       id: Type.Optional(harnessId("Harness id; omit to sync every harness")),
     }),
-    agentsSync: Type.Object({
-      id: Type.Optional(harnessId("Harness id; omit to sync every harness")),
-      check: Type.Optional(
-        Type.Boolean({ description: "Report what would change without writing anything" }),
-      ),
-    }),
-    promptsSync: Type.Object({
+    agentsSync: closed({
       id: Type.Optional(harnessId("Harness id; omit to sync every harness")),
       check: Type.Optional(
         Type.Boolean({ description: "Report what would change without writing anything" }),
       ),
     }),
-    mcpAdd: Type.Object({
+    promptsSync: closed({
+      id: Type.Optional(harnessId("Harness id; omit to sync every harness")),
+      check: Type.Optional(
+        Type.Boolean({ description: "Report what would change without writing anything" }),
+      ),
+    }),
+    mcpAdd: closed({
       id: harnessId("Harness id"),
       name: Type.String({
         description: "Server name",
@@ -177,7 +187,7 @@ export function harnessToolSchemas<I, S>(Type: McpSchemaBuilder<I, S>) {
       headers: Type.Optional(stringRecord("Headers for an http/sse server")),
       scope,
     }),
-    mcpRemove: Type.Object({
+    mcpRemove: closed({
       id: harnessId("Harness id"),
       name: Type.String({
         description: "Server name",

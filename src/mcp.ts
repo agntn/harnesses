@@ -5,7 +5,7 @@ import {
   type CallToolResult,
   type Tool,
 } from "@modelcontextprotocol/sdk/types.js";
-import { Type, type TSchema } from "typebox";
+import { IsObject, Type, type TSchema } from "typebox";
 import { Value } from "typebox/value";
 import type { McpServerParams, ToolResult } from "./tool-operations.ts";
 import { harnessToolSchemas } from "./tool-schemas.ts";
@@ -173,13 +173,17 @@ const tools: ToolDefinition[] = [
 ];
 
 /**
- * Formats the first TypeBox validation failure for an MCP client.
+ * Formats the first TypeBox validation failure for an MCP client. A stray key is
+ * named from the schema itself, since TypeBox reports it as `schema is false`.
  *
  * @param schema - Schema that rejected the value.
  * @param value - Rejected input value.
  * @returns {string} A client-facing validation message.
  */
-function validationError(schema: TSchema, value: unknown): string {
+function validationError(schema: TSchema, value: object): string {
+  const declared = IsObject(schema) ? schema.properties : {};
+  const unknown = Object.keys(value).filter((key) => !Object.hasOwn(declared, key));
+  if (unknown.length > 0) return `Invalid arguments at /: unknown property ${unknown.join(", ")}`;
   const first = Value.Errors(schema, value)[0];
   if (!first) return "Invalid arguments";
   return `Invalid arguments at ${first.instancePath || "/"}: ${first.message}`;
