@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { decode as fromToon } from "@toon-format/toon";
 import { getEventListeners } from "node:events";
-import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getHarness, registerHarness } from "../src/index.ts";
@@ -615,6 +615,51 @@ describe.each(["invoke", "listModels"] as const)("%s cancellation cleanup", (ope
   });
 });
 
+describe.each(["invoke", "listModels"] as const)("%s spawn failures", (operation) => {
+  class NodeHarness extends FakeCursor {
+    override readonly binaries = [process.execPath];
+    override readonly invocation: Harness["invocation"] = { args: ["-e", ""], level: "inferred" };
+    override readonly modelListing: Harness["modelListing"] = {
+      args: ["-e", ""],
+      level: "inferred",
+    };
+  }
+  const run = (fake: Harness, cwd: string) =>
+    operation === "invoke" ? fake.invoke("x", { cwd, tools: true }) : fake.listModels({ cwd });
+
+  it("names a missing working directory instead of the installed binary", async () => {
+    const cwd = join(tmpdir(), "agntn-missing-harness-cwd");
+    await expect(run(new NodeHarness(), cwd)).rejects.toMatchObject({
+      code: "ENOENT",
+      message: `Working directory not found: ${cwd}`,
+    });
+  });
+
+  it("names a working directory that is a file", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "harness-cwd-"));
+    try {
+      const cwd = join(directory, "file");
+      await writeFile(cwd, "");
+      await expect(run(new NodeHarness(), cwd)).rejects.toMatchObject({
+        message: `Working directory is not a directory: ${cwd}`,
+      });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("names a missing binary", async () => {
+    const binary = join(tmpdir(), "agntn-missing-harness-binary");
+    const fake = new (class extends NodeHarness {
+      override readonly binaries = [binary];
+    })();
+    await expect(run(fake, tmpdir())).rejects.toMatchObject({
+      code: "ENOENT",
+      message: `Command not found: ${binary}. Install it or add it to PATH`,
+    });
+  });
+});
+
 describe.each([
   ["invoke", "deadline"],
   ["listModels", "deadline"],
@@ -831,6 +876,16 @@ describe("runHarness tool operation", () => {
 
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("Unknown harness: nope");
+  });
+
+  it("tells the agent when the working directory is missing", async () => {
+    const cwd = join(tmpdir(), "agntn-missing-harness-cwd");
+    const result = await runHarness("claude", "x", { cwd });
+
+    expect(result.isError).toBe(true);
+    expect(result.details).toEqual({
+      error: `Failed to run claude: Working directory not found: ${cwd}`,
+    });
   });
 
   it("flags a harness without a headless mode", async () => {
