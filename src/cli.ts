@@ -205,6 +205,8 @@ const info = defineCommand({
           commands: harness.commands,
           promptTemplates: harness.promptTemplates,
           hooks: harness.hooks,
+          temp: harness.temp,
+          envOverrides: harness.envOverrides,
           persistence: harness.persistence,
           detection: harness.detection,
         },
@@ -250,6 +252,14 @@ const info = defineCommand({
     renderPathSection("Commands", harness.commands);
     renderPathSection("Prompt templates", harness.promptTemplates);
     renderPathSection("Hooks", harness.hooks);
+    renderPathSection("Temp", harness.temp);
+    renderPathSection(
+      "Env overrides",
+      harness.envOverrides.map((e) => ({
+        ...e,
+        path: `${e.variable}  ${s.dim(`${e.path} → ${e.relocates.join(", ")}`)}`,
+      })),
+    );
 
     if (harness.persistence.length) {
       consola.log(section("Persistence"));
@@ -281,6 +291,7 @@ const paths = defineCommand({
     renderResolvedPathSection("Commands", resolved.commands);
     renderResolvedPathSection("Prompt templates", resolved.promptTemplates);
     renderResolvedPathSection("Hooks", resolved.hooks);
+    renderResolvedPathSection("Temp", resolved.temp);
 
     consola.log("");
   },

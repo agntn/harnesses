@@ -28,6 +28,8 @@ export type HarnessRecord = Pick<
   | "promptTemplates"
   | "promptTemplateSyncTarget"
   | "hooks"
+  | "temp"
+  | "envOverrides"
   | "mcpConfigs"
   | "agentsFile"
   | "detection"

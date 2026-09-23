@@ -17,7 +17,7 @@ export default class Omp extends Harness {
       path: "~/.omp/agent/config.yml",
       scope: "user",
       level: "official",
-      note: "Agent dir overridable with PI_CODING_AGENT_DIR; profiles use ~/.omp/profiles/<name>/agent.",
+      note: "Profiles use ~/.omp/profiles/<name>/agent.",
     },
     {
       path: "~/.omp/agent/settings.json",
@@ -174,6 +174,16 @@ export default class Omp extends Harness {
       format: "json",
       key: ["mcpServers"],
       dialect: "standard",
+    },
+  ];
+  override readonly envOverrides: Harness["envOverrides"] = [
+    {
+      variable: "PI_CODING_AGENT_DIR",
+      path: "~/.omp/agent",
+      scope: "user",
+      level: "official",
+      relocates: ["config", "sessions", "instructions", "skills", "commands", "promptTemplates"],
+      note: "Ignored under a named profile (OMP_PROFILE). On Linux, after omp config init-xdg, data, state and cache live under $XDG_*_HOME/omp instead.",
     },
   ];
   override readonly agentsFile = "~/.omp/agent/AGENTS.md";

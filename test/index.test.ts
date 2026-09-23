@@ -147,6 +147,74 @@ describe("@agntn/harnesses", () => {
     );
   });
 
+  it("should resolve ${TMPDIR} to the system temp dir or the given one", () => {
+    expect(resolvePathTemplate("${TMPDIR}/x")).toBe(`${tmpdir()}/x`);
+    expect(resolvePathTemplate("${TMPDIR}/x", { tempDir: "/scratch" })).toBe("/scratch/x");
+  });
+
+  it("should resolve the Claude temp root per platform", () => {
+    vi.stubEnv("CLAUDE_CODE_TMPDIR", "");
+    const claude = getHarness("claude");
+
+    expect(claude.resolve({ platform: "linux", tempDir: "/tmp" }).temp.map((e) => e.path)).toEqual([
+      "/tmp/claude-<uid>/",
+    ]);
+    expect(claude.resolve({ platform: "darwin", tempDir: "/var/folders/x" }).temp[0]?.path).toBe(
+      "/tmp/claude-<uid>/",
+    );
+    expect(
+      claude.resolve({ platform: "win32", tempDir: "C:\\Temp" }).temp.map((e) => e.path),
+    ).toEqual(["C:\\Temp/claude/"]);
+  });
+
+  it("should move the Claude temp root to a set CLAUDE_CODE_TMPDIR", () => {
+    vi.stubEnv("CLAUDE_CODE_TMPDIR", "/var/tmp");
+    const claude = getHarness("claude");
+
+    expect(claude.resolve({ platform: "linux", tempDir: "/tmp" }).temp[0]?.path).toBe(
+      "/var/tmp/claude-<uid>/",
+    );
+    expect(claude.resolve({ platform: "darwin" }).temp[0]?.path).toBe("/var/tmp/claude-<uid>/");
+    expect(claude.resolve({ platform: "linux" }).config[0]?.path).not.toContain("/var/tmp");
+  });
+
+  it("should leave harnesses without a verified temp root empty", () => {
+    expect(getHarness("gemini").resolve({ platform: "linux" }).temp).toEqual([]);
+    expect(getHarness("gemini").envOverrides).toEqual([]);
+  });
+
+  it("should list each env override against the categories under its root", () => {
+    const categories = [
+      "config",
+      "sessions",
+      "instructions",
+      "skills",
+      "commands",
+      "promptTemplates",
+      "hooks",
+      "temp",
+    ] as const;
+    const under = (path: string, root: string) =>
+      path === root || path.startsWith(`${root}/`) || path.startsWith(`${root}\\`);
+
+    for (const harness of getAllHarnesses()) {
+      for (const override of harness.envOverrides) {
+        const moved = categories.filter((category) =>
+          harness[category].some(
+            (entry) =>
+              under(entry.path, override.path) &&
+              (!entry.platforms ||
+                !override.platforms ||
+                entry.platforms.some((platform) => override.platforms?.includes(platform))),
+          ),
+        );
+        expect([...override.relocates].sort(), `${harness.id} ${override.variable}`).toEqual(
+          moved.sort(),
+        );
+      }
+    }
+  });
+
   it("should resolve %ENVVAR% placeholders", () => {
     vi.stubEnv("HARNESSES_TEST_DIR", "/test/appdata");
 

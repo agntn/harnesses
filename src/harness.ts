@@ -12,6 +12,7 @@ import type {
   HarnessInvocationModes,
   HarnessModelListing,
   InvokeOptions,
+  EnvOverride,
   InvokeResult,
   ListModelsOptions,
   ListModelsResult,
@@ -26,6 +27,23 @@ import type {
   Platform,
 } from "./types.ts";
 import { resolvePathTemplate } from "./resolve.ts";
+
+/**
+ * Swaps the default root at the start of a resolved path for the value the
+ * harness reads instead; a path outside that root comes back unchanged.
+ *
+ * @param path - Resolved path.
+ * @param root - Resolved default root.
+ * @param value - Value of the override variable.
+ * @returns {string} The path under the moved root.
+ */
+function moveRoot(path: string, root: string, value: string): string {
+  if (path === root) return value;
+  const rest = path.slice(root.length);
+  return path.startsWith(root) && (rest.startsWith("/") || rest.startsWith("\\"))
+    ? value + rest
+    : path;
+}
 
 const SUPPORTED_PLATFORMS: Record<Platform, true> = {
   linux: true,
@@ -367,6 +385,10 @@ export abstract class Harness {
   /** Stable user-scope destination used by prompt template synchronization. */
   readonly promptTemplateSyncTarget: PromptTemplateSyncTarget | null = null;
   abstract readonly hooks: PathCandidate[];
+  /** Where the harness keeps its temp files; empty when not verified. */
+  readonly temp: PathCandidate[] = [];
+  /** Environment variables that move a root of this harness; empty when none is verified. */
+  readonly envOverrides: EnvOverride[] = [];
   abstract readonly capabilities: HarnessCapabilities;
   abstract readonly detection: HarnessDetection;
   /** Non-interactive invocation recipe; null when the harness has no headless mode. */
@@ -648,7 +670,25 @@ export abstract class Harness {
           ? null
           : (this.resolveCandidates([this.promptTemplateSyncTarget], options)[0] ?? null),
       hooks: this.resolveCandidates(this.hooks, options),
+      temp: this.resolveTemp(options),
     };
+  }
+
+  /**
+   * Temp roots for the platform. A `temp` override set in the environment
+   * replaces its default root, the same move the harness makes itself.
+   *
+   * @param options - Platform and path-resolution overrides.
+   * @returns {PathCandidate[]} Resolved temp roots.
+   */
+  private resolveTemp(options: ResolveOptions): PathCandidate[] {
+    const temp = this.resolveCandidates(this.temp, options);
+    const override = this.resolveCandidates(this.envOverrides, options).find((entry) =>
+      entry.relocates.includes("temp"),
+    );
+    const value = override ? process.env[override.variable] : undefined;
+    if (!override || !value) return temp;
+    return temp.map((entry) => ({ ...entry, path: moveRoot(entry.path, override.path, value) }));
   }
 }
 

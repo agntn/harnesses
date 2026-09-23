@@ -86,7 +86,6 @@ export default class Pi extends Harness {
       path: "~/.pi/agent/settings.json",
       scope: "user",
       level: "official",
-      note: "Config dir overridable with PI_CODING_AGENT_DIR.",
     },
     { path: ".pi/settings.json", scope: "project", level: "official" },
   ];
@@ -95,7 +94,7 @@ export default class Pi extends Harness {
       path: "~/.pi/agent/sessions/<dash-encoded-cwd>/<timestamp>_<session-id>.jsonl",
       scope: "data",
       level: "official",
-      note: "Per-project session transcripts in JSONL format; session ids are UUIDv7. Overridable with PI_CODING_AGENT_SESSION_DIR or --session-dir.",
+      note: "Per-project session transcripts in JSONL format; session ids are UUIDv7. Overridable with --session-dir.",
     },
   ];
   readonly persistence: Harness["persistence"] = [
@@ -180,6 +179,24 @@ export default class Pi extends Harness {
     level: "official",
     note: "Lists models with configured provider authentication; accepts an optional fuzzy search.",
   };
+  override readonly envOverrides: Harness["envOverrides"] = [
+    {
+      variable: "PI_CODING_AGENT_DIR",
+      path: "~/.pi/agent",
+      scope: "user",
+      level: "official",
+      relocates: ["config", "sessions", "instructions", "skills", "commands", "promptTemplates"],
+      note: "A leading ~ in the value is expanded.",
+    },
+    {
+      variable: "PI_CODING_AGENT_SESSION_DIR",
+      path: "~/.pi/agent/sessions",
+      scope: "data",
+      level: "official",
+      relocates: ["sessions"],
+      note: "Takes precedence over PI_CODING_AGENT_DIR for sessions; --session-dir beats both.",
+    },
+  ];
   override readonly agentsFile = "~/.pi/agent/AGENTS.md";
   readonly detection = {
     envVars: ["PI_CODING_AGENT", "PI_SESSION_ID", "PI_SESSION_FILE"],

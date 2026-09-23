@@ -103,6 +103,7 @@ import { getHarness, detectHarness } from "@agntn/harnesses";
 const claude = getHarness("claude");
 const paths = claude.resolve({ platform: "linux", homeDir: "/home/dev" });
 console.log(paths.skills);
+console.log(paths.temp, claude.envOverrides);
 
 const active = detectHarness();
 if (active) console.log(active.id);
@@ -113,6 +114,8 @@ const agy = getHarness("antigravity");
 const [model] = (await agy.listModels({ search: "gemini" })).models;
 if (model) await agy.invoke("Review this patch", { tools: true, model: agy.modelSelector(model) });
 ```
+
+`temp` is where a harness drops its own temp files, and `envOverrides` names the variables that move its directories. `claude.resolve().temp` follows `CLAUDE_CODE_TMPDIR` when it's set, which is handy when `/tmp` is tmpfs and Claude's scratchpads are quietly eating RAM.
 
 That's most of it, really. `getHarness` wants an exact id. `detectHarness` uses env vars first, then a single project marker. `invoke()` talks to the CLI. `listModels()` asks it what it can run, and `modelSelector()` turns one of those into what `model` takes, since Pi wants `provider/id` and Antigravity the bare id. A mode the CLI cannot run comes back as an error, not a quieter one. The rest: [Registry](https://harnesses.agntn.dev/guide/registry), [Invoke](https://harnesses.agntn.dev/guide/invoke), [MCP servers](https://harnesses.agntn.dev/guide/mcp-servers), [Instructions files](https://harnesses.agntn.dev/guide/agents-sync).
 

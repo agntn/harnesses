@@ -4,6 +4,8 @@ export type {
   EvidenceLevel,
   Platform,
   PathCandidate,
+  PathCategory,
+  EnvOverride,
   PromptTemplateSyncTarget,
   StorageDescriptor,
   HarnessCapabilities,

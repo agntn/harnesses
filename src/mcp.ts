@@ -61,7 +61,7 @@ const tools: ToolDefinition[] = [
     name: "harnesses_info",
     title: "Harnesses Info",
     description:
-      "Full metadata for one or more AI coding harnesses, including supported invocation and model operations, configuration, sessions, instructions, skills, commands, prompt templates, hooks, and resolved paths.",
+      "Full metadata for one or more AI coding harnesses, including supported invocation and model operations, configuration, sessions, instructions, skills, commands, prompt templates, hooks, temp directories, the env variables that move them, and resolved paths.",
     inputSchema: schemas.info,
     annotations: READ_ONLY,
     execute: ({ harnessInfo }, args) => harnessInfo(args.id as string | string[]),

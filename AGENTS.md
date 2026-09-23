@@ -58,7 +58,7 @@ Nested `AGENTS.md` files in `src/`, `src/commands/`, `test/`, `docs/` and each `
 6. Add an entry to `PRESENTATION` in `docs/app/utils/harnesses.ts` and a page in `docs/content/2.harnesses/`
 7. Run `pnpm lint && pnpm typecheck && pnpm build && pnpm test:run`
 
-Each harness class has: `config`, `sessions`, `persistence`, `instructions`, `skills`, `commands`, `hooks`, `capabilities`, `detection`, `invocation` (null when the CLI has no headless mode). Optional overrides: `promptTemplates` and `promptTemplateSyncTarget` (prompt locations and the sync destination), `modelListing` (null without a native model list), `mcpConfigs` (empty when unknown), `agentsFile` (null when no stable user-scope instructions file). All path entries carry `scope` (user/project/system/data), `level` (official/community/inferred), optional `platforms`.
+Each harness class has: `config`, `sessions`, `persistence`, `instructions`, `skills`, `commands`, `hooks`, `capabilities`, `detection`, `invocation` (null when the CLI has no headless mode). Optional overrides: `promptTemplates` and `promptTemplateSyncTarget` (prompt locations and the sync destination), `modelListing` (null without a native model list), `mcpConfigs` (empty when unknown), `agentsFile` (null when no stable user-scope instructions file), `temp` and `envOverrides` (empty until verified; `relocates` must match the categories under the override's root). All path entries carry `scope` (user/project/system/data), `level` (official/community/inferred), optional `platforms`.
 
 ## Code conventions
 

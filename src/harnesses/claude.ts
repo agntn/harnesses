@@ -266,6 +266,53 @@ export default class Claude extends Harness {
       dialect: "standard",
     },
   ];
+  override readonly temp: Harness["temp"] = [
+    {
+      path: "${TMPDIR}/claude-<uid>/",
+      scope: "data",
+      level: "official",
+      platforms: ["linux"],
+      note: "Session scratchpads sit under <dash-encoded-cwd>/<session-id>/scratchpad.",
+    },
+    { path: "/tmp/claude-<uid>/", scope: "data", level: "official", platforms: ["darwin"] },
+    { path: "${TMPDIR}/claude/", scope: "data", level: "official", platforms: ["win32"] },
+  ];
+  override readonly envOverrides: Harness["envOverrides"] = [
+    {
+      variable: "CLAUDE_CONFIG_DIR",
+      path: "~/.claude",
+      scope: "user",
+      level: "official",
+      relocates: [
+        "config",
+        "sessions",
+        "instructions",
+        "skills",
+        "commands",
+        "promptTemplates",
+        "hooks",
+      ],
+      note: "Read from the shell or the env block of user or managed settings, not project settings.",
+    },
+    {
+      variable: "CLAUDE_CODE_TMPDIR",
+      path: "${TMPDIR}",
+      scope: "data",
+      level: "official",
+      platforms: ["linux", "win32"],
+      relocates: ["temp"],
+      note: "Read from the shell or the env block of user or managed settings, not project settings.",
+    },
+    {
+      variable: "CLAUDE_CODE_TMPDIR",
+      path: "/tmp",
+      scope: "data",
+      level: "official",
+      platforms: ["darwin"],
+      relocates: ["temp"],
+      note: "Read from the shell or the env block of user or managed settings, not project settings.",
+    },
+  ];
   override readonly agentsFile = "~/.claude/CLAUDE.md";
   readonly detection = {
     envVars: ["CLAUDE_CODE", "CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CONFIG_DIR"],

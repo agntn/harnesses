@@ -21,6 +21,19 @@ describe("harness info", () => {
     expect(templates.map((entry) => entry.path)).toContain("~/.claude/settings.json");
   });
 
+  it("shows env overrides with their default roots resolved", () => {
+    const result = harnessInfo("claude");
+    const text = result.content[0]?.text ?? "";
+
+    expect(text).toMatch(/^envOverrides\[/m);
+    expect(text).toContain("CLAUDE_CONFIG_DIR");
+    expect(text).toContain("CLAUDE_CODE_TMPDIR");
+    expect(text).not.toContain("${TMPDIR}");
+    expect(text).toMatch(/^  temp\[/m);
+    const overrides = "envOverrides" in result.details ? result.details.envOverrides : [];
+    expect(overrides.map((entry) => entry.path)).toContain("${TMPDIR}");
+  });
+
   it("drops the templates from every batch entry", () => {
     const result = harnessInfo(["claude", "missing"]);
     const text = result.content[0]?.text ?? "";
