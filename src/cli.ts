@@ -344,14 +344,15 @@ const run = defineCommand({
     },
     "read-only": {
       type: "boolean" as const,
-      description: "Require native read-only tool enforcement; implies --tools",
+      description:
+        "Require native read-only tool enforcement; implies --tools, rejected with --no-tools",
     },
   },
   async run({ args }) {
     const harness = resolveHarness(args.id as string);
     const structured = args.json === true;
     const readOnly = args["read-only"] === true;
-    const tools = readOnly || args.tools === true;
+    const tools = args.tools ?? readOnly;
 
     const invocationOptions = { model: args.model, structured, tools, readOnly };
     if (!harness.buildInvocation("", invocationOptions)) {

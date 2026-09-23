@@ -76,7 +76,7 @@ harnesses agents sync --check
 harnesses prompts sync --check
 ```
 
-`run` without `--tools` is the advisor. `--tools` is the full agent. `--read-only` asks the CLI for a sandbox and implies tools. Timeouts, `--cwd` and `--model` sit in the [CLI guide](https://harnesses.agntn.dev/guide/cli).
+`run` without `--tools` is the advisor. `--tools` is the full agent. `--read-only` asks the CLI for a sandbox and implies tools, so pairing it with `--no-tools` is an error. Timeouts, `--cwd` and `--model` sit in the [CLI guide](https://harnesses.agntn.dev/guide/cli).
 
 ### Commands
 

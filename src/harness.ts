@@ -78,6 +78,34 @@ function requestedInvocationMode(options: InvocationOptions): InvocationMode {
   return options.structured === true ? "advisorStructured" : "advisor";
 }
 
+/**
+ * Explains an explicit `tools: false` beside `readOnly: true`, or returns null.
+ * Read-only access still hands the harness tools, so the pair is rejected
+ * instead of one flag silently overriding the other.
+ *
+ * @param id - Harness id for the message.
+ * @param invocation - Templates that decide which retries are offered.
+ * @param options - Requested execution mode.
+ * @returns {string | null} The conflict with its executable retries, or null.
+ */
+function accessConflictError(
+  id: string,
+  invocation: HarnessInvocation,
+  options: InvocationOptions,
+): string | null {
+  if (options.readOnly !== true || options.tools !== false) return null;
+
+  const retries: string[] = [];
+  if (invocationTemplate(invocation, requestedInvocationMode(options))) {
+    retries.push("tools: true to keep its read-only tools");
+  }
+  if (invocationTemplate(invocation, requestedInvocationMode({ ...options, readOnly: false }))) {
+    retries.push("readOnly: false to use its advisor without tools");
+  }
+  const error = `Harness ${id} cannot run readOnly with tools: false, since read-only access still uses tools`;
+  return retries.length === 0 ? error : `${error}; retry with ${retries.join(", or with ")}`;
+}
+
 function invocationTemplate(
   invocation: HarnessInvocation,
   mode: InvocationMode,
@@ -378,6 +406,7 @@ export abstract class Harness {
     const command = this.invocation.binary ?? this.binaries[0];
     if (!command) return null;
     if (options.model !== undefined && !this.invocation.modelArgs) return null;
+    if (accessConflictError(this.id, this.invocation, options) !== null) return null;
     const template = invocationTemplate(this.invocation, requestedInvocationMode(options));
     if (!template) return null;
     return {
@@ -397,6 +426,8 @@ export abstract class Harness {
     if (options.model !== undefined && !this.invocation.modelArgs) {
       return `Harness ${this.id} does not support model selection`;
     }
+    const conflict = accessConflictError(this.id, this.invocation, options);
+    if (conflict !== null) return conflict;
     const mode = requestedInvocationMode(options);
     if (invocationTemplate(this.invocation, mode)) return null;
 

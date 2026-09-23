@@ -95,6 +95,13 @@ describe("harnesses usage paths", () => {
     expect(JSON.parse(result.stdout)).toMatchObject({ error: "Unknown harness: unknown" });
   });
 
+  it("harnesses run rejects --read-only beside --no-tools", () => {
+    const result = runCli(["run", "claude", "--no-tools", "--read-only", "review"]);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Harness claude cannot run readOnly with tools: false");
+  });
+
   it("harnesses prompts sync sanitizes Unicode formatting in human errors", () => {
     const bidiOverride = String.fromCodePoint(0x202e);
     const result = runCli(["prompts", "sync", `bad${bidiOverride}id`]);
