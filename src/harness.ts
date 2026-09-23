@@ -1,8 +1,10 @@
 import { addAbortListener } from "node:events";
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { execFile, execFileSync, spawn } from "node:child_process";
+import type { ChildProcessByStdio } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 import { join } from "node:path";
+import type { Readable } from "node:stream";
 import type {
   HarnessDetection,
   HarnessId,
@@ -213,6 +215,38 @@ async function terminateCommand(pid: number): Promise<void> {
   signalProcessGroup(pid, "SIGKILL");
 }
 
+/**
+ * Tells a missing cwd from a missing binary, both `spawn <command> ENOENT` from Node.
+ *
+ * @param command - Command that was spawned.
+ * @param cwd - Working directory passed to the spawn, if any.
+ * @param error - Error thrown by `spawn` or emitted by the child.
+ * @returns {unknown} The error with a message that names the cause, keeping its `code`.
+ */
+function spawnError(command: string, cwd: string | undefined, error: unknown): unknown {
+  if (!(error instanceof Error && "code" in error)) return error;
+  if (error.code !== "ENOENT" && error.code !== "ENOTDIR") return error;
+  let message: string;
+  if (cwd !== undefined && !isDirectory(cwd)) {
+    message = existsSync(cwd)
+      ? `Working directory is not a directory: ${cwd}`
+      : `Working directory not found: ${cwd}`;
+  } else if (error.code === "ENOENT") {
+    message = `Command not found: ${command}. Install it or add it to PATH`;
+  } else {
+    return error;
+  }
+  return Object.assign(new Error(message, { cause: error }), { code: error.code });
+}
+
+function isDirectory(path: string): boolean {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
 function executeCommand(
   command: string,
   args: readonly string[],
@@ -234,14 +268,20 @@ function executeCommand(
       return;
     }
 
-    const child = spawn(command, args, {
-      cwd: options.cwd,
-      env: options.env ? { ...process.env, ...options.env } : process.env,
-      stdio: ["ignore", "pipe", "pipe"],
-      detached:
-        process.platform !== "win32" &&
-        (Boolean(options.timeoutMs) || options.signal !== undefined),
-    });
+    let child: ChildProcessByStdio<null, Readable, Readable>;
+    try {
+      child = spawn(command, args, {
+        cwd: options.cwd,
+        env: options.env ? { ...process.env, ...options.env } : process.env,
+        stdio: ["ignore", "pipe", "pipe"],
+        detached:
+          process.platform !== "win32" &&
+          (Boolean(options.timeoutMs) || options.signal !== undefined),
+      });
+    } catch (error) {
+      fail(spawnError(command, options.cwd, error));
+      return;
+    }
 
     if (options.timeoutMs) timer = setTimeout(() => stop("timeout"), options.timeoutMs);
     if (options.signal) abortListener = addAbortListener(options.signal, () => stop("abort"));
@@ -257,7 +297,7 @@ function executeCommand(
       stderr += chunk;
       lastOutputAt = performance.now();
     });
-    child.on("error", fail);
+    child.on("error", (error) => fail(spawnError(command, options.cwd, error)));
     child.on("close", (code) => {
       if (stopped === undefined) finish(code);
     });
