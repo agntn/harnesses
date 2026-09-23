@@ -1,15 +1,15 @@
 # @agntn/harnesses
 
-Metadata registry for AI coding harnesses. Paths, formats, detection rules, session schemas - one TypeScript API covering Claude Code, Codex, Gemini, Grok, OpenCode, Cursor, GitHub Copilot, Mastra Code, OMP, Pi, and Freebuff.
+Metadata registry for AI coding harnesses. Paths, formats, detection rules, session schemas - one TypeScript API over every harness registered in `src/harnesses/index.ts`.
 
 ## Commands
 
 ```bash
 pnpm install              # install deps
-pnpm lint                 # oxlint + oxfmt check
+pnpm lint                 # build, then oxlint + oxfmt check
 pnpm lint:fix             # auto-fix lint/format
-pnpm typecheck            # tsgo --noEmit --skipLibCheck
-pnpm build                # obuild (library + CLI)
+pnpm typecheck            # tsgo on src, build, then tsgo on the Pi/OMP extensions
+pnpm build                # obuild (library, CLI, MCP server, tool modules)
 pnpm test:run             # vitest --run
 pnpm test                 # vitest watch mode
 
@@ -26,42 +26,39 @@ src/
   index.ts              # public API barrel - all exports go through here
   types.ts              # HarnessId, HarnessCapabilities, PathCandidate, etc.
   harness.ts            # abstract Harness class (resolve, detect, isInstalled, version, invoke)
-  mcp-servers.ts        # normalized MCP server read/write across harness config dialects
-  agents-sync.ts        # symlink-based sync of global instructions files to one master
   registry.ts           # global Map<HarnessId, Harness>, detect functions
   resolve.ts            # path template expansion (~, ${HOME}, %ENVVAR%)
-  cli.ts                # citty CLI (list, detect, info, paths)
+  mcp-servers.ts        # normalized MCP server read/write across harness config dialects
+  agents-sync.ts        # symlink-based sync of global instructions files to one master
+  prompt-sync.ts        # prompt template sync: directory links, generated Gemini TOML
+  tool-schemas.ts       # tool parameter schemas shared by MCP and the Pi/OMP extensions
+  tool-operations.ts    # tool executors behind those schemas
+  mcp.ts                # MCP server over the shared tools (`harnesses mcp`)
+  cli.ts                # citty CLI root
+  commands/             # CLI subcommands (agents, mcp-servers, prompts, mcp) and output helpers
   harnesses/
-    index.ts            # constructor registry for all built-in harnesses
-    claude.ts           # one file per harness implementation
-    codex.ts
-    gemini.ts
-    opencode.ts
-    cursor.ts
-    github-copilot.ts
-    mastracode.ts
-  schemas/
-    index.ts            # type-only re-exports for session formats
-    claude.ts           # ClaudeSessionEntry, ClaudeUserEntry, etc.
-    codex.ts            # CodexThread, CodexLogEntry, etc.
-    gemini.ts           # GeminiConversationRecord, etc.
-    opencode.ts         # OpenCodeSession, OpenCodeMessage, OpenCodePart, etc.
-test/
-  index.test.ts         # all tests in one file, covers registry + detection + resolution
-build.config.ts         # obuild entries: src/index + src/cli
-docs/                   # Docus site for harnesses.agntn.dev; own AGENTS.md, reads a snapshot of dist/
+    index.ts            # constructor registry; order decides env detection priority
+    <id>.ts             # one class per harness
+  schemas/              # type-only session formats (claude, codex, gemini, opencode)
+packages/               # shipped Pi and OMP extension adapters plus their shared TUI
+test/                   # one Vitest file per area; index.test.ts covers registry, detection, resolution
+build.config.ts         # one obuild bundle over five inputs, so entries share registry state
+docs/                   # Docus site for harnesses.agntn.dev; own AGENTS.md, reads the registry from ../src at build time
 ```
+
+Nested `AGENTS.md` files in `src/`, `src/commands/`, `test/`, `docs/` and each `packages/` adapter add local rules.
 
 ## Adding a new harness
 
 1. Add the ID to `HarnessId` union in `src/types.ts`
-2. Create `src/harnesses/<name>.ts` with a concrete class extending `Harness`
-3. Import it in `src/harnesses/index.ts`
+2. Create `src/harnesses/<id>.ts` with a concrete class extending `Harness`
+3. Import it in `src/harnesses/index.ts`; place it before any harness whose env markers it also sets
 4. Add a row in the `README.md` harnesses table
-5. Update the harness ID list in `test/index.test.ts` (`should expose stable harness ids`)
-6. Run `pnpm lint && pnpm typecheck && pnpm build && pnpm test:run`
+5. Add the ID to `should expose stable harness ids` and the audio/video table in `test/index.test.ts`
+6. Add an entry to `PRESENTATION` in `docs/app/utils/harnesses.ts` and a page in `docs/content/2.harnesses/`
+7. Run `pnpm lint && pnpm typecheck && pnpm build && pnpm test:run`
 
-Each harness class has: `config`, `sessions`, `persistence`, `instructions`, `skills`, `commands`, `hooks`, `capabilities`, `detection`, `invocation` (null when the CLI has no headless mode), `mcpConfigs` (empty when unknown), `agentsFile` (null when no stable user-scope instructions file). All path entries carry `scope` (user/project/system/data), `level` (official/community/inferred), optional `platforms`.
+Each harness class has: `config`, `sessions`, `persistence`, `instructions`, `skills`, `commands`, `hooks`, `capabilities`, `detection`, `invocation` (null when the CLI has no headless mode). Optional overrides: `promptTemplates` and `promptTemplateSyncTarget` (prompt locations and the sync destination), `modelListing` (null without a native model list), `mcpConfigs` (empty when unknown), `agentsFile` (null when no stable user-scope instructions file). All path entries carry `scope` (user/project/system/data), `level` (official/community/inferred), optional `platforms`.
 
 ## Code conventions
 
