@@ -90,6 +90,33 @@ describe("harnesses usage paths", () => {
     }
   });
 
+  it("harnesses skills sync links the canonical skills directory", () => {
+    const temporaryRoot = mkdtempSync(join(tmpdir(), "harnesses-cli-skills-"));
+    const homeDir = join(temporaryRoot, "home");
+    const xdgDataDir = join(temporaryRoot, "data");
+    const source = join(xdgDataDir, "agntn", "skills");
+    mkdirSync(join(source, "review"), { recursive: true });
+    writeFileSync(join(source, "review", "SKILL.md"), "# review\n");
+
+    try {
+      const result = runCli(["skills", "sync", "pi", "--json"], "", {
+        HOME: homeDir,
+        USERPROFILE: homeDir,
+        XDG_DATA_HOME: xdgDataDir,
+      });
+
+      expect(result.status).toBe(0);
+      expect(JSON.parse(result.stdout)).toMatchObject({
+        source,
+        skills: ["review"],
+        targets: [{ id: "pi", action: "linked" }],
+      });
+      expect(readlinkSync(join(homeDir, ".pi", "agent", "skills"))).toBe(source);
+    } finally {
+      rmSync(temporaryRoot, { recursive: true, force: true });
+    }
+  });
+
   it("harnesses prompts sync formats failures as JSON", () => {
     const result = runCli(["prompts", "sync", "unknown", "--json"]);
 

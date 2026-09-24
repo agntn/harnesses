@@ -101,6 +101,11 @@ export default class PrimeAgent extends Harness {
       note: "Shared skills directory; root .md files are ignored there.",
     },
   ];
+  override readonly skillsSyncTarget: Harness["skillsSyncTarget"] = {
+    path: "~/.prime/agent/skills/",
+    scope: "user",
+    level: "official",
+  };
   readonly commands: Harness["commands"] = [
     {
       path: ".prime/agent/prompts/",

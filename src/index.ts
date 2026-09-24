@@ -7,6 +7,7 @@ export type {
   PathCategory,
   EnvOverride,
   PromptTemplateSyncTarget,
+  SkillsSyncTarget,
   StorageDescriptor,
   HarnessCapabilities,
   HarnessDetection,
@@ -63,6 +64,8 @@ export type {
   PromptSyncTargetResult,
   PromptTemplateTargetResult,
 } from "./prompt-sync.ts";
+export { syncSkills } from "./skills-sync.ts";
+export type { SkillsSyncAction, SkillsSyncReport, SkillsSyncTargetResult } from "./skills-sync.ts";
 
 export type {
   ClaudeContentBlock,

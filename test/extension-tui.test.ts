@@ -114,28 +114,34 @@ describe("Pi and OMP extension renderers", () => {
     }
   });
 
-  it("propagates prompt sync failures through both host adapters", async () => {
-    const piDefinition = tool(piTools, "harnesses_prompts_sync");
-    const ompDefinition = tool(ompTools, "harnesses_prompts_sync");
-    if (typeof piDefinition.execute !== "function" || typeof ompDefinition.execute !== "function") {
-      throw new TypeError("Missing execute");
-    }
+  it.each(["harnesses_prompts_sync", "harnesses_skills_sync"])(
+    "propagates %s failures through both host adapters",
+    async (name) => {
+      const piDefinition = tool(piTools, name);
+      const ompDefinition = tool(ompTools, name);
+      if (
+        typeof piDefinition.execute !== "function" ||
+        typeof ompDefinition.execute !== "function"
+      ) {
+        throw new TypeError("Missing execute");
+      }
 
-    const piResult: unknown = Reflect.apply(piDefinition.execute, piDefinition, [
-      "call",
-      { id: "unknown" },
-    ]);
-    await expect(piResult).rejects.toThrow("Unknown harness: unknown");
+      const piResult: unknown = Reflect.apply(piDefinition.execute, piDefinition, [
+        "call",
+        { id: "unknown" },
+      ]);
+      await expect(piResult).rejects.toThrow("Unknown harness: unknown");
 
-    const ompResult: unknown = await Reflect.apply(ompDefinition.execute, ompDefinition, [
-      "call",
-      { id: "unknown" },
-    ]);
-    expect(ompResult).toMatchObject({
-      isError: true,
-      details: { error: "Unknown harness: unknown" },
-    });
-  });
+      const ompResult: unknown = await Reflect.apply(ompDefinition.execute, ompDefinition, [
+        "call",
+        { id: "unknown" },
+      ]);
+      expect(ompResult).toMatchObject({
+        isError: true,
+        details: { error: "Unknown harness: unknown" },
+      });
+    },
+  );
 
   it("forwards cancellation from both hosts to runs and model listings", async () => {
     registerHarness(

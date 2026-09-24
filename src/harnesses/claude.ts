@@ -189,6 +189,11 @@ export default class Claude extends Harness {
       note: "Global user-level skills.",
     },
   ];
+  override readonly skillsSyncTarget: Harness["skillsSyncTarget"] = {
+    path: "~/.claude/skills/",
+    scope: "user",
+    level: "official",
+  };
   readonly commands: Harness["commands"] = [
     {
       path: ".claude/commands/",

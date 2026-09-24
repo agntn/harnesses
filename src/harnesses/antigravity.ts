@@ -126,6 +126,11 @@ export default class Antigravity extends Harness {
     { path: ".agents/skills/", scope: "project", level: "official" },
     { path: "~/.gemini/config/skills/", scope: "user", level: "official" },
   ];
+  override readonly skillsSyncTarget: Harness["skillsSyncTarget"] = {
+    path: "~/.gemini/config/skills/",
+    scope: "user",
+    level: "official",
+  };
   readonly commands: Harness["commands"] = [];
   readonly hooks: Harness["hooks"] = [
     { path: ".agents/hooks.json", scope: "project", level: "official" },

@@ -289,6 +289,11 @@ export const TOOLS = [
     kind: "write",
     does: "Sync canonical Markdown prompts into harness destinations",
   },
+  {
+    name: "harnesses_skills_sync",
+    kind: "write",
+    does: "Link skills directories to one shared folder",
+  },
 ] as const;
 
 export const SCOPE_LABEL: Record<Scope, string> = {

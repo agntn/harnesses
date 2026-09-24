@@ -85,6 +85,7 @@ export default class OpenCode extends Harness {
       note: "Claude Code compatible.",
     },
     { path: ".agents/skills/", scope: "project", level: "official" },
+    { path: "~/.config/opencode/skills/", scope: "user", level: "official" },
     {
       path: "~/.claude/skills/",
       scope: "user",
@@ -93,6 +94,12 @@ export default class OpenCode extends Harness {
     },
     { path: "~/.agents/skills/", scope: "user", level: "official" },
   ];
+  override readonly skillsSyncTarget: Harness["skillsSyncTarget"] = {
+    path: "~/.config/opencode/skills/",
+    scope: "user",
+    level: "official",
+    note: "OpenCode also scans ~/.claude/skills/ and ~/.agents/skills/; skill names must be unique across them.",
+  };
   readonly commands: Harness["commands"] = [
     {
       path: ".opencode/commands/",

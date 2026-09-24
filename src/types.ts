@@ -48,6 +48,11 @@ export interface EnvOverride extends PathCandidate {
   relocates: PathCategory[];
 }
 
+/** The user-scope skills directory that skill synchronization links to the source. */
+export interface SkillsSyncTarget extends PathCandidate {
+  scope: "user";
+}
+
 /** One stable user-scope destination used by prompt template synchronization. */
 export interface PromptTemplateSyncTarget extends PathCandidate {
   scope: "user";
@@ -236,6 +241,7 @@ export interface ResolvedPaths {
   sessions: PathCandidate[];
   instructions: PathCandidate[];
   skills: PathCandidate[];
+  skillsSyncTarget: SkillsSyncTarget | null;
   commands: PathCandidate[];
   promptTemplates: PathCandidate[];
   promptTemplateSyncTarget: PromptTemplateSyncTarget | null;

@@ -26,7 +26,7 @@ The rest of it sits on [harnesses.agntn.dev](https://harnesses.agntn.dev).
 - 🔗 **One AGENTS.md behind the global files.** Symlinks, so an edit through Claude or Gemini is the same bytes.
 - 🗂️ **One prompt folder, supported harnesses.** Markdown lives under XDG data; Gemini TOML is generated from it.
 - 📜 **Session types when the format is stable.** JSONL, SQLite, JSON. Unstable shapes stay `unknown`.
-- 🤖 **Ten tools, three doors.** MCP, Pi and OMP call the same executors.
+- 🤖 **Eleven tools, three doors.** MCP, Pi and OMP call the same executors.
 
 ## 📦 Install
 
@@ -74,6 +74,7 @@ harnesses run codex --read-only "review this"
 harnesses mcp-servers list
 harnesses agents sync --check
 harnesses prompts sync --check
+harnesses skills sync --check
 ```
 
 `run` without `--tools` is the advisor. `--tools` is the full agent. `--read-only` asks the CLI for a sandbox and implies tools, so pairing it with `--no-tools` is an error. Timeouts, `--cwd` and `--model` sit in the [CLI guide](https://harnesses.agntn.dev/guide/cli).
@@ -91,6 +92,7 @@ harnesses prompts sync --check
 | `mcp-servers`  | MCP servers across the config dialects                 | `harnesses mcp-servers list`                |
 | `agents sync`  | Link global instructions files to one master           | `harnesses agents sync --check`             |
 | `prompts sync` | Sync one Markdown prompt directory across harnesses    | `harnesses prompts sync --check`            |
+| `skills sync`  | Link every skills directory to one shared folder       | `harnesses skills sync --check`             |
 | `mcp`          | The MCP server on stdio                                | `harnesses mcp`                             |
 
 `list`, `detect`, `info`, `paths` and `models` take `--json` or `--toon`. `run --json` is different: that one is the harness's own structured output.
@@ -141,6 +143,34 @@ location. `promptTemplateSyncTarget` is the single stable user destination the
 sync owns for that harness. Formats, frontmatter and CLI limits are in the
 [registry guide](https://harnesses.agntn.dev/guide/registry#prompt-templates).
 
+### Skills
+
+Skills live in `$XDG_DATA_HOME/agntn/skills/`, next to the prompts, one folder
+with a `SKILL.md` per skill:
+
+```bash
+harnesses skills sync --check
+harnesses skills sync
+```
+
+```ts
+import { getAllHarnesses, syncSkills } from "@agntn/harnesses";
+
+const report = syncSkills(getAllHarnesses(), true);
+console.log(report.skills, report.targets);
+```
+
+Every harness's user skills directory, `~/.claude/skills/`, `~/.agents/skills/`
+for Codex, `~/.pi/agent/skills/` and the rest, becomes one symlink to that
+folder. A skill written through Claude is already there when Pi looks. Old
+setups with a symlink per skill get replaced without ceremony, and a directory
+with real skills in it is backed up to `diverged/skills/` first. Already keep
+skills in a dotfiles repo? Make the XDG folder a symlink to it. The sync leaves
+a harness directory alone if the source points into it, instead of moving your
+only copy away. `skillsSyncTarget` names the directory it links for each
+harness, `null` for Copilot and Freebuff, which have no user skills directory
+in the registry.
+
 ## 🗺️ Harnesses
 
 | ID               | Name                   | Project skills         |
@@ -177,7 +207,7 @@ omp install @agntn/harnesses
 }
 ```
 
-Ten tools, the same ten on MCP, Pi and OMP. `harnesses_detect`, `harnesses_info` and `harnesses_mcp_list` only read. `harnesses_run` is the one that can spend tokens. `tools` is required, so the model has to pick advisor or agent. What each call returns is on the [Agents page](https://harnesses.agntn.dev/guide/agents).
+Eleven tools, the same eleven on MCP, Pi and OMP. `harnesses_detect`, `harnesses_info` and `harnesses_mcp_list` only read. `harnesses_run` is the one that can spend tokens. `tools` is required, so the model has to pick advisor or agent. What each call returns is on the [Agents page](https://harnesses.agntn.dev/guide/agents).
 
 ## 🚫 What this does not do
 
