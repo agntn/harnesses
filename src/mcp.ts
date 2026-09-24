@@ -157,6 +157,16 @@ const tools: ToolDefinition[] = [
       promptsSync(args.id as string | undefined, args.check === true),
   },
   {
+    name: "harnesses_skills_sync",
+    title: "Harnesses Skills Sync",
+    description:
+      "Link every harness's user-scope skills directory to the canonical skills directory in the agntn XDG data directory, so a skill added or edited through any harness lands in one place. Links to single skills in the source are replaced; anything else there is backed up first. Pass check to only report.",
+    inputSchema: schemas.skillsSync,
+    annotations: CONFIG_WRITE,
+    execute: ({ skillsSync }, args) =>
+      skillsSync(args.id as string | undefined, args.check === true),
+  },
+  {
     name: "harnesses_mcp_remove",
     title: "Harnesses MCP Remove",
     description:

@@ -20,6 +20,7 @@ import type {
   McpConfigFile,
   PathCandidate,
   PromptTemplateSyncTarget,
+  SkillsSyncTarget,
   StorageDescriptor,
   HarnessCapabilities,
   ResolveOptions,
@@ -379,6 +380,8 @@ export abstract class Harness {
   abstract readonly persistence: StorageDescriptor[];
   abstract readonly instructions: PathCandidate[];
   abstract readonly skills: PathCandidate[];
+  /** User-scope skills directory that skill synchronization links; null when none is verified. */
+  readonly skillsSyncTarget: SkillsSyncTarget | null = null;
   abstract readonly commands: PathCandidate[];
   /** Reusable prompt files; empty when no CLI template location is verified. */
   readonly promptTemplates: PathCandidate[] = [];
@@ -663,6 +666,10 @@ export abstract class Harness {
       sessions: this.resolveCandidates(this.sessions, options),
       instructions: this.resolveCandidates(this.instructions, options),
       skills: this.resolveCandidates(this.skills, options),
+      skillsSyncTarget:
+        this.skillsSyncTarget === null
+          ? null
+          : (this.resolveCandidates([this.skillsSyncTarget], options)[0] ?? null),
       commands: this.resolveCandidates(this.commands, options),
       promptTemplates: this.resolveCandidates(this.promptTemplates, options),
       promptTemplateSyncTarget:

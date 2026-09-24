@@ -90,6 +90,11 @@ export default class Codex extends Harness {
       platforms: ["linux", "darwin"],
     },
   ];
+  override readonly skillsSyncTarget: Harness["skillsSyncTarget"] = {
+    path: "~/.agents/skills/",
+    scope: "user",
+    level: "official",
+  };
   readonly commands: Harness["commands"] = [
     {
       path: "~/.codex/prompts/",

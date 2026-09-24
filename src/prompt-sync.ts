@@ -1,19 +1,21 @@
-import { randomUUID } from "node:crypto";
 import {
   lstatSync,
   mkdirSync,
   readFileSync,
   readdirSync,
-  readlinkSync,
   renameSync,
-  rmdirSync,
-  symlinkSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { createRequire } from "node:module";
-import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
-import { moveFile } from "./agents-sync.ts";
+import { basename, dirname, extname, join, resolve } from "node:path";
+import {
+  CHECK_DETAIL,
+  backupDestination,
+  isInsideDirectory,
+  syncDirectoryLink,
+  tempPath,
+} from "./directory-link.ts";
 import type { Harness } from "./harness.ts";
 import { agntnDataDir } from "./resolve.ts";
 import type { PromptTemplateSyncTarget, ResolveOptions } from "./types.ts";
@@ -135,11 +137,6 @@ function generatedSource(content: string): string | null {
   }
 }
 
-function linkTarget(path: string): string {
-  const target = readlinkSync(path);
-  return isAbsolute(target) ? target : resolve(dirname(path), target);
-}
-
 function inspectDestination(path: string): DestinationState {
   let stats;
   try {
@@ -157,121 +154,11 @@ function inspectDestination(path: string): DestinationState {
   return { kind: "unmanaged-file" };
 }
 
-function tempPath(path: string, kind: string): string {
-  return join(dirname(path), `.${basename(path)}-${randomUUID()}.${kind}.tmp`);
-}
-
-function linkDirectory(path: string, source: string): void {
-  mkdirSync(dirname(path), { recursive: true });
-  const temp = tempPath(path, "prompt-link");
-  // Junctions let Windows link a directory without symlink privileges.
-  symlinkSync(source, temp, "junction");
-  renameSync(temp, path);
-}
-
 function writeTemplate(path: string, content: string): void {
   mkdirSync(dirname(path), { recursive: true });
   const temp = tempPath(path, "prompt-write");
   writeFileSync(temp, content);
   renameSync(temp, path);
-}
-
-function backupDestination(id: string, path: string, options: ResolveOptions): string {
-  const backupDir = join(agntnDataDir(options), "diverged", "prompts", id);
-  mkdirSync(backupDir, { recursive: true });
-  const backup = join(backupDir, `${basename(path)}-${Date.now()}-${randomUUID()}`);
-  if (lstatSync(path).isSymbolicLink()) {
-    symlinkSync(linkTarget(path), backup);
-    unlinkSync(path);
-    return backup;
-  }
-  moveFile(path, backup);
-  return backup;
-}
-
-function checkDetail(): string {
-  return "check mode: not applied";
-}
-
-function isInsideDirectory(path: string, directory: string): boolean {
-  const remainder = relative(directory, path);
-  return remainder !== "" && !remainder.startsWith("..") && !isAbsolute(remainder);
-}
-
-function isLegacyTemplateLink(path: string, sourceDir: string): boolean {
-  return lstatSync(path).isSymbolicLink() && isInsideDirectory(linkTarget(path), sourceDir);
-}
-
-type DirectoryState =
-  | { readonly kind: "missing" | "correct-link" | "wrong-link" | "local-files" | "not-directory" }
-  | { readonly kind: "legacy-links"; readonly entries: readonly string[] };
-
-const DIRECTORY_ACTION: Record<DirectoryState["kind"], PromptSyncAction> = {
-  missing: "linked",
-  "correct-link": "unchanged",
-  "wrong-link": "relinked",
-  "legacy-links": "relinked",
-  "local-files": "adopted",
-  "not-directory": "skipped",
-};
-
-function inspectDirectory(targetDir: string, sourceDir: string): DirectoryState {
-  let stats;
-  try {
-    stats = lstatSync(targetDir);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { kind: "missing" };
-    throw error;
-  }
-
-  if (stats.isSymbolicLink()) {
-    return { kind: linkTarget(targetDir) === sourceDir ? "correct-link" : "wrong-link" };
-  }
-  if (!stats.isDirectory()) return { kind: "not-directory" };
-
-  // Per-template links from earlier releases carry nothing worth a backup.
-  const entries = readdirSync(targetDir).map((entry) => join(targetDir, entry));
-  return entries.every((entry) => isLegacyTemplateLink(entry, sourceDir))
-    ? { kind: "legacy-links", entries }
-    : { kind: "local-files" };
-}
-
-function clearDirectory(
-  id: string,
-  targetDir: string,
-  state: DirectoryState,
-  options: ResolveOptions,
-): string | undefined {
-  if (state.kind === "wrong-link" || state.kind === "local-files") {
-    return backupDestination(id, targetDir, options);
-  }
-  if (state.kind === "legacy-links") {
-    for (const entry of state.entries) unlinkSync(entry);
-    rmdirSync(targetDir);
-  }
-  return undefined;
-}
-
-// A Markdown destination becomes one link to the whole source directory, so a
-// template any harness adds or edits lands in the shared source.
-function syncMarkdownDirectory(
-  id: string,
-  targetDir: string,
-  sourceDir: string,
-  check: boolean,
-  options: ResolveOptions,
-): Pick<PromptSyncTargetResult, "action" | "detail"> {
-  const state = inspectDirectory(targetDir, sourceDir);
-  const action = DIRECTORY_ACTION[state.kind];
-  if (state.kind === "correct-link") return { action };
-  if (state.kind === "not-directory") {
-    return { action, detail: "destination exists and is not a directory or symlink" };
-  }
-  if (check) return { action, detail: checkDetail() };
-
-  const detail = clearDirectory(id, targetDir, state, options);
-  linkDirectory(targetDir, sourceDir);
-  return { action, detail };
 }
 
 // yaml is most of the modules a package import loads, and only Gemini's
@@ -346,11 +233,11 @@ function syncGeminiTemplate(
 
   const action = GEMINI_ACTION[state.kind];
   if (check) {
-    return { name: template.name, source: template.path, path, action, detail: checkDetail() };
+    return { name: template.name, source: template.path, path, action, detail: CHECK_DETAIL };
   }
 
   let detail: string | undefined;
-  if (GEMINI_BACKUP[state.kind]) detail = backupDestination(id, path, options);
+  if (GEMINI_BACKUP[state.kind]) detail = backupDestination("prompts", id, path, options);
   writeTemplate(path, content);
   return { name: template.name, source: template.path, path, action, detail };
 }
@@ -397,14 +284,19 @@ function pruneGeminiTarget(
           ...(source === null ? {} : { source }),
           path,
           action: "removed",
-          detail: checkDetail(),
+          detail: CHECK_DETAIL,
         };
       }
       if (source !== null) {
         unlinkSync(path);
         return { name, source, path, action: "removed" };
       }
-      return { name, path, action: "removed", detail: backupDestination(id, path, options) };
+      return {
+        name,
+        path,
+        action: "removed",
+        detail: backupDestination("prompts", id, path, options),
+      };
     });
 }
 
@@ -439,7 +331,7 @@ function syncTarget(
       id: harness.id,
       path: targetDir,
       format: resolved.format,
-      ...syncMarkdownDirectory(harness.id, targetDir, sourceDir, check, options),
+      ...syncDirectoryLink("prompts", harness.id, targetDir, sourceDir, check, options),
       templates: [],
     };
   }

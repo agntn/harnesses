@@ -31,11 +31,13 @@ src/
   mcp-servers.ts        # normalized MCP server read/write across harness config dialects
   agents-sync.ts        # symlink-based sync of global instructions files to one master
   prompt-sync.ts        # prompt template sync: directory links, generated Gemini TOML
+  skills-sync.ts        # skills sync: each harness skills directory links to one source
+  directory-link.ts     # directory link and backup shared by prompt and skills sync
   tool-schemas.ts       # tool parameter schemas shared by MCP and the Pi/OMP extensions
   tool-operations.ts    # tool executors behind those schemas
   mcp.ts                # MCP server over the shared tools (`harnesses mcp`)
   cli.ts                # citty CLI root
-  commands/             # CLI subcommands (agents, mcp-servers, prompts, mcp) and output helpers
+  commands/             # CLI subcommands (agents, mcp-servers, prompts, skills, mcp) and output helpers
   harnesses/
     index.ts            # constructor registry; order decides env detection priority
     <id>.ts             # one class per harness
@@ -58,7 +60,7 @@ Nested `AGENTS.md` files in `src/`, `src/commands/`, `test/`, `docs/` and each `
 6. Add an entry to `PRESENTATION` in `docs/app/utils/harnesses.ts` and a page in `docs/content/2.harnesses/`
 7. Run `pnpm lint && pnpm typecheck && pnpm build && pnpm test:run`
 
-Each harness class has: `config`, `sessions`, `persistence`, `instructions`, `skills`, `commands`, `hooks`, `capabilities`, `detection`, `invocation` (null when the CLI has no headless mode). Optional overrides: `promptTemplates` and `promptTemplateSyncTarget` (prompt locations and the sync destination), `modelListing` (null without a native model list), `mcpConfigs` (empty when unknown), `agentsFile` (null when no stable user-scope instructions file), `temp` and `envOverrides` (empty until verified; `relocates` must match the categories under the override's root). All path entries carry `scope` (user/project/system/data), `level` (official/community/inferred), optional `platforms`.
+Each harness class has: `config`, `sessions`, `persistence`, `instructions`, `skills`, `commands`, `hooks`, `capabilities`, `detection`, `invocation` (null when the CLI has no headless mode). Optional overrides: `promptTemplates` and `promptTemplateSyncTarget` (prompt locations and the sync destination), `skillsSyncTarget` (the user skills directory skills sync links; one of `skills`), `modelListing` (null without a native model list), `mcpConfigs` (empty when unknown), `agentsFile` (null when no stable user-scope instructions file), `temp` and `envOverrides` (empty until verified; `relocates` must match the categories under the override's root). All path entries carry `scope` (user/project/system/data), `level` (official/community/inferred), optional `platforms`.
 
 ## Code conventions
 

@@ -115,6 +115,11 @@ export default class Omp extends Harness {
       note: "Auto-generated managed skills.",
     },
   ];
+  override readonly skillsSyncTarget: Harness["skillsSyncTarget"] = {
+    path: "~/.omp/agent/skills/",
+    scope: "user",
+    level: "official",
+  };
   readonly commands: Harness["commands"] = [
     {
       path: ".omp/commands/",

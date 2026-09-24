@@ -58,6 +58,11 @@ export default class Cursor extends Harness {
       note: "Cursor natively scans Codex skills directory.",
     },
   ];
+  override readonly skillsSyncTarget: Harness["skillsSyncTarget"] = {
+    path: "~/.cursor/skills/",
+    scope: "user",
+    level: "official",
+  };
   readonly commands: Harness["commands"] = [];
   readonly hooks: Harness["hooks"] = [];
   readonly invocation: Harness["invocation"] = {

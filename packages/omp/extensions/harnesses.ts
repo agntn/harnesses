@@ -258,6 +258,24 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
   });
 
   pi.registerTool({
+    name: "harnesses_skills_sync",
+    label: HARNESS_TOOL_LABELS.harnesses_skills_sync,
+    description:
+      "Link supported harness skills directories to the canonical skills directory in the agntn XDG data directory. Links to single skills are replaced; anything else is backed up. Pass check to only report",
+    parameters: schemas.skillsSync,
+    approval: HARNESS_TOOL_APPROVALS.harnesses_skills_sync,
+    async execute(
+      _toolCallId,
+      params: Readonly<HarnessSchemas.SkillsSyncParams>,
+    ): Promise<AgentToolResult<HarnessTools.SkillsSyncReport | HarnessTools.RunFailure>> {
+      const { skillsSync } = await loadToolOperations();
+      const { content, details, isError } = skillsSync(params.id, params.check === true);
+      return { content, details, isError };
+    },
+    ...statusRenderers("harnesses_skills_sync"),
+  });
+
+  pi.registerTool({
     name: "harnesses_mcp_remove",
     label: HARNESS_TOOL_LABELS.harnesses_mcp_remove,
     description:

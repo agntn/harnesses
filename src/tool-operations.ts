@@ -25,6 +25,9 @@ export type { PromptSyncReport } from "./prompt-sync.ts";
 export type { HarnessInvocationModes } from "./types.ts";
 import { syncPromptTemplates } from "./prompt-sync.ts";
 import type { PromptSyncReport } from "./prompt-sync.ts";
+export type { SkillsSyncReport } from "./skills-sync.ts";
+import { syncSkills } from "./skills-sync.ts";
+import type { SkillsSyncReport } from "./skills-sync.ts";
 import type { Harness } from "./harness.ts";
 import type {
   AvailableModel,
@@ -39,6 +42,7 @@ import type {
   PathCandidate,
   PromptTemplateSyncTarget,
   ResolvedPaths,
+  SkillsSyncTarget,
   StorageDescriptor,
 } from "./types.ts";
 
@@ -76,6 +80,7 @@ export interface HarnessMetadata {
   sessions: PathCandidate[];
   instructions: PathCandidate[];
   skills: PathCandidate[];
+  skillsSyncTarget: SkillsSyncTarget | null;
   commands: PathCandidate[];
   promptTemplates: PathCandidate[];
   promptTemplateSyncTarget: PromptTemplateSyncTarget | null;
@@ -307,6 +312,7 @@ function harnessInfoResult(id: string): HarnessInfoResult {
     sessions: harness.sessions,
     instructions: harness.instructions,
     skills: harness.skills,
+    skillsSyncTarget: harness.skillsSyncTarget,
     commands: harness.commands,
     promptTemplates: harness.promptTemplates,
     promptTemplateSyncTarget: harness.promptTemplateSyncTarget,
@@ -331,6 +337,7 @@ type HarnessInfoText =
       | "sessions"
       | "instructions"
       | "skills"
+      | "skillsSyncTarget"
       | "commands"
       | "promptTemplates"
       | "promptTemplateSyncTarget"
@@ -810,6 +817,28 @@ export function promptsSync(id?: string, check = false): ToolResult<PromptSyncRe
 
   try {
     const details = syncPromptTemplates(
+      id !== undefined && isHarnessId(id) ? [getHarness(id)] : getAllHarnesses(),
+      check,
+    );
+    return { content: text(details), details };
+  } catch (error) {
+    const details: RunFailure = { error: errorMessage(error) };
+    return { content: text(details), details, isError: true };
+  }
+}
+
+/**
+ * Links harness skills directories to the canonical skills directory.
+ *
+ * @param id - Optional harness id; omission targets every harness.
+ * @param check - Report intended changes without writing them.
+ * @returns {ToolResult<SkillsSyncReport | RunFailure>} The sync report or failure.
+ */
+export function skillsSync(id?: string, check = false): ToolResult<SkillsSyncReport | RunFailure> {
+  if (id !== undefined && !isHarnessId(id)) return unknownHarness(id);
+
+  try {
+    const details = syncSkills(
       id !== undefined && isHarnessId(id) ? [getHarness(id)] : getAllHarnesses(),
       check,
     );

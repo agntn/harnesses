@@ -110,6 +110,11 @@ export default class Grok extends Harness {
       note: "Global user-level skills.",
     },
   ];
+  override readonly skillsSyncTarget: Harness["skillsSyncTarget"] = {
+    path: "~/.grok/skills/",
+    scope: "user",
+    level: "official",
+  };
   readonly commands: Harness["commands"] = [
     { path: ".grok/commands/", scope: "project", level: "official" },
     {

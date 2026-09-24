@@ -29,10 +29,10 @@ const server = createMcpServer();
 const [a, b] = InMemoryTransport.createLinkedPair();
 try {
   await Promise.all([client.connect(a), server.connect(b)]);
-  assert.equal((await client.listTools()).tools.length, 10);
+  assert.equal((await client.listTools()).tools.length, 11);
   assert.equal((await client.callTool({ name: 'missing' })).isError, true);
   assert.equal((await client.callTool({ name: 'harnesses_info', arguments: { id: 42 } })).isError, true);
-  assert.equal(loaded.some(url => /\/(tool-operations|prompt-sync|mcp-servers)\.[tm]/.test(url)), false);
+  assert.equal(loaded.some(url => /\/(tool-operations|prompt-sync|skills-sync|directory-link|mcp-servers)\.[tm]/.test(url)), false);
   assert.equal(loaded.some(url => url.includes('/node_modules/yaml/')), false);
   const response = await client.callTool({ name: 'harnesses_info', arguments: { id: 'pi' } });
   assert.notEqual(response.isError, true);

@@ -140,6 +140,11 @@ export default class Pi extends Harness {
       note: "Global user-level skills.",
     },
   ];
+  override readonly skillsSyncTarget: Harness["skillsSyncTarget"] = {
+    path: "~/.pi/agent/skills/",
+    scope: "user",
+    level: "official",
+  };
   readonly commands: Harness["commands"] = [
     {
       path: ".pi/prompts/",

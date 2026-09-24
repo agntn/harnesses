@@ -160,6 +160,11 @@ export default class MastraCode extends Harness {
       note: "Claude Code compatible.",
     },
   ];
+  override readonly skillsSyncTarget: Harness["skillsSyncTarget"] = {
+    path: "~/.mastracode/skills/",
+    scope: "user",
+    level: "official",
+  };
   readonly commands: Harness["commands"] = [
     {
       path: ".mastracode/commands/",

@@ -158,6 +158,12 @@ export function harnessToolSchemas<I, S>(Type: McpSchemaBuilder<I, S>) {
         Type.Boolean({ description: "Report what would change without writing anything" }),
       ),
     }),
+    skillsSync: closed({
+      id: Type.Optional(harnessId("Harness id; omit to sync every harness")),
+      check: Type.Optional(
+        Type.Boolean({ description: "Report what would change without writing anything" }),
+      ),
+    }),
     mcpAdd: closed({
       id: harnessId("Harness id"),
       name: Type.String({
@@ -240,6 +246,11 @@ export interface AgentsSyncParams {
 }
 
 export interface PromptsSyncParams {
+  id?: string;
+  check?: boolean;
+}
+
+export interface SkillsSyncParams {
   id?: string;
   check?: boolean;
 }

@@ -79,6 +79,11 @@ export default class Gemini extends Harness {
     { path: "~/.gemini/skills/", scope: "user", level: "official" },
     { path: "~/.agents/skills/", scope: "user", level: "official" },
   ];
+  override readonly skillsSyncTarget: Harness["skillsSyncTarget"] = {
+    path: "~/.gemini/skills/",
+    scope: "user",
+    level: "official",
+  };
   readonly commands: Harness["commands"] = [
     {
       path: ".gemini/commands/",
