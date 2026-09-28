@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { MODES, PATH_GROUPS, harnessEntry } from "../../utils/harnesses";
+import { MODES, PATH_GROUPS, allPaths, harnessEntry } from "../../utils/harnesses";
 
 const props = defineProps<{ id: string }>();
 
@@ -25,47 +25,53 @@ const modes = computed(() =>
       })
     : [],
 );
+const supported = computed(() => modes.value.filter((mode) => mode.template).length);
 </script>
 
 <template>
   <div v-if="harness">
     <ProseH2 id="capabilities">Capabilities and invocation</ProseH2>
-    <p class="not-prose flex flex-wrap gap-1.5">
-      <span
-        v-for="(value, key) in harness.capabilities"
-        :key="key"
-        class="harnesses-chip"
-        :class="{ 'harnesses-chip-ok': value }"
-        >{{ key }}: {{ value ? "yes" : "no" }}</span
-      >
-    </p>
+    <ul class="sheet-caps not-prose" aria-label="Capabilities">
+      <li v-for="(value, key) in harness.capabilities" :key="key">
+        <UBadge
+          color="neutral"
+          :variant="value ? 'subtle' : 'outline'"
+          :label="`${key}: ${value ? 'yes' : 'no'}`"
+        />
+      </li>
+    </ul>
     <template v-if="harness.invocation">
       <ProseP>
-        Binary <ProseCode>{{ harness.invocation.binary ?? harness.binaries[0] }}</ProseCode>,
-        evidence <ProseCode>{{ harness.invocation.level }}</ProseCode>.
+        Binary <ProseCode>{{ harness.invocation.binary ?? harness.binaries[0] }}</ProseCode
+        >, evidence <ProseCode>{{ harness.invocation.level }}</ProseCode
+        >.
         <template v-if="harness.invocation.note">{{ harness.invocation.note }} </template>
         <template v-if="harness.invocation.modelArgs">
           Model selection appends
-          <ProseCode>{{ harness.invocation.modelArgs.join(" ") }}</ProseCode>.
+          <ProseCode>{{ harness.invocation.modelArgs.join(" ") }}</ProseCode
+          >.
         </template>
-        <template v-else>No model selection: a <ProseCode>model</ProseCode> option is rejected.</template>
-      </ProseP>
-      <div class="harnesses-frame not-prose my-5 divide-y divide-muted overflow-hidden rounded-xl">
-        <div
-          v-for="mode in modes"
-          :key="mode.key"
-          class="grid gap-x-4 gap-y-1 px-4 py-3 sm:grid-cols-[9rem_minmax(0,1fr)]"
+        <template v-else
+          >No model selection: a <ProseCode>model</ProseCode> option is rejected.</template
         >
-          <div>
-            <p class="font-mono text-[11px] tracking-[0.08em] uppercase" :class="mode.template ? 'text-primary' : 'text-dimmed'">
-              {{ mode.label }}
-            </p>
-            <p class="font-mono text-[11px] text-dimmed">{{ mode.options }}</p>
-          </div>
-          <code v-if="mode.template" class="font-mono text-[13px] break-all text-highlighted">{{ mode.template }}</code>
-          <span v-else class="font-mono text-[11px] text-dimmed">rejected</span>
-        </div>
-      </div>
+      </ProseP>
+      <ConsolePanel
+        tag="Call"
+        :title="`invoke(prompt, options)`"
+        :meta="`${supported} of ${MODES.length} modes`"
+        label="Invocation templates"
+      >
+        <ul class="harnesses-rows sheet-modes">
+          <li v-for="mode in modes" :key="mode.key" :class="{ 'sheet-mode-off': !mode.template }">
+            <span class="sheet-mode">
+              <span class="sheet-mode-label">{{ mode.label }}</span>
+              <span class="harnesses-dim">{{ mode.options }}</span>
+            </span>
+            <code v-if="mode.template" class="sheet-template">{{ mode.template }}</code>
+            <span v-else class="harnesses-dim">rejected</span>
+          </li>
+        </ul>
+      </ConsolePanel>
     </template>
     <ProseP v-else>
       No non-interactive invocation is recorded, so <ProseCode>invoke()</ProseCode> rejects before
@@ -85,21 +91,37 @@ const modes = computed(() =>
     <ProseP>
       Templates as the registry stores them. <ProseCode>~</ProseCode>,
       <ProseCode>${HOME}</ProseCode>, <ProseCode>${TMPDIR}</ProseCode> and
-      <ProseCode>%VAR%</ProseCode> expand in
-      <ProseCode>resolve()</ProseCode>; entries tagged with a platform are dropped on the others.
+      <ProseCode>%VAR%</ProseCode> expand in <ProseCode>resolve()</ProseCode>; entries tagged with a
+      platform are dropped on the others.
       <ProseA :href="`/explorer?id=${harness.id}`">Open in the explorer</ProseA> to see them
       expanded for a home directory of your choice.
     </ProseP>
-    <div class="harnesses-frame not-prose my-5 divide-y divide-muted overflow-hidden rounded-xl">
-      <HarnessPathList v-for="row in groups" :key="row.group" :group="row.group" :entries="row.entries" platforms />
-      <div v-if="emptyGroups.length > 0" class="px-4 py-3.5">
-        <p class="harnesses-eyebrow mb-2">empty</p>
-        <p class="text-xs text-muted">
-          <code v-for="group in emptyGroups" :key="group" class="me-2 font-mono text-[13px] text-highlighted">{{ group }}</code>
-          No known location. That is not the same as the feature being missing.
+    <ConsolePanel
+      tag="Paths"
+      :title="`getHarness(&quot;${harness.id}&quot;)`"
+      :meta="`${allPaths(harness).length} templates · ${groups.length} groups`"
+      label="Path templates"
+    >
+      <HarnessPathList
+        v-for="row in groups"
+        :key="row.group"
+        :group="row.group"
+        :entries="row.entries"
+        platforms
+      />
+      <div v-if="emptyGroups.length > 0" class="harnesses-band">
+        <p class="console-label console-rule-title">
+          <span>Empty <span aria-hidden="true">[ no known location ]</span></span>
+          <span class="console-mark" aria-hidden="true" />
+        </p>
+        <p class="sheet-empty">
+          <code v-for="group in emptyGroups" :key="group" class="sheet-empty-name">{{
+            group
+          }}</code>
+          <span>That is not the same as the feature being missing.</span>
         </p>
       </div>
-    </div>
+    </ConsolePanel>
 
     <template v-if="harness.envOverrides.length > 0">
       <ProseH3 id="env-overrides">Env overrides</ProseH3>
@@ -107,40 +129,58 @@ const modes = computed(() =>
         Variables the harness reads to move a root. The path is the default while the variable is
         unset; <ProseCode>resolve()</ProseCode> applies a set one to <ProseCode>temp</ProseCode>.
       </ProseP>
-      <div class="harnesses-frame not-prose my-5 divide-y divide-muted overflow-hidden rounded-xl">
-        <div
-          v-for="item in harness.envOverrides"
-          :key="`${item.variable}-${item.path}`"
-          class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-4 py-3"
-        >
-          <code class="font-mono text-[13px] break-all text-highlighted">{{ item.variable }}</code>
-          <code class="font-mono text-[13px] break-all text-muted">{{ item.path }}</code>
-          <span class="font-mono text-[10px] tracking-[0.08em] text-dimmed uppercase"
-            >{{ item.relocates.join(" · ") }}<template v-if="item.platforms">
-              · {{ item.platforms.join(", ") }}</template
-            ></span
-          >
-          <p v-if="item.note" class="basis-full text-xs text-muted">{{ item.note }}</p>
-        </div>
-      </div>
+      <ConsolePanel
+        tag="Env"
+        title="envOverrides"
+        :meta="`${harness.envOverrides.length} variables`"
+        label="Env overrides"
+      >
+        <ul class="harnesses-rows sheet-env">
+          <li v-for="item in harness.envOverrides" :key="`${item.variable}-${item.path}`">
+            <code class="sheet-var">{{ item.variable }}</code>
+            <code class="sheet-default">{{ item.path }}</code>
+            <span class="sheet-relocates"
+              >{{ item.relocates.join(" · ")
+              }}<template v-if="item.platforms"> · {{ item.platforms.join(", ") }}</template></span
+            >
+            <p v-if="item.note" class="sheet-note">{{ item.note }}</p>
+          </li>
+        </ul>
+      </ConsolePanel>
     </template>
 
     <ProseH2 id="mcp">MCP servers</ProseH2>
-    <div v-if="harness.mcpConfigs.length > 0" class="harnesses-frame not-prose my-5 divide-y divide-muted overflow-hidden rounded-xl">
-      <div v-for="file in harness.mcpConfigs" :key="file.path" class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-4 py-3">
-        <code class="font-mono text-[13px] break-all text-highlighted">{{ file.path }}</code>
-        <span class="font-mono text-[10px] tracking-[0.08em] text-dimmed uppercase">{{ file.scope }} · {{ file.format }} · {{ file.dialect }} · {{ file.key.join(".") }}</span>
-      </div>
-    </div>
+    <ConsolePanel
+      v-if="harness.mcpConfigs.length > 0"
+      tag="File"
+      title="mcpConfigs"
+      :meta="`${harness.mcpConfigs.length} ${harness.mcpConfigs.length === 1 ? 'file' : 'files'}`"
+      label="MCP config files"
+    >
+      <ul class="harnesses-rows sheet-mcp">
+        <li v-for="file in harness.mcpConfigs" :key="file.path">
+          <code class="sheet-var">{{ file.path }}</code>
+          <span class="sheet-relocates"
+            >{{ file.scope }} · {{ file.format }} · {{ file.dialect }} ·
+            {{ file.key.join(".") }}</span
+          >
+        </li>
+      </ul>
+    </ConsolePanel>
     <ProseP v-else>
       No MCP config file is mapped, so <ProseCode>listMcpServers</ProseCode> returns nothing for it
       and <ProseCode>syncMcpServers</ProseCode> skips it.
     </ProseP>
 
     <ProseH2 id="detection">Detection</ProseH2>
-    <div class="harnesses-frame not-prose my-5 overflow-hidden rounded-xl">
+    <ConsolePanel
+      tag="Call"
+      title="detectHarness()"
+      :meta="harness.detection.envVars.length > 0 ? 'env, then project' : 'project markers only'"
+      label="Detection markers"
+    >
       <HarnessDetection :detection="harness.detection" />
-    </div>
+    </ConsolePanel>
 
     <ProseH2 id="persistence">Persistence</ProseH2>
     <ProseUl>
@@ -160,3 +200,95 @@ const modes = computed(() =>
     </ProseP>
   </div>
 </template>
+
+<style scoped>
+.sheet-caps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 16px 0;
+  padding: 0;
+  list-style: none;
+}
+.sheet-modes > li {
+  grid-template-columns: 11rem minmax(0, 1fr);
+}
+.sheet-mode {
+  display: grid;
+  gap: 2px;
+}
+.sheet-mode-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ui-text-highlighted);
+}
+.sheet-mode-off .sheet-mode-label {
+  color: var(--ui-text-dimmed);
+}
+.sheet-template {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  color: var(--ui-text-highlighted);
+}
+.sheet-env > li,
+.sheet-mcp > li {
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
+}
+.sheet-var {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  color: var(--ui-text-highlighted);
+}
+.sheet-default {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  color: var(--ui-text-muted);
+}
+.sheet-relocates {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-align: right;
+  text-transform: uppercase;
+  color: var(--ui-text-dimmed);
+}
+.sheet-mcp > li {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.sheet-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ui-text-muted);
+}
+.sheet-empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ui-text-muted);
+}
+.sheet-empty-name {
+  padding: 1px 7px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ui-text-highlighted);
+  box-shadow: inset 0 0 0 1px var(--console-line);
+}
+@media (width < 640px) {
+  .sheet-modes > li,
+  .sheet-env > li,
+  .sheet-mcp > li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sheet-relocates {
+    text-align: left;
+  }
+}
+</style>
