@@ -26,12 +26,12 @@ const PRESENTATION: Record<string, { icon: string; short: string; blurb: string 
     blurb: "codex exec with a native read-only sandbox. TOML config, comments kept on edit.",
   },
   cursor: {
-    icon: "i-solar-cursor-linear",
+    icon: "i-simple-icons-cursor",
     short: "Cursor",
     blurb: "cursor-agent is the CLI. Scans Claude and Codex skills directories on its own.",
   },
   freebuff: {
-    icon: "i-solar-ghost-linear",
+    icon: "i-lucide-ghost",
     short: "Freebuff",
     blurb: "Codebuff based. Knowledge files instead of rules, chats under ~/.config/manicode.",
   },
@@ -48,32 +48,34 @@ const PRESENTATION: Record<string, { icon: string; short: string; blurb: string 
   grok: {
     icon: "i-simple-icons-x",
     short: "Grok CLI",
-    blurb: "ACP session streams, TOML config, hooks and rules with Claude and Cursor compatibility.",
+    blurb:
+      "ACP session streams, TOML config, hooks and rules with Claude and Cursor compatibility.",
   },
   mastracode: {
-    icon: "i-solar-layers-linear",
+    icon: "i-lucide-layers",
     short: "Mastra Code",
     blurb: "LibSQL database for threads and memory. No headless mode yet, so no invoke.",
   },
   omp: {
-    icon: "i-solar-planet-linear",
+    icon: "i-lucide-orbit",
     short: "OMP",
     blurb: "Pi fork with profiles, sticky RULES.md and a PERSONALITY.md. No advisor mode.",
   },
   opencode: {
-    icon: "i-solar-code-2-linear",
+    icon: "i-lucide-code-xml",
     short: "OpenCode",
     blurb: "XDG paths on every platform, one SQLite database, its own MCP dialect.",
   },
   pi: {
-    icon: "i-solar-atom-linear",
+    icon: "i-lucide-pi",
     short: "Pi",
     blurb: "Every invocation mode, native model listing with search. The reference harness here.",
   },
   "prime-agent": {
-    icon: "i-solar-cpu-linear",
+    icon: "i-lucide-cpu",
     short: "Prime Agent",
-    blurb: "Pi fork with one Python REPL tool, flat JSONL sessions and model listing. No read-only mode.",
+    blurb:
+      "Pi fork with one Python REPL tool, flat JSONL sessions and model listing. No read-only mode.",
   },
 };
 
@@ -315,4 +317,32 @@ export function capabilityList(harness: HarnessRecord): string[] {
 
 export function modeList(harness: HarnessRecord): ModeKey[] {
   return MODES.filter((mode) => harness.invocationModes[mode.key]).map((mode) => mode.key);
+}
+
+/** Evidence levels in the order the registry ranks them, strongest first. */
+export const LEVELS = ["official", "community", "inferred"] as const;
+export type Level = (typeof LEVELS)[number];
+
+/** Every path of a harness, all groups together. */
+export function allPaths(harness: HarnessRecord): PathCandidate[] {
+  return PATH_GROUPS.flatMap((group) => harness[group]);
+}
+
+/** How many paths of the harnesses sit at each evidence level. */
+export function levelCounts(harnesses: readonly HarnessRecord[]): Record<Level, number> {
+  const counts: Record<Level, number> = { official: 0, community: 0, inferred: 0 };
+  for (const entry of harnesses.flatMap(allPaths)) counts[entry.level] += 1;
+  return counts;
+}
+
+/** The resolve options the landing uses: templates stay readable with `~` and `.` as the roots. */
+export const LANDING_RESOLVE: ResolveOptions = {
+  platform: "linux",
+  homeDir: "~",
+  projectRoot: ".",
+};
+
+/** The user-scope MCP config `syncMcpServers` rewrites, or the first one the harness has. */
+export function userMcpConfig(harness: HarnessRecord) {
+  return harness.mcpConfigs.find((file) => file.scope === "user") ?? harness.mcpConfigs[0];
 }

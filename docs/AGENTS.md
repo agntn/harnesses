@@ -1,20 +1,22 @@
 # docs/
 
-Docus site for `@agntn/harnesses`. Markdown lives in `content/`. The explorer is a Vue page that reads the registry a Nuxt module copies out of the library at build time. There is no server API: the library spawns processes and reads the filesystem, so it stays out of the browser and out of the worker.
+Docus site for `@agntn/harnesses`. Markdown lives in `content/`. The explorer is a Vue page that reads the registry a Nuxt module copies out of the library at build time. There is no server API: the library spawns processes and reads the filesystem, so it stays out of the browser and out of the worker. The look follows the agntn instrument family; [DESIGN.md](DESIGN.md) lists the instruments this site owns and where it departs from the family.
 
 ## Layout
 
 ```
 docs/
+├── DESIGN.md                      # instruments this site owns, their anatomy, departures from the family rules
 ├── nuxt.config.ts                 # extends: ['docus'], cloudflare_module preset (Workers)
-├── app/app.config.ts              # title, github, theme, seo schema
-├── app/app.css                    # theme tokens (light + .dark), shared `harnesses-*` classes
-├── app/components/                # Docus overrides: AppHeaderLogo, AppHeaderCTA (nav), AppFooterLeft, DocsAsideLeftBody; icons are Solar (linear), brands stay simple-icons
-├── app/components/content/        # MDC components (`::landing-home`, `::harness-facts`, `::harness-sheet`), the landing panels, HarnessesExplorer, CodeSnippet
+├── shiki-theme.ts                 # code blocks in the palette of the tok-* classes, every colour a --shiki-token-* variable
+├── app/app.config.ts              # title, github, seo schema, the Nuxt UI variants that carry the family look
+├── app/app.css                    # tokens, the shared `console-*` and `hero-*` grammar, `harnesses-*` classes
+├── app/components/                # Docus overrides (header, tabs, sidebar, toc, page links, surround, callout), ConsolePanel; icons are Lucide, brands stay simple-icons
+├── app/components/content/        # MDC components (`::landing-home`, `::harness-facts`, `::harness-sheet`, `::harness-roster`), the landing instruments, HarnessesExplorer, Prose overrides, ConsoleReticle
 ├── app/components/OgImage/        # Docs.takumi and Landing.takumi override the Docus OG templates
 ├── app/assets/fonts.css           # @font-face for the TTFs served from public/fonts (site and OG images)
-├── app/composables/               # useLandingHarness (one clock for every live panel), useSubNavigation
-├── app/utils/                     # harnesses table (icons, blurbs, resolve and buildCommand ports), highlight, format
+├── app/composables/               # useLandingHarness (one clock for every live panel), useSubNavigation, useCopied, useRosterFlip
+├── app/utils/                     # harnesses table (icons, blurbs, resolve and buildCommand ports), format, roster classes, tokenizers
 ├── shared/types/registry.ts       # HarnessRecord as a Pick of Harness, plus the path and platform types the pages read
 ├── modules/registry.ts            # runs getAllHarnesses() from ../src/registry.ts in Node, ships the records as `#harnesses-registry`
 ├── app/pages/explorer.vue         # explorer, own route outside the docs layout, its own useSeo and OG image
@@ -44,7 +46,7 @@ Two resolution traps, both because the repo root is its own pnpm workspace:
 
 ## The registry
 
-- `#harnesses-registry` is the single source for every number, path, template and marker on the site. `modules/registry.ts` imports `getAllHarnesses()` from `../src/registry.ts` and `version` from `../src/types.ts` (jiti runs the TypeScript, no `dist/` needed), maps every harness onto `HarnessRecord`, a `Pick` of the `Harness` data members in `shared/types/registry.ts`, and writes the result as one typed `.ts` template Nuxt bundles. Nothing is committed, so the site can't drift from the library in the same commit. A harness added to the library shows up in the grid, the sidebar and the explorer by itself; it needs one entry in `PRESENTATION` in `app/utils/harnesses.ts` (icon, short label, blurb) and a page in `content/2.harnesses/`, and the utils throw at import if the entry is missing.
+- `#harnesses-registry` is the single source for every number, path, template and marker on the site. `modules/registry.ts` imports `getAllHarnesses()` from `../src/registry.ts` and `version` from `../src/types.ts` (jiti runs the TypeScript, no `dist/` needed), maps every harness onto `HarnessRecord`, a `Pick` of the `Harness` data members in `shared/types/registry.ts`, and writes the result as one typed `.ts` template Nuxt bundles. Nothing is committed, so the site can't drift from the library in the same commit. A harness added to the library shows up in the landing instruments, the roster, the sidebar and the explorer by itself; it needs one entry in `PRESENTATION` in `app/utils/harnesses.ts` (icon, short label, blurb) and a page in `content/2.harnesses/`, and the utils throw at import if the entry is missing.
 - `resolveTemplate` and `buildCommand` in `app/utils/harnesses.ts` are ports of `resolvePathTemplate` and `Harness.buildInvocation`. They exist because the library cannot be imported into the browser. One known divergence: `resolveTemplate` substitutes fixed Windows defaults for `%PROGRAMDATA%`, `%APPDATA%`, `%LOCALAPPDATA%` and `%USERPROFILE%`, where the library reads `process.env`; the explorer page says so. Change the library's expansion or argument order, change them too; the explorer is the place that would be wrong otherwise.
 - Values are deterministic, so SSR and the client agree and hydration doesn't flicker. No `Math.random`, no clock inside a computed.
 - `HarnessesExplorer.vue` reads the deep link in `onMounted`, once. A prerendered page hydrates with an empty query and Nuxt restores the address afterwards, so reading `route.query` in setup gives you nothing. It writes state back with `router.replace` on every change.
@@ -63,7 +65,7 @@ Two resolution traps, both because the repo root is its own pnpm workspace:
 
 ## Constraints
 
-- Text a visitor types into the explorer is rendered as text, through interpolation or a `<pre>`. Never `v-html` on it. `CodeSnippet` uses `v-html` only on markup our own tokenizer produced from escaped text.
-- Harness names, icons, blurbs live once, in `app/utils/harnesses.ts`. Sidebar, landing grid, explorer and `::harness-facts` read from it. Paths, templates, capabilities and markers come from the registry and are not repeated here.
+- Text a visitor types into the explorer is rendered as text, through interpolation or a `<pre>`. Never `v-html` on it; snippets are token arrays from `app/utils/tokens.ts` rendered through interpolation.
+- Harness names, icons, blurbs live once, in `app/utils/harnesses.ts`. Sidebar, landing instruments, roster, explorer and `::harness-facts` read from it. Counts on the page come from the registry, never typed into copy. Paths, templates, capabilities and markers come from the registry and are not repeated here.
 - Every path, flag and error message quoted in `content/` has a line in `src/`. Check a new one the same way before writing it down.
 - The site makes no network request for its own work and reads nothing from the visitor's machine. The footer says so.
