@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { getHarness } from "../src/index.ts";
 import Omp from "../src/harnesses/omp.ts";
 import { harnessInfo } from "../src/tool-operations.ts";

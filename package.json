@@ -37,14 +37,14 @@
     "access": "public"
   },
   "scripts": {
-    "build": "obuild",
-    "dev": "obuild --stub",
+    "build": "vp pack",
+    "dev": "vp pack --watch",
     "docs": "pnpm --dir docs dev",
-    "lint": "pnpm build && oxlint . && oxfmt --check .",
-    "lint:fix": "pnpm build && oxlint . --fix && oxfmt . && pnpm build",
+    "lint": "pnpm build && vp lint && vp fmt --check",
+    "lint:fix": "pnpm build && vp lint --fix && vp fmt && pnpm build",
     "typecheck": "tsgo --noEmit --skipLibCheck && pnpm build && tsgo --noEmit --skipLibCheck -p tsconfig.extensions.json",
-    "test": "vitest",
-    "test:run": "vitest --run",
+    "test": "vp test watch",
+    "test:run": "vp test run",
     "prepack": "pnpm run build",
     "release": "pnpm test:run && pnpm build && changelogen --release --push"
   },
@@ -67,12 +67,8 @@
     "@types/node": "latest",
     "@typescript/native-preview": "latest",
     "changelogen": "0.6.2",
-    "obuild": "0.4.40",
-    "oxfmt": "0.68.0",
-    "oxlint": "1.83.0",
-    "oxlint-tsgolint": "7.0.2003",
     "typescript": "6.0.3",
-    "vitest": "5.0.2"
+    "vite-plus": "catalog:"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": ">=0.84.2 <1",

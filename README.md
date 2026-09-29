@@ -221,11 +221,11 @@ Want a fourteenth? One class extending `Harness`, then `registerHarness`. `getHa
 
 ```bash
 pnpm install
-pnpm lint        # builds first, then oxlint and oxfmt --check
+pnpm lint        # builds first, then vp lint and vp fmt --check
 pnpm lint:fix
 pnpm typecheck
 pnpm test:run
-pnpm build       # obuild
+pnpm build       # vp pack
 pnpm docs        # the Docus site, bundles src/ itself
 ```
 
