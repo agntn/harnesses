@@ -1,4 +1,5 @@
 import { spawn, spawnSync, type SpawnSyncReturns } from "node:child_process";
+import { once } from "node:events";
 import {
   existsSync,
   mkdirSync,
@@ -195,73 +196,111 @@ describe("harnesses usage paths", () => {
     expect(result.loaded.some((url) => url.endsWith("/src/mcp.ts"))).toBe(true);
   });
 
-  it("harnesses mcp stops an in-flight run when the client closes stdin", async () => {
-    const binDir = mkdtempSync(join(tmpdir(), "harnesses-grok-"));
-    const pidFile = join(binDir, "pid");
-    writeFileSync(
-      join(binDir, "grok"),
-      [
-        "#!/bin/sh",
-        'if [ "$1" = --version ]; then echo 1.0.41; exit 0; fi',
-        `echo $$ > '${pidFile}'`,
-        "exec sleep 30",
-        "",
-      ].join("\n"),
-      { mode: 0o755 },
-    );
-    const server = spawn(process.execPath, [cli, "mcp"], {
-      cwd: root,
-      env: { ...process.env, PATH: `${binDir}:${process.env.PATH ?? ""}` },
-      stdio: ["pipe", "ignore", "ignore"],
-    });
-    const send = (message: object) => server.stdin.write(`${JSON.stringify(message)}\n`);
-    try {
-      send({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "initialize",
-        params: {
-          protocolVersion: "2025-06-18",
-          capabilities: {},
-          clientInfo: { name: "harnesses-test", version: "1.0.0" },
-        },
+  it.each(["closes stdin", "stops reading stdout"])(
+    "harnesses mcp stops an in-flight run when the client %s",
+    async (how) => {
+      const binDir = mkdtempSync(join(tmpdir(), "harnesses-grok-"));
+      const pidFile = join(binDir, "pid");
+      writeFileSync(
+        join(binDir, "grok"),
+        [
+          "#!/bin/sh",
+          'if [ "$1" = --version ]; then echo 1.0.41; exit 0; fi',
+          `echo $$ > '${pidFile}'`,
+          "exec sleep 30",
+          "",
+        ].join("\n"),
+        { mode: 0o755 },
+      );
+      const server = spawn(process.execPath, [cli, "mcp"], {
+        cwd: root,
+        env: { ...process.env, PATH: `${binDir}:${process.env.PATH ?? ""}` },
+        stdio: ["pipe", "pipe", "pipe"],
       });
-      send({ jsonrpc: "2.0", method: "notifications/initialized" });
-      send({
-        jsonrpc: "2.0",
-        id: 2,
-        method: "tools/call",
-        params: { name: "harnesses_run", arguments: { id: "grok", prompt: "x", tools: true } },
-      });
-      await expect.poll(() => existsSync(pidFile), { timeout: 10_000 }).toBe(true);
-      const pid = Number(readFileSync(pidFile, "utf8"));
-
-      server.stdin.end();
-
-      await expect.poll(() => server.exitCode, { timeout: 5000 }).toBe(0);
-      await expect
-        .poll(
-          () => {
-            try {
-              process.kill(pid, 0);
-              return true;
-            } catch {
-              return false;
-            }
+      let stderr = "";
+      server.stderr.setEncoding("utf8").on("data", (chunk: string) => (stderr += chunk));
+      const send = (message: object) => server.stdin.write(`${JSON.stringify(message)}\n`);
+      try {
+        send({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: {
+            protocolVersion: "2025-06-18",
+            capabilities: {},
+            clientInfo: { name: "harnesses-test", version: "1.0.0" },
           },
-          { timeout: 2000 },
-        )
-        .toBe(false);
-    } finally {
-      server.kill("SIGKILL");
-      if (existsSync(pidFile)) {
-        try {
-          process.kill(Number(readFileSync(pidFile, "utf8")), "SIGKILL");
-        } catch {
-          // Already gone.
+        });
+        send({ jsonrpc: "2.0", method: "notifications/initialized" });
+        send({
+          jsonrpc: "2.0",
+          id: 2,
+          method: "tools/call",
+          params: { name: "harnesses_run", arguments: { id: "grok", prompt: "x", tools: true } },
+        });
+        await expect.poll(() => existsSync(pidFile), { timeout: 10_000 }).toBe(true);
+        const pid = Number(readFileSync(pidFile, "utf8"));
+
+        if (how === "closes stdin") {
+          server.stdin.end();
+        } else {
+          // The next frame the server writes then fails with EPIPE, as when the client is gone.
+          server.stdout.destroy();
+          send({ jsonrpc: "2.0", id: 3, method: "ping" });
         }
+
+        await expect.poll(() => server.exitCode, { timeout: 5000 }).toBe(0);
+        await expect
+          .poll(
+            () => {
+              try {
+                process.kill(pid, 0);
+                return true;
+              } catch {
+                return false;
+              }
+            },
+            { timeout: 2000 },
+          )
+          .toBe(false);
+        expect(stderr).toBe("");
+      } finally {
+        server.kill("SIGKILL");
+        if (existsSync(pidFile)) {
+          try {
+            process.kill(Number(readFileSync(pidFile, "utf8")), "SIGKILL");
+          } catch {
+            // Already gone.
+          }
+        }
+        rmSync(binDir, { recursive: true, force: true });
       }
-      rmSync(binDir, { recursive: true, force: true });
-    }
-  }, 15_000);
+    },
+    15_000,
+  );
+});
+
+describe("harnesses with a closed pipe", () => {
+  it.each(["list", "info claude"])(
+    "harnesses %s ends quietly when the reader goes away",
+    async (command) => {
+      // consola stays silent below warnings under a test runner, so the level is raised to make
+      // the command write its listing through consola as it does in a terminal.
+      const child = spawn(process.execPath, [cli, ...command.split(" ")], {
+        cwd: root,
+        env: { ...process.env, CONSOLA_LEVEL: "3" },
+        stdio: ["ignore", "pipe", "pipe"],
+        timeout: 10_000,
+      });
+      // Closing the read end before the child writes makes its first write fail with EPIPE, as
+      // after `| head -1`.
+      child.stdout.destroy();
+      let stderr = "";
+      child.stderr.setEncoding("utf8").on("data", (chunk: string) => (stderr += chunk));
+      await once(child, "close");
+
+      expect(stderr).toBe("");
+      expect(child.exitCode).toBe(0);
+    },
+  );
 });
