@@ -59,6 +59,9 @@ type CommandOptions = Readonly<{
   signal?: AbortSignal;
 }>;
 
+/** Set on every harness {@link Harness.invoke} starts, so a nested `harnesses` can refuse. */
+const PARENT_ENV = "AGNTN_HARNESSES_PARENT";
+
 type InvocationOptions = Readonly<{
   model?: string;
   structured?: boolean;
@@ -510,13 +513,24 @@ export abstract class Harness {
   /**
    * Runs one prompt through the harness non-interactively and collects the
    * output. stdin is closed so a harness that falls back to interactive mode
-   * exits instead of waiting forever.
+   * exits instead of waiting forever. Inside a harness that `invoke` started, it rejects.
    *
    * @param prompt - Prompt sent to the harness.
    * @param options - Invocation, environment, timeout, and cancellation options.
    * @returns {Promise<InvokeResult>} The completed process result.
    */
   invoke(prompt: string, options: InvokeOptions = {}): Promise<InvokeResult> {
+    const parent = process.env[PARENT_ENV];
+    if (parent) {
+      return Promise.reject(
+        new Error(
+          `Nested run refused: this process already runs inside ${parent}, started by harnesses. ` +
+            `${this.id} under it would stack agents, and in a read-only sandbox it gets no network ` +
+            `and hangs until the deadline. Answer without it`,
+        ),
+      );
+    }
+
     const invocationOptions = {
       model: options.model,
       structured: options.structured,
@@ -532,9 +546,10 @@ export abstract class Harness {
     const versionError = this.readOnlyVersionError(invocationOptions);
     if (versionError) return Promise.reject(new Error(versionError));
 
+    const command = { ...options, env: { ...options.env, [PARENT_ENV]: this.id } };
     const streamArgs = options.structured ? undefined : this.invocation?.streamArgs;
-    if (!streamArgs) return executeCommand(built.command, built.args, options);
-    return executeCommand(built.command, [...built.args, ...streamArgs], options).then(
+    if (!streamArgs) return executeCommand(built.command, built.args, command);
+    return executeCommand(built.command, [...built.args, ...streamArgs], command).then(
       (result) => ({
         ...result,
         stdout: this.foldStreamOutput(result.stdout, !result.timedOut && !result.aborted),

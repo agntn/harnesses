@@ -321,6 +321,46 @@ describe("normalized invocation", () => {
     expect(result.exitCode).toBeNull();
   });
 
+  it("tells the started harness which harness it runs inside", async () => {
+    const fake = registerHarness(
+      class extends FakeCursor {
+        override readonly invocation: Harness["invocation"] = {
+          args: ["-e", "console.log(process.env.AGNTN_HARNESSES_PARENT)"],
+          level: "inferred",
+        };
+      },
+    );
+
+    try {
+      const result = await fake.invoke("x", { tools: true, env: { AGNTN_HARNESSES_PARENT: "" } });
+
+      expect(result.stdout.trim()).toBe("cursor");
+    } finally {
+      registerHarness(Cursor);
+    }
+  });
+
+  it("refuses to start a harness inside one it started", async () => {
+    const fake = registerHarness(
+      class extends FakeCursor {
+        override readonly binaries = [join(tmpdir(), "agntn-missing-harness-binary")];
+      },
+    );
+    process.env.AGNTN_HARNESSES_PARENT = "grok";
+    try {
+      await expect(fake.invoke("x")).rejects.toThrow(
+        "Nested run refused: this process already runs inside grok",
+      );
+
+      const result = await runHarness("cursor", "x");
+      expect(result.isError).toBe(true);
+      expect(result.content[0]?.text).toContain("Failed to run cursor: Nested run refused");
+    } finally {
+      delete process.env.AGNTN_HARNESSES_PARENT;
+      registerHarness(Cursor);
+    }
+  });
+
   it("rejects invoking a harness without a headless mode", async () => {
     await expect(getHarness("mastracode").invoke("x")).rejects.toThrow(
       "no non-interactive invocation",
