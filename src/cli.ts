@@ -6,6 +6,7 @@ import { encode as toToon } from "@toon-format/toon";
 import { version, type AvailableModel, type InvokeResult } from "./types.ts";
 import { getAllHarnesses, getHarness, isHarnessId, listHarnesses } from "./registry.ts";
 import { listHarnessModels, type ModelsOutcome, type RunFailure } from "./tool-operations.ts";
+import { exitOnClosedPipe } from "./commands/output.ts";
 
 const s = {
   cyan: (t: string) => `\x1B[36m${t}\x1B[0m`,
@@ -396,6 +397,9 @@ const run = defineCommand({
     finishInvocation(result, timeoutSeconds);
   },
 });
+
+process.stdout.on("error", exitOnClosedPipe);
+process.stderr.on("error", exitOnClosedPipe);
 
 const main = defineCommand({
   meta: {

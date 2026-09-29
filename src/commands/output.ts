@@ -8,6 +8,19 @@ export const formatArgs = {
   toon: { type: "boolean" as const, description: "Output as TOON" },
 };
 
+/**
+ * Ends the process once the reader of stdout or stderr is gone, as after
+ * `| head -1` or a pager that quits early. Node ignores SIGPIPE, so without a
+ * listener the next write throws `EPIPE` with a stack trace. The exit code
+ * stays whatever the command set.
+ *
+ * @param error - The error the stream emitted.
+ */
+export function exitOnClosedPipe(error: Readonly<NodeJS.ErrnoException>): void {
+  if (error.code !== "EPIPE") throw error;
+  process.exit();
+}
+
 type OutputFormat = Readonly<{ json?: boolean; toon?: boolean }>;
 
 /** Control bytes removed from reports because they can echo untrusted configuration values. */
