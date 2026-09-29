@@ -6,4 +6,4 @@ Scope: public types, base harness behavior, registry-backed operations, CLI, and
 - Provider-specific parsing belongs in the owning `src/harnesses/<id>.ts` adapter.
 - Expected unsupported capabilities must fail explicitly; do not represent them as successful empty results.
 - Public API changes require tests and README examples.
-- Preserve the shared build bundle topology in `build.config.ts`.
+- Preserve the shared build bundle topology in the `pack` block of `vite.config.ts`.

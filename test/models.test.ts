@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { getHarness, registerHarness } from "../src/index.ts";
 import Antigravity, { parseAntigravityModels } from "../src/harnesses/antigravity.ts";
 import Grok, { parseGrokModels } from "../src/harnesses/grok.ts";

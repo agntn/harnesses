@@ -15,3 +15,4 @@ docs/.cache
 docs/.wrangler
 docs/.nuxt
 docs/.output
+.vitest/

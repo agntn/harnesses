@@ -1,7 +1,7 @@
 import { Type as OmpType } from "@oh-my-pi/omptype/typebox";
 import { IsSchema } from "typebox";
 import { Value } from "typebox/value";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 vi.mock("@oh-my-pi/pi-coding-agent", () => ({
   Text: class {

@@ -6,15 +6,15 @@ Metadata registry for AI coding harnesses. Paths, formats, detection rules, sess
 
 ```bash
 pnpm install              # install deps
-pnpm lint                 # build, then oxlint + oxfmt check
+pnpm lint                 # build, then vp lint + vp fmt check
 pnpm lint:fix             # auto-fix lint/format
 pnpm typecheck            # tsgo on src, build, then tsgo on the Pi/OMP extensions
-pnpm build                # obuild (library, CLI, MCP server, tool modules)
-pnpm test:run             # vitest --run
-pnpm test                 # vitest watch mode
+pnpm build                # vp pack (library, CLI, MCP server, tool modules)
+pnpm test:run             # vp test run
+pnpm test                 # vp test watch
 
 # single test
-pnpm vitest run test/index.test.ts -t "should detect a harness from env vars"
+pnpm exec vp test run test/index.test.ts -t "should detect a harness from env vars"
 ```
 
 Run order after changes: `lint` -> `typecheck` -> `build` -> `test:run`. CI does the same.
@@ -44,7 +44,7 @@ src/
   schemas/              # type-only session formats (claude, codex, gemini, opencode)
 packages/               # shipped Pi and OMP extension adapters plus their shared TUI
 test/                   # one Vitest file per area; index.test.ts covers registry, detection, resolution
-build.config.ts         # one obuild bundle over five inputs, so entries share registry state
+vite.config.ts          # Vite+ config: one pack bundle over five inputs, so entries share registry state; lint, fmt and test
 docs/                   # Docus site for harnesses.agntn.dev; own AGENTS.md, reads the registry from ../src at build time
 ```
 
@@ -66,7 +66,8 @@ Each harness class has: `config`, `sessions`, `persistence`, `instructions`, `sk
 
 - ESM-only, no CommonJS. `sideEffects: false` is safe because built-in harnesses are referenced explicitly by the constructor registry.
 - All local imports use `.ts` extensions (`import { Harness } from "./harness.ts"`) - required by nodenext moduleResolution.
-- `obuild` builds artifacts. `tsgo` is typecheck-only (`noEmit: true`).
+- `vp pack` builds artifacts. `tsgo` is typecheck-only (`noEmit: true`).
+- Tests import the Vitest API from `vite-plus/test`, not `vitest`.
 - Public API is barrel-driven via `src/index.ts`. Don't export from submodules directly.
 - Types from `src/schemas/` are type-only re-exports - no runtime code, no validators.
 - Session schema types use `unknown` for fields with unstable upstream shapes. That's intentional - don't add Zod or tighten types without confirming the upstream format is stable.
@@ -86,7 +87,7 @@ Don't weaken these. Fix the code instead.
 - No `as any`, `@ts-ignore`, or `@ts-expect-error`
 - No provider-specific data shapes in the top-level public API
 - No tests that depend on network or external services
-- No bypassing `build.config.ts` with ad-hoc build scripts
+- No bypassing `vite.config.ts` with ad-hoc build scripts
 - Don't commit CLAUDE.md files (gitignored, they're local context-mode config)
 
 ## Git
