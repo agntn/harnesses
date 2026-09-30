@@ -88,8 +88,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     ...statusRenderers("harnesses_detect"),
     async execute(_toolCallId, _params): Promise<AgentToolResult<HarnessTools.HarnessListing>> {
       const { detectHarnesses } = await loadToolOperations();
-      const { content, details } = detectHarnesses();
-      return { content, details };
+      return detectHarnesses();
     },
   });
 
@@ -111,8 +110,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       params: HarnessSchemas.InfoParams,
     ): Promise<AgentToolResult<HarnessTools.HarnessInfoDetails>> {
       const { harnessInfo } = await loadToolOperations();
-      const { content, details } = harnessInfo(params.id);
-      return { content, details };
+      return harnessInfo(params.id);
     },
   });
 
@@ -135,24 +133,12 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       signal,
     ): Promise<AgentToolResult<HarnessTools.ModelsOutcome | HarnessTools.RunFailure>> {
       const { listHarnessModels } = await loadToolOperations();
-      const { content, details, isError } = await listHarnessModels(params.id, {
+      return listHarnessModels(params.id, {
         search: params.search,
         cwd: params.cwd,
         timeoutSeconds: params.timeoutSeconds,
         signal,
       });
-      if (isError) {
-        const message =
-          "error" in details
-            ? details.error
-            : details.aborted
-              ? `Harness ${details.id} model listing aborted`
-              : details.timedOut
-                ? `Harness ${details.id} model listing timed out`
-                : details.stderr || `Harness ${details.id} exited with code ${details.exitCode}`;
-        throw new Error(message);
-      }
-      return { content, details };
     },
   });
 
@@ -177,7 +163,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       signal,
     ): Promise<AgentToolResult<HarnessTools.RunOutcome | HarnessTools.RunFailure>> {
       const { runHarness } = await loadToolOperations();
-      const { content, details, isError } = await runHarness(params.id, params.prompt, {
+      return runHarness(params.id, params.prompt, {
         cwd: params.cwd,
         model: params.model,
         timeoutSeconds: params.timeoutSeconds,
@@ -186,16 +172,6 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
         tools: params.tools,
         readOnly: params.readOnly,
       });
-      if (isError) {
-        if ("error" in details) throw new Error(details.error);
-        const message =
-          content[0]?.text ??
-          (details.timedOut
-            ? `Harness ${details.id} timed out`
-            : details.stderr || `Harness ${details.id} exited with code ${details.exitCode}`);
-        throw new Error(message);
-      }
-      return { content, details };
     },
   });
 
@@ -214,8 +190,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       params: HarnessSchemas.McpListParams,
     ): Promise<AgentToolResult<HarnessTools.McpListing | HarnessTools.UnknownHarness>> {
       const { mcpList } = await loadToolOperations();
-      const { content, details } = mcpList(params.id);
-      return { content, details };
+      return mcpList(params.id);
     },
   });
 
@@ -231,8 +206,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       params: HarnessSchemas.McpAddParams,
     ): Promise<AgentToolResult<HarnessTools.McpMutation | HarnessTools.RunFailure>> {
       const { mcpAdd } = await loadToolOperations();
-      const { content, details } = mcpAdd(params.id, params, params.scope ?? "user");
-      return { content, details };
+      return mcpAdd(params.id, params, params.scope ?? "user");
     },
   });
 
@@ -248,8 +222,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       params: HarnessSchemas.McpSyncParams,
     ): Promise<AgentToolResult<HarnessTools.SyncReport | HarnessTools.RunFailure>> {
       const { mcpSync } = await loadToolOperations();
-      const { content, details } = mcpSync(params.id);
-      return { content, details };
+      return mcpSync(params.id);
     },
   });
 
@@ -265,8 +238,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       params: HarnessSchemas.AgentsSyncParams,
     ): Promise<AgentToolResult<HarnessTools.AgentsSyncReport | HarnessTools.RunFailure>> {
       const { agentsSync } = await loadToolOperations();
-      const { content, details } = agentsSync(params.id, params.check === true);
-      return { content, details };
+      return agentsSync(params.id, params.check === true);
     },
   });
 
@@ -282,13 +254,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       params: Readonly<HarnessSchemas.PromptsSyncParams>,
     ): Promise<AgentToolResult<HarnessTools.PromptSyncReport | HarnessTools.RunFailure>> {
       const { promptsSync } = await loadToolOperations();
-      const { content, details, isError } = promptsSync(params.id, params.check === true);
-      if (isError) {
-        throw new Error(
-          "error" in details ? details.error : (content[0]?.text ?? "Prompt sync failed"),
-        );
-      }
-      return { content, details };
+      return promptsSync(params.id, params.check === true);
     },
   });
 
@@ -304,13 +270,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       params: Readonly<HarnessSchemas.SkillsSyncParams>,
     ): Promise<AgentToolResult<HarnessTools.SkillsSyncReport | HarnessTools.RunFailure>> {
       const { skillsSync } = await loadToolOperations();
-      const { content, details, isError } = skillsSync(params.id, params.check === true);
-      if (isError) {
-        throw new Error(
-          "error" in details ? details.error : (content[0]?.text ?? "Skill sync failed"),
-        );
-      }
-      return { content, details };
+      return skillsSync(params.id, params.check === true);
     },
   });
 
@@ -326,8 +286,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       params: HarnessSchemas.McpRemoveParams,
     ): Promise<AgentToolResult<HarnessTools.McpMutation | HarnessTools.RunFailure>> {
       const { mcpRemove } = await loadToolOperations();
-      const { content, details } = mcpRemove(params.id, params.name, params.scope ?? "user");
-      return { content, details };
+      return mcpRemove(params.id, params.name, params.scope ?? "user");
     },
   });
 }

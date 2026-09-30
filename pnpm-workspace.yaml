@@ -31,6 +31,13 @@ minimumReleaseAgeExclude:
   - "@oxlint-tsgolint/linux-x64@7.0.2002"
   - "@oxlint-tsgolint/win32-arm64@7.0.2002"
   - "@oxlint-tsgolint/win32-x64@7.0.2002"
+  - "@earendil-works/chord@0.99.1"
+  - "@earendil-works/pi-ai@0.99.1"
+  - "@earendil-works/pi-codemode@0.99.1"
+  - "@earendil-works/pi-coding-agent@0.99.1"
+  - "@earendil-works/pi-mcp@0.99.1"
+  - "@earendil-works/pi-telemetry@0.99.1"
+  - "@earendil-works/pi-tui@0.99.1"
 catalog:
   vite: npm:@voidzero-dev/vite-plus-core@1.0.0
   vite-plus: 1.0.0
