@@ -1,6 +1,31 @@
 # Changelog
 
 
+## v0.3.1
+
+[compare changes](https://github.com/agntn/harnesses/compare/v0.3.0...v0.3.1)
+
+### 🚀 Enhancements
+
+- Share one skills folder across harnesses ([#89](https://github.com/agntn/harnesses/pull/89))
+- **docs:** Redraw the site as agntn instruments ([#98](https://github.com/agntn/harnesses/pull/98))
+
+### 🩹 Fixes
+
+- Refuse a harness nested in another ([#103](https://github.com/agntn/harnesses/pull/103))
+- **mcp:** End runs when the client goes away ([#106](https://github.com/agntn/harnesses/pull/106))
+- **cli:** Survive a reader that quits early ([#107](https://github.com/agntn/harnesses/pull/107))
+- **pi:** Leave typebox and failures to Pi 0.99 ([#114](https://github.com/agntn/harnesses/pull/114))
+
+### 🏡 Chore
+
+- Vite+ builds, lints and tests the package ([#108](https://github.com/agntn/harnesses/pull/108))
+
+### ❤️ Contributors
+
+- Ori ([@oritwoen](https://github.com/oritwoen))
+- Aeitwoen ([@aeitwoen](https://github.com/aeitwoen))
+
 ## v0.3.0
 
 [compare changes](https://github.com/agntn/harnesses/compare/v0.2.1...v0.3.0)
