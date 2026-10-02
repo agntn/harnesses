@@ -184,6 +184,26 @@ export default class Pi extends Harness {
     level: "official",
     note: "Lists models with configured provider authentication; accepts an optional fuzzy search.",
   };
+  override readonly mcpConfigs: Harness["mcpConfigs"] = [
+    {
+      path: "~/.pi/agent/mcp.json",
+      scope: "user",
+      level: "official",
+      format: "json",
+      key: ["mcpServers"],
+      dialect: "pi",
+      note: "Read by the built-in MCP extension, which -builtin:mcp in the extensions setting turns off.",
+    },
+    {
+      path: ".pi/mcp.json",
+      scope: "project",
+      level: "official",
+      format: "json",
+      key: ["mcpServers"],
+      dialect: "pi",
+      note: "Read only after the project is trusted.",
+    },
+  ];
   override readonly envOverrides: Harness["envOverrides"] = [
     {
       variable: "PI_CODING_AGENT_DIR",

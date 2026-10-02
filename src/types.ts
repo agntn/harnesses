@@ -215,10 +215,11 @@ export interface McpConfigFile extends PathCandidate {
   key: string[];
   /**
    * Shape of individual entries; "standard" is the {command, args, env, url}
-   * family, "prime" is that family with env values as {"env": "NAME"} references
-   * and "mastracode" is that family read by its keys alone, type ignored.
+   * family, "prime" is that family with env values as {"env": "NAME"} references,
+   * "mastracode" is that family read by its keys alone, type ignored, and "pi"
+   * is that family without sse that keeps the entry fields it doesn't manage.
    */
-  dialect: "standard" | "antigravity" | "mastracode" | "opencode" | "prime" | "vscode";
+  dialect: "standard" | "antigravity" | "mastracode" | "opencode" | "pi" | "prime" | "vscode";
 }
 
 export interface HarnessDetection {

@@ -1,12 +1,13 @@
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { afterEach, describe, expect, it, onTestFinished, vi } from "vite-plus/test";
 import {
   addMcpServer,
   getHarness,
   listMcpServers,
   McpEnvError,
+  McpTransportError,
   registerHarness,
   removeMcpServer,
   syncMcpServers,
@@ -262,6 +263,38 @@ describe("listMcpServers", () => {
     ]);
   });
 
+  it("reads Pi mcp.json at both scopes", () => {
+    const dirs = fixtureDirs();
+    onTestFinished(() => rmSync(dirname(dirs.homeDir), { recursive: true, force: true }));
+    const userConfig = join(dirs.homeDir, ".pi", "agent", "mcp.json");
+    const projectConfig = join(dirs.projectRoot, ".pi", "mcp.json");
+    mkdirSync(dirname(userConfig), { recursive: true });
+    mkdirSync(dirname(projectConfig), { recursive: true });
+    writeFileSync(
+      userConfig,
+      JSON.stringify({
+        autoEnableCodemode: true,
+        mcpServers: {
+          wiki: { command: "wiki-mcp", args: ["serve"], exposure: "direct", enabled: false },
+          docs: { type: "streamable-http", url: "https://example.com/mcp", timeout: 30 },
+        },
+      }),
+    );
+    writeFileSync(projectConfig, JSON.stringify({ mcpServers: { tools: { command: "uvx" } } }));
+
+    const listings = listMcpServers(getHarness("pi"), dirs);
+
+    expect(listings.map((l) => [l.scope, l.path])).toEqual([
+      ["user", userConfig],
+      ["project", projectConfig],
+    ]);
+    expect(listings[0]?.servers).toEqual([
+      { name: "wiki", transport: "stdio", command: "wiki-mcp", args: ["serve"], enabled: false },
+      { name: "docs", transport: "http", url: "https://example.com/mcp" },
+    ]);
+    expect(listings[1]?.servers).toEqual([{ name: "tools", transport: "stdio", command: "uvx" }]);
+  });
+
   it("normalizes the Antigravity serverUrl dialect", () => {
     const dirs = fixtureDirs();
     const configDir = join(dirs.homeDir, ".gemini", "config");
@@ -428,6 +461,57 @@ describe("addMcpServer / removeMcpServer", () => {
     const raw = parseJsonRecord(join(dirs.homeDir, ".claude.json"));
     expect(raw.theme).toBe("dark");
     expect(Object.keys(nestedRecord(raw, "mcpServers")).sort()).toEqual(["extra", "keep"]);
+  });
+
+  it("keeps the fields Pi adds to an entry while its transport stays", () => {
+    const dirs = fixtureDirs();
+    onTestFinished(() => rmSync(dirname(dirs.homeDir), { recursive: true, force: true }));
+    const pi = getHarness("pi");
+    const config = join(dirs.homeDir, ".pi", "agent", "mcp.json");
+    mkdirSync(dirname(config), { recursive: true });
+    writeFileSync(
+      config,
+      JSON.stringify({
+        mcpServers: {
+          wiki: {
+            command: "old",
+            cwd: "~/wiki",
+            exposure: "direct",
+            description: "Search the wiki",
+          },
+          docs: { url: "https://example.com/mcp", oauth: { clientId: "pi" }, timeout: 30 },
+        },
+      }),
+    );
+
+    addMcpServer(pi, { name: "wiki", transport: "stdio", command: "wiki-mcp" }, "user", dirs);
+    addMcpServer(pi, { name: "docs", transport: "stdio", command: "docs-mcp" }, "user", dirs);
+
+    expect(nestedRecord(parseJsonRecord(config), "mcpServers")).toEqual({
+      wiki: {
+        type: "stdio",
+        command: "wiki-mcp",
+        cwd: "~/wiki",
+        exposure: "direct",
+        description: "Search the wiki",
+      },
+      docs: { type: "stdio", command: "docs-mcp" },
+    });
+  });
+
+  it("refuses an sse server for Pi", () => {
+    const dirs = fixtureDirs();
+    onTestFinished(() => rmSync(dirname(dirs.homeDir), { recursive: true, force: true }));
+
+    expect(() =>
+      addMcpServer(
+        getHarness("pi"),
+        { name: "events", transport: "sse", url: "https://example.com/sse" },
+        "project",
+        dirs,
+      ),
+    ).toThrow(McpTransportError);
+    expect(existsSync(join(dirs.projectRoot, ".pi", "mcp.json"))).toBe(false);
   });
 
   it("writes the Antigravity serverUrl dialect shape", () => {
@@ -748,6 +832,46 @@ describe("syncMcpServers", () => {
     }
   });
 
+  it("syncs Pi and skips an sse server it cannot hold", () => {
+    const dirs = fixtureDirs();
+    onTestFinished(() => rmSync(dirname(dirs.homeDir), { recursive: true, force: true }));
+    const previousXdg = process.env.XDG_CONFIG_HOME;
+    delete process.env.XDG_CONFIG_HOME;
+    try {
+      writeMaster(
+        dirs.homeDir,
+        JSON.stringify({
+          mcpServers: {
+            probe: { command: "node", args: ["srv.mjs"] },
+            events: { type: "sse", url: "https://example.com/sse" },
+          },
+        }),
+      );
+
+      const first = syncMcpServers([getHarness("pi")], dirs);
+      expect(targetResults(first.targets, "pi")).toEqual([
+        { name: "probe", action: "added" },
+        {
+          name: "events",
+          action: "skipped",
+          reason: expect.stringContaining("not sse") as string,
+        },
+      ]);
+      const raw = parseJsonRecord(join(dirs.homeDir, ".pi", "agent", "mcp.json"));
+      expect(nestedRecord(raw, "mcpServers")).toEqual({
+        probe: { type: "stdio", command: "node", args: ["srv.mjs"] },
+      });
+
+      const second = syncMcpServers([getHarness("pi")], dirs);
+      expect(targetResults(second.targets, "pi").map((r) => r.action)).toEqual([
+        "unchanged",
+        "skipped",
+      ]);
+    } finally {
+      if (previousXdg !== undefined) process.env.XDG_CONFIG_HOME = previousXdg;
+    }
+  });
+
   it("reports a literal Prime Agent env as skipped even when the file already holds it", () => {
     const dirs = fixtureDirs();
     const previousXdg = process.env.XDG_CONFIG_HOME;
@@ -785,10 +909,7 @@ describe("syncMcpServers", () => {
         JSON.stringify({ mcpServers: { probe: { type: "stdio", command: "old" } } }),
       );
 
-      const report = syncMcpServers(
-        [getHarness("claude"), getHarness("github-copilot"), getHarness("pi")],
-        dirs,
-      );
+      const report = syncMcpServers([getHarness("claude"), getHarness("github-copilot")], dirs);
 
       const claude = report.targets.find((t) => t.id === "claude");
       expect(claude?.results).toEqual([
@@ -798,7 +919,6 @@ describe("syncMcpServers", () => {
       expect(report.targets.find((t) => t.id === "github-copilot")?.skipped).toContain(
         "no user-scope",
       );
-      expect(report.targets.find((t) => t.id === "pi")?.skipped).toContain("no user-scope");
     } finally {
       if (previousXdg !== undefined) process.env.XDG_CONFIG_HOME = previousXdg;
     }
