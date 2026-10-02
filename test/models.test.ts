@@ -295,6 +295,45 @@ describe("model listing", () => {
     );
   });
 
+  it("keeps successful listing stderr out of content sent to the model", async () => {
+    const result = await listHarnessModels("antigravity");
+
+    expect(result.isError).toBeUndefined();
+    expect(result.details).toMatchObject({ stderr: "Fetching available models...\n" });
+    expect(result.content[0]?.text).toContain("gemini-3.1-pro-low");
+    expect(result.content[0]?.text).not.toMatch(/^stderr/m);
+  });
+
+  it("shows failed listing stderr as plain text", async () => {
+    registerHarness(
+      class extends FakeGrok {
+        override readonly modelListing: Grok["modelListing"] = {
+          args: [
+            "-e",
+            `process.stderr.write("\\u001B[31mERROR\\u001B[0m not logged in\\n"); process.exit(2)`,
+          ],
+          level: "inferred",
+        };
+      },
+    );
+
+    try {
+      const result = await listHarnessModels("grok");
+      const content = result.content[0]?.text ?? "";
+
+      expect(result.isError).toBe(true);
+      expect(result.details).toMatchObject({
+        exitCode: 2,
+        stderr: "\u001B[31mERROR\u001B[0m not logged in\n",
+      });
+      expect(content).toContain("stderr:\nERROR not logged in");
+      expect(content).not.toContain("\u001B");
+      expect(content).not.toContain('stderr: "');
+    } finally {
+      registerHarness(FakeGrok);
+    }
+  });
+
   it("lists Antigravity models past the stderr progress line and filters them locally", async () => {
     const antigravity = getHarness("antigravity");
 
