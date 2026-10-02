@@ -57,16 +57,10 @@ function tool(tools: readonly unknown[], name: string): Record<string, unknown> 
 async function expectFailure(
   definition: Readonly<Record<string, unknown>>,
   args: readonly unknown[],
-  omp: boolean,
   message: string,
 ): Promise<void> {
   if (typeof definition.execute !== "function") throw new Error("Missing execute");
-  const result: unknown = Reflect.apply(definition.execute, definition, ["call", ...args]);
-  if (omp) {
-    await expect(result).rejects.toThrow(message);
-    return;
-  }
-  const settled: unknown = await result;
+  const settled: unknown = await Reflect.apply(definition.execute, definition, ["call", ...args]);
   if (!isRecord(settled) || !Array.isArray(settled.content)) throw new Error("Missing content");
   expect(settled.isError).toBe(true);
   expect(settled.details).toBeDefined();
@@ -124,41 +118,14 @@ describe("Pi and OMP extension renderers", () => {
   });
 
   it("returns retry guidance through both host adapters", async () => {
-    for (const [definitions, omp] of [
-      [piTools, false],
-      [ompTools, true],
-    ] as const) {
+    for (const definitions of [piTools, ompTools]) {
       await expectFailure(
         tool(definitions, "harnesses_run"),
         [{ id: "github-copilot", prompt: "inspect", structured: true, tools: false }],
-        omp,
         "retry with structured: false and tools: true",
       );
     }
   });
-
-  it.each(["harnesses_prompts_sync", "harnesses_skills_sync"])(
-    "propagates %s failures through both host adapters",
-    async (name) => {
-      await expectFailure(
-        tool(piTools, name),
-        [{ id: "unknown" }],
-        false,
-        "Unknown harness: unknown",
-      );
-
-      const ompDefinition = tool(ompTools, name);
-      if (typeof ompDefinition.execute !== "function") throw new TypeError("Missing execute");
-      const ompResult: unknown = await Reflect.apply(ompDefinition.execute, ompDefinition, [
-        "call",
-        { id: "unknown" },
-      ]);
-      expect(ompResult).toMatchObject({
-        isError: true,
-        details: { error: "Unknown harness: unknown" },
-      });
-    },
-  );
 
   it("forwards cancellation from both hosts to runs and model listings", async () => {
     registerHarness(
@@ -169,15 +136,11 @@ describe("Pi and OMP extension renderers", () => {
       },
     );
     try {
-      for (const [definitions, omp] of [
-        [piTools, false],
-        [ompTools, true],
-      ] as const) {
+      for (const definitions of [piTools, ompTools]) {
         for (const name of ["harnesses_run", "harnesses_models"]) {
           await expectFailure(
             tool(definitions, name),
             [{ id: "cursor", prompt: "x", tools: true }, AbortSignal.abort()],
-            omp,
             "aborted",
           );
         }
@@ -199,14 +162,10 @@ describe("Pi and OMP extension renderers", () => {
     );
 
     try {
-      for (const [definitions, omp] of [
-        [piTools, false],
-        [ompTools, true],
-      ] as const) {
+      for (const definitions of [piTools, ompTools]) {
         await expectFailure(
           tool(definitions, "harnesses_run"),
           [{ id: "cursor", prompt: "inspect", tools: true }],
-          omp,
           "partial-result",
         );
       }
@@ -218,10 +177,16 @@ describe("Pi and OMP extension renderers", () => {
   it.each([
     ["harnesses_info", { id: "unknown" }],
     ["harnesses_mcp_list", { id: "unknown" }],
+    ["harnesses_mcp_add", { id: "unknown", name: "probe", command: "probe" }],
+    ["harnesses_mcp_remove", { id: "unknown", name: "probe" }],
     ["harnesses_mcp_sync", { id: "unknown" }],
     ["harnesses_agents_sync", { id: "unknown" }],
-  ])("marks a failed %s result as an error in Pi", async (name, args) => {
-    await expectFailure(tool(piTools, name), [args], false, "Unknown harness: unknown");
+    ["harnesses_prompts_sync", { id: "unknown" }],
+    ["harnesses_skills_sync", { id: "unknown" }],
+  ])("marks a failed %s result as an error in both hosts", async (name, args) => {
+    for (const definitions of [piTools, ompTools]) {
+      await expectFailure(tool(definitions, name), [args], "Unknown harness: unknown");
+    }
   });
 
   it("prepares serialized Pi metadata batches before validation", () => {
