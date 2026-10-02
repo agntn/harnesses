@@ -187,6 +187,11 @@ type RunStatus = Readonly<Omit<RunOutcome, "args" | "stdout" | "stderr">> & {
   readonly args: readonly string[];
 };
 
+type ListingStatus = Readonly<Omit<ModelsOutcome, "args" | "models" | "stderr">> & {
+  readonly args: readonly string[];
+  readonly models: readonly Readonly<AvailableModel>[];
+};
+
 type RunStreams = Readonly<Partial<Pick<RunOutcome, "stdout" | "stderr">>>;
 
 // oxlint-disable-next-line no-control-regex -- Terminal control bytes are precisely what this boundary removes.
@@ -203,15 +208,17 @@ function plainOutput(output: string): string {
 }
 
 /**
- * Lays the run out for the model: the TOON status block, then each stream under
- * its name as plain text, since quoting a markdown answer into one TOON string
- * escaped every code block and cost about a tenth more tokens.
+ * Lays a run or listing out as a TOON status block, then each stream as plain text:
+ * quoting a markdown answer into TOON escaped every code block and cost a tenth more tokens.
  *
- * @param outcome - The run without its output.
+ * @param outcome - The run or listing without its output.
  * @param streams - The capped streams; empty ones are left out.
  * @returns {Array<{ type: "text"; text: string }>} The text handed to the model.
  */
-function runText(outcome: RunStatus, streams: RunStreams): Array<{ type: "text"; text: string }> {
+function runText(
+  outcome: RunStatus | ListingStatus,
+  streams: RunStreams,
+): Array<{ type: "text"; text: string }> {
   const blocks = [toToon(outcome)];
   for (const name of ["stdout", "stderr"] as const) {
     const output = streams[name];
@@ -484,7 +491,7 @@ function completedListing(
   models: readonly Readonly<AvailableModel>[],
   search: string | undefined,
 ): ToolResult<ModelsOutcome> {
-  const details: ModelsOutcome = {
+  const contentOutcome: Omit<ModelsOutcome, "stderr"> = {
     id,
     command: result.command,
     args: [...result.args],
@@ -494,14 +501,13 @@ function completedListing(
     timedOut: result.timedOut,
     aborted: result.aborted,
     ...(result.idleMs === undefined ? {} : { idleMs: result.idleMs }),
-    stderr: truncate(result.stderr),
   };
-
-  return {
-    content: text(details),
-    details,
-    ...(result.timedOut || result.exitCode !== 0 ? { isError: true } : {}),
-  };
+  const stderr = truncate(result.stderr);
+  const details: ModelsOutcome = { ...contentOutcome, stderr };
+  if (result.timedOut || result.exitCode !== 0) {
+    return { content: runText(contentOutcome, { stderr }), details, isError: true };
+  }
+  return { content: runText(contentOutcome, {}), details };
 }
 
 /** Options accepted by {@link runHarness}. */
