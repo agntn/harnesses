@@ -185,6 +185,11 @@ export class McpEnvError extends Error {
   override readonly name = "McpEnvError";
 }
 
+/** Thrown when the target dialect cannot carry a server's transport. */
+export class McpTransportError extends Error {
+  override readonly name = "McpTransportError";
+}
+
 function envReference(value: string): string | undefined {
   return ENV_REFERENCE.exec(value)?.[1];
 }
@@ -374,6 +379,7 @@ function resolveEnvReferences(
 
 /**
  * Env references per {@link resolveEnvReferences}, minus `sse` and `enabled` for Mastra Code.
+ * Pi rejects `sse`, and an sse url is rarely the streamable HTTP endpoint, so it's refused.
  *
  * @param server - Normalized server from the master list or a caller.
  * @param dialect - Target harness config dialect.
@@ -384,6 +390,11 @@ function shapeForDialect(
   dialect: McpConfigFile["dialect"],
 ): McpServerConfig {
   const shaped = resolveEnvReferences(server, dialect);
+  if (dialect === "pi" && shaped.transport === "sse") {
+    throw new McpTransportError(
+      `${server.name}: Pi takes stdio and streamable HTTP servers, not sse; point url at the server's streamable HTTP endpoint`,
+    );
+  }
   if (dialect !== "mastracode") return shaped;
   return compact({
     ...shaped,
@@ -408,6 +419,38 @@ function denormalizeEntry(
   if (dialect === "opencode") return denormalizeOpenCode(server);
   if (dialect === "prime") return denormalizePrime(server);
   return denormalizeStandard(server);
+}
+
+/** Entry fields the standard family reads or writes; Pi keeps the rest on a replace. */
+const STANDARD_FIELDS: ReadonlySet<string> = new Set([
+  "type",
+  "command",
+  "args",
+  "env",
+  "url",
+  "httpUrl",
+  "headers",
+  "enabled",
+]);
+
+/**
+ * A Pi entry that keeps its transport keeps `exposure`, `description` and the other fields Pi adds.
+ *
+ * @param previous - Raw entry stored under the server name, if any.
+ * @param server - Normalized server being written.
+ * @param dialect - Target harness config dialect.
+ * @returns {Record<string, unknown>} The raw entry to store.
+ */
+function replacementEntry(
+  previous: unknown,
+  server: McpServerConfig,
+  dialect: McpConfigFile["dialect"],
+): Record<string, unknown> {
+  const entry = denormalizeEntry(server, dialect);
+  if (dialect !== "pi" || !isObjectRecord(previous)) return entry;
+  if (normalizeStandard(server.name, previous).transport !== server.transport) return entry;
+  const kept = Object.entries(previous).filter(([key]) => !STANDARD_FIELDS.has(key));
+  return { ...entry, ...Object.fromEntries(kept) };
 }
 
 function listingBase(entry: McpConfigFile, path: string): McpConfigListing {
@@ -653,7 +696,7 @@ export function addMcpServer(
   if (!map) throw new Error(`Config at ${path} has a non-object at ${entry.key.join(".")}`);
 
   const replaced = Object.hasOwn(map, server.name);
-  map[server.name] = denormalizeEntry(resolved, entry.dialect);
+  map[server.name] = replacementEntry(map[server.name], resolved, entry.dialect);
   writeAtomically(path, `${JSON.stringify(root, null, 2)}\n`);
   return { path, replaced };
 }
@@ -939,6 +982,16 @@ function withdrawMasterServersFromExcludedHarness(
   return { id: harness.id, ...optionalPath(path), excluded: true, results };
 }
 
+/**
+ * A server the target dialect cannot hold, skipped in a sync instead of stopping it.
+ *
+ * @param error - Error thrown while shaping or writing one server.
+ * @returns {boolean} Whether the error is one of the refusals a sync reports.
+ */
+function cannotHold(error: unknown): error is McpEnvError | McpTransportError {
+  return error instanceof McpEnvError || error instanceof McpTransportError;
+}
+
 function syncIncludedHarness(
   harness: Harness,
   master: MasterSyncInput,
@@ -962,7 +1015,7 @@ function syncIncludedHarness(
       results.push({ name: server.name, action: written.replaced ? "replaced" : "added" });
     } catch (error) {
       // One server the dialect cannot hold must not stop the rest of the list.
-      if (!(error instanceof McpEnvError)) throw error;
+      if (!cannotHold(error)) throw error;
       results.push({ name: server.name, action: "skipped", reason: error.message });
     }
   }
