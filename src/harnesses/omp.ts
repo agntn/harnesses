@@ -1,4 +1,44 @@
 import { Harness } from "../harness.ts";
+import type { AvailableModel } from "../types.ts";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Parses `omp models --json`, where `reasoning` is the flag Pi prints as `thinking`.
+ *
+ * @param stdout - Native model-listing output.
+ * @returns {AvailableModel[]} The listed models, in the CLI's order.
+ */
+export function parseOmpModels(stdout: string): AvailableModel[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stdout);
+  } catch {
+    throw new Error(`Unexpected OMP model-list output: ${JSON.stringify(stdout.slice(0, 200))}`);
+  }
+  if (!isRecord(parsed) || !Array.isArray(parsed["models"]))
+    throw new Error(`Unexpected OMP model-list output: ${JSON.stringify(stdout.slice(0, 200))}`);
+
+  return parsed["models"].map((entry: unknown) => {
+    if (
+      !isRecord(entry) ||
+      typeof entry["provider"] !== "string" ||
+      typeof entry["id"] !== "string"
+    )
+      throw new Error(`Unexpected OMP model-list entry: ${JSON.stringify(entry)}`);
+    const { contextWindow, maxTokens, reasoning, input } = entry;
+    return {
+      provider: entry["provider"],
+      id: entry["id"],
+      ...(typeof contextWindow === "number" ? { contextWindow } : {}),
+      ...(typeof maxTokens === "number" ? { maxOutputTokens: maxTokens } : {}),
+      ...(typeof reasoning === "boolean" ? { thinking: reasoning } : {}),
+      ...(Array.isArray(input) ? { images: input.includes("image") } : {}),
+    };
+  });
+}
 
 export default class Omp extends Harness {
   readonly id = "omp";
@@ -163,6 +203,12 @@ export default class Omp extends Harness {
     level: "official",
     note: "Add --mode json for structured event output. --no-tools disables only OMP's bundled tools, so it cannot provide an advisor mode without tools.",
   };
+  override readonly modelListing: Harness["modelListing"] = {
+    args: ["models", "--json", "--kind", "chat", "--no-extensions"],
+    searchArgs: ["models", "find", "--json", "--kind", "chat", "--no-extensions", "--", "{search}"],
+    level: "official",
+    note: "Lists chat models with configured provider authentication as JSON; find matches a substring of the provider, id or name, ignoring case. --no-extensions keeps extension load errors out of the run; verified with 18.4.10.",
+  };
   override readonly mcpConfigs: Harness["mcpConfigs"] = [
     {
       path: "~/.omp/agent/mcp.json",
@@ -196,4 +242,8 @@ export default class Omp extends Harness {
     envVars: ["OMP_PROFILE", "PI_CODING_AGENT_DIR"],
     projectMarkers: [".omp"],
   };
+
+  protected override parseModelListingOutput(stdout: string): AvailableModel[] {
+    return parseOmpModels(stdout);
+  }
 }
