@@ -1,6 +1,33 @@
 # Changelog
 
 
+## v0.4.0
+
+[compare changes](https://github.com/agntn/harnesses/compare/v0.3.1...v0.4.0)
+
+### 🚀 Enhancements
+
+- **pi:** Manage the built-in MCP config ([#120](https://github.com/agntn/harnesses/pull/120))
+- **omp:** List models through omp models ([#122](https://github.com/agntn/harnesses/pull/122))
+
+### 🩹 Fixes
+
+- **mcp:** Keep listing stderr out of the answer ([#121](https://github.com/agntn/harnesses/pull/121))
+- **omp:** Stop failed tools reading as success ([#125](https://github.com/agntn/harnesses/pull/125))
+
+### 🏡 Chore
+
+- ⚠️  Move to Node.js 26 ([#123](https://github.com/agntn/harnesses/pull/123))
+
+#### ⚠️ Breaking Changes
+
+- ⚠️  Move to Node.js 26 ([#123](https://github.com/agntn/harnesses/pull/123))
+
+### ❤️ Contributors
+
+- Aeitwoen ([@aeitwoen](https://github.com/aeitwoen))
+- Ori ([@oritwoen](https://github.com/oritwoen))
+
 ## v0.3.1
 
 [compare changes](https://github.com/agntn/harnesses/compare/v0.3.0...v0.3.1)
