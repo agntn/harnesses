@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { getHarness, registerHarness } from "../src/index.ts";
 import Antigravity, { parseAntigravityModels } from "../src/harnesses/antigravity.ts";
 import Grok, { parseGrokModels } from "../src/harnesses/grok.ts";
+import Omp, { parseOmpModels } from "../src/harnesses/omp.ts";
 import Pi, { parsePiModelTable } from "../src/harnesses/pi.ts";
 import PrimeAgent from "../src/harnesses/prime-agent.ts";
 import { listHarnessModels, runHarness } from "../src/tool-operations.ts";
@@ -31,6 +32,22 @@ const AGY_MODELS_OUTPUT = [
   "gpt-oss-120b-medium\tGPT-OSS 120B (Medium)",
   "",
 ].join("\n");
+
+/** Verbatim `omp models --json --kind chat` entries from omp 18.4.10. */
+const OMP_MODELS_OUTPUT = `{"models":[
+{"provider":"openai-codex","kind":"chat","id":"gpt-5.5","selector":"openai-codex/gpt-5.5","name":"GPT-5.5","contextWindow":272000,"maxTokens":128000,"reasoning":true,"thinking":["low","medium","high","xhigh"],"input":["text","image"],"cost":{"input":5,"output":30,"cacheRead":0.5,"cacheWrite":0},"pricingStatus":"fixed"},
+{"provider":"xai-oauth","kind":"chat","id":"grok-build","selector":"xai-oauth/grok-build","name":"Grok Build","contextWindow":512000,"maxTokens":512000,"reasoning":true,"thinking":null,"input":["text","image"],"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0},"pricingStatus":"unknown"},
+{"provider":"opencode-go","kind":"chat","id":"omen-alpha","selector":"opencode-go/omen-alpha","name":"omen-alpha","contextWindow":null,"maxTokens":null,"reasoning":false,"thinking":null,"input":["text"],"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0},"pricingStatus":"unknown"}
+]}
+`;
+
+class FakeOmp extends Omp {
+  override readonly binaries = ["node"];
+  override readonly modelListing: Omp["modelListing"] = {
+    args: ["-e", `process.stdout.write(${JSON.stringify(OMP_MODELS_OUTPUT)})`],
+    level: "inferred",
+  };
+}
 
 class FakeAntigravity extends Antigravity {
   override readonly binaries = ["node"];
@@ -78,12 +95,14 @@ describe("model listing", () => {
     registerHarness(FakePi);
     registerHarness(FakeGrok);
     registerHarness(FakeAntigravity);
+    registerHarness(FakeOmp);
   });
 
   afterAll(() => {
     registerHarness(Pi);
     registerHarness(Grok);
     registerHarness(Antigravity);
+    registerHarness(Omp);
   });
 
   it("exposes the Pi model-listing command", () => {
@@ -341,5 +360,68 @@ describe("model listing", () => {
     expect((await antigravity.listModels({ search: "CLAUDE" })).models).toEqual([
       { provider: "google", id: "claude-opus-4-6-thinking" },
     ]);
+  });
+
+  it("exposes the OMP chat model listing and passes the search after --", () => {
+    const omp = new Omp();
+
+    expect(omp.buildModelListInvocation()).toEqual({
+      command: "omp",
+      args: ["models", "--json", "--kind", "chat", "--no-extensions"],
+    });
+    expect(omp.buildModelListInvocation("--config=evil.yml")).toEqual({
+      command: "omp",
+      args: [
+        "models",
+        "find",
+        "--json",
+        "--kind",
+        "chat",
+        "--no-extensions",
+        "--",
+        "--config=evil.yml",
+      ],
+    });
+  });
+
+  it("parses the OMP model list and leaves out limits it does not print", () => {
+    expect(parseOmpModels(OMP_MODELS_OUTPUT)).toEqual([
+      {
+        provider: "openai-codex",
+        id: "gpt-5.5",
+        contextWindow: 272_000,
+        maxOutputTokens: 128_000,
+        thinking: true,
+        images: true,
+      },
+      {
+        provider: "xai-oauth",
+        id: "grok-build",
+        contextWindow: 512_000,
+        maxOutputTokens: 512_000,
+        thinking: true,
+        images: true,
+      },
+      { provider: "opencode-go", id: "omen-alpha", thinking: false, images: false },
+    ]);
+    expect(parseOmpModels('{"models":[]}\n')).toEqual([]);
+  });
+
+  it("rejects OMP output it does not recognize", () => {
+    expect(() => parseOmpModels("Failed to load extension\n")).toThrow(
+      "Unexpected OMP model-list output",
+    );
+    expect(() => parseOmpModels('{"models":{}}')).toThrow("Unexpected OMP model-list output");
+    expect(() => parseOmpModels('{"models":[{"id":"gpt-5.5"}]}')).toThrow(
+      "Unexpected OMP model-list entry",
+    );
+  });
+
+  it("lists OMP models through the shared tool operation", async () => {
+    const result = await listHarnessModels("omp");
+
+    expect(result.isError).toBeUndefined();
+    expect("models" in result.details ? result.details.models : []).toHaveLength(3);
+    expect(result.content[0]?.text).toContain("openai-codex/gpt-5.5");
   });
 });
