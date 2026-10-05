@@ -27,6 +27,7 @@ const homeDir = ref("/home/dev");
 const projectRoot = ref("/srv/app");
 const mode = ref<ModeKey>("advisor");
 const model = ref("");
+const effort = ref("");
 const prompt = ref(DEFAULT_PROMPT);
 
 const harness = computed(() => harnessEntry(id.value) ?? HARNESSES[0]!);
@@ -51,10 +52,21 @@ const groups = computed(() =>
 const shownPaths = computed(() => groups.value.reduce((sum, row) => sum + row.entries.length, 0));
 
 const built = computed(() =>
-  buildCommand(harness.value, mode.value, prompt.value, model.value || undefined),
+  buildCommand(
+    harness.value,
+    mode.value,
+    prompt.value,
+    model.value || undefined,
+    effort.value || undefined,
+  ),
 );
 const spawned = computed(() => (built.value ? shellLine(built.value) : null));
-const invokeError = computed(() => invocationError(harness.value, mode.value, model.value));
+const invokeError = computed(() =>
+  invocationError(harness.value, mode.value, model.value, effort.value),
+);
+const effortPlaceholder = computed(() =>
+  harness.value.invocation?.effortArgs ? "optional, low keeps it quick" : "no flag for it here",
+);
 
 const modeItems = computed(() =>
   MODES.map((entry) => ({
@@ -66,7 +78,8 @@ const modeItems = computed(() =>
 const tsLines = computed(() => {
   const opts = modeSpec(mode.value).fields;
   const modelPart = model.value ? `model: ${JSON.stringify(model.value)}` : "";
-  const merged = [opts, modelPart].filter(Boolean).join(", ");
+  const effortPart = effort.value ? `effort: ${JSON.stringify(effort.value)}` : "";
+  const merged = [opts, modelPart, effortPart].filter(Boolean).join(", ");
   return [
     'import { getHarness } from "@agntn/harnesses";',
     "",
@@ -88,6 +101,7 @@ const cliLines = computed(() => {
   else if (mode.value === "agent" || mode.value === "agentStructured") flags.push("--tools");
   if (mode.value.endsWith("Structured")) flags.push("--json");
   if (model.value) flags.push(`--model ${model.value}`);
+  if (effort.value) flags.push(`--effort ${effort.value}`);
   return [
     `harnesses paths ${harness.value.id} --json`,
     `harnesses run ${harness.value.id}${flags.length ? ` ${flags.join(" ")}` : ""} ${JSON.stringify(prompt.value)}`,
@@ -120,6 +134,7 @@ function readQuery() {
     mode.value = query.mode as ModeKey;
   }
   if (typeof query.model === "string") model.value = query.model;
+  if (typeof query.effort === "string") effort.value = query.effort;
   if (typeof query.prompt === "string" && query.prompt) prompt.value = query.prompt;
 }
 
@@ -141,7 +156,7 @@ onMounted(() => {
   syncing = true;
 });
 
-watch([id, platform, homeDir, projectRoot, mode, model, prompt], () => {
+watch([id, platform, homeDir, projectRoot, mode, model, effort, prompt], () => {
   if (!syncing) return;
   void router.replace({
     query: {
@@ -151,6 +166,7 @@ watch([id, platform, homeDir, projectRoot, mode, model, prompt], () => {
       root: projectRoot.value,
       mode: mode.value,
       ...(model.value ? { model: model.value } : {}),
+      ...(effort.value ? { effort: effort.value } : {}),
       ...(prompt.value !== DEFAULT_PROMPT ? { prompt: prompt.value } : {}),
     },
   });
@@ -314,6 +330,20 @@ watch([id, platform, homeDir, projectRoot, mode, model, prompt], () => {
                   v-model="model"
                   variant="none"
                   placeholder="optional"
+                  spellcheck="false"
+                  autocomplete="off"
+                  class="w-full"
+                />
+              </dd>
+            </div>
+            <div>
+              <dt><label for="explorer-effort">effort</label></dt>
+              <dd>
+                <UInput
+                  id="explorer-effort"
+                  v-model="effort"
+                  variant="none"
+                  :placeholder="effortPlaceholder"
                   spellcheck="false"
                   autocomplete="off"
                   class="w-full"

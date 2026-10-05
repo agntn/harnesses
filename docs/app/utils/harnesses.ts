@@ -227,38 +227,66 @@ export interface BuiltCommand {
   args: string[];
 }
 
+/** Same word rule as `selectionError` in the library. */
+const EFFORT_PATTERN = /^[a-z]+$/u;
+
+/** Mirrors `selectionError`: a model or effort this harness can't take. Empty means unset. */
+function selectionError(harness: HarnessRecord, model?: string, effort?: string): string | null {
+  const invocation = harness.invocation;
+  if (!invocation) return null;
+  if (model && !invocation.modelArgs) {
+    return `Harness ${harness.id} does not support model selection`;
+  }
+  if (!effort) return null;
+  if (!invocation.effortArgs) return `Harness ${harness.id} does not support reasoning effort`;
+  return EFFORT_PATTERN.test(effort)
+    ? null
+    : "Reasoning effort must be one lowercase word, such as low or high";
+}
+
+function fillArgs(args: readonly string[] | undefined, placeholder: string, value?: string) {
+  return value && args ? args.map((arg) => arg.replaceAll(placeholder, value)) : [];
+}
+
 /**
- * Mirrors what `Harness.invoke` spawns: template first, model arguments appended,
- * then `streamArgs` for a plain text run.
+ * Mirrors what `Harness.invoke` spawns: template first, model and effort arguments
+ * appended, then `streamArgs` for a plain text run.
  */
 export function buildCommand(
   harness: HarnessRecord,
   mode: ModeKey,
   prompt: string,
   model?: string,
+  effort?: string,
 ): BuiltCommand | null {
   const invocation = harness.invocation;
   if (!invocation) return null;
   const command = invocation.binary ?? harness.binaries[0];
   if (!command) return null;
-  if (model !== undefined && model !== "" && !invocation.modelArgs) return null;
+  if (selectionError(harness, model, effort) !== null) return null;
   const template = invocation[MODE_TEMPLATE[mode]];
   if (!Array.isArray(template)) return null;
-  const args = template.map((arg) => arg.replaceAll("{prompt}", prompt));
-  if (model && invocation.modelArgs) {
-    args.push(...invocation.modelArgs.map((arg) => arg.replaceAll("{model}", model)));
-  }
+  const args = [
+    ...fillArgs(template, "{prompt}", prompt),
+    ...fillArgs(invocation.modelArgs, "{model}", model),
+    ...fillArgs(invocation.effortArgs, "{effort}", effort),
+  ];
   if (!mode.endsWith("Structured") && invocation.streamArgs) args.push(...invocation.streamArgs);
   return { command, args };
 }
 
 /** Mirrors `Harness.invocationError` without the retry hint: why `buildCommand` returns null. */
-export function invocationError(harness: HarnessRecord, mode: ModeKey, model?: string): string {
+export function invocationError(
+  harness: HarnessRecord,
+  mode: ModeKey,
+  model?: string,
+  effort?: string,
+): string {
   if (!harness.invocation) return `Harness ${harness.id} has no non-interactive invocation`;
-  if (model && !harness.invocation.modelArgs) {
-    return `Harness ${harness.id} does not support model selection`;
-  }
-  return `Harness ${harness.id} has no ${MODE_DESCRIPTION[mode]} invocation`;
+  return (
+    selectionError(harness, model, effort) ??
+    `Harness ${harness.id} has no ${MODE_DESCRIPTION[mode]} invocation`
+  );
 }
 
 /** A shell argument: single quotes unless the value is a plain word. Empty stays visible as ''. */
