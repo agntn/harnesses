@@ -28,7 +28,7 @@ import type { PromptSyncReport } from "./prompt-sync.ts";
 export type { SkillsSyncReport } from "./skills-sync.ts";
 import { syncSkills } from "./skills-sync.ts";
 import type { SkillsSyncReport } from "./skills-sync.ts";
-import { selectionError } from "./harness.ts";
+import { readOnlyVersionError, selectionError } from "./harness.ts";
 import type { Harness } from "./harness.ts";
 import type {
   AvailableModel,
@@ -63,7 +63,7 @@ export interface HarnessStatus {
   version: string | null;
   /** Takes `tools: false`, an advisor without tools. */
   advisor: boolean;
-  /** Takes `tools: true` with `readOnly: true`, under native read-only enforcement. */
+  /** Takes `tools: true` with `readOnly: true`; false while the installed CLI is too old for it. */
   readOnly: boolean;
   /** Takes `tools: true`, the full agent. */
   agent: boolean;
@@ -303,14 +303,17 @@ export function detectHarnesses(): ToolResult<HarnessListing> {
   const details: HarnessListing = {
     harnesses: getAllHarnesses().map((harness) => {
       const installed = harness.isInstalled();
+      const version = installed ? harness.version : null;
       const { advisor, readOnly, agent } = harness.invocationModes;
+      const belowFloor =
+        installed && readOnlyVersionError(harness.id, harness.invocation, version) !== null;
       return {
         id: harness.id,
         name: harness.name,
         installed,
-        version: installed ? harness.version : null,
+        version,
         advisor,
-        readOnly,
+        readOnly: readOnly && !belowFloor,
         agent,
       };
     }),

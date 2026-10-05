@@ -221,6 +221,27 @@ function compareVersions(a: string, b: string): number {
   return Number(aPre === undefined) - Number(bPre === undefined);
 }
 
+/**
+ * Refuses read-only runs on a CLI older than the recipe's version floor. An unknown version fails closed.
+ *
+ * @param id - Harness id for the message.
+ * @param invocation - Recipe that may carry `readOnlyMinVersion`.
+ * @param installed - Version the installed CLI reports, or null when it can't tell.
+ * @returns {string | null} The incompatibility, or null when no floor applies or the version meets it.
+ */
+export function readOnlyVersionError(
+  id: string,
+  invocation: HarnessInvocation | null,
+  installed: string | null,
+): string | null {
+  const floor = invocation?.readOnlyMinVersion;
+  if (floor === undefined) return null;
+  const error = `Harness ${id} requires version ${floor} or newer for read-only runs`;
+  if (installed === null) return `${error}; installed version unknown`;
+  if (compareVersions(installed, floor) < 0) return `${error}; installed ${installed}`;
+  return null;
+}
+
 function fillArgs(
   args: readonly string[] | undefined,
   placeholder: string,
@@ -611,13 +632,8 @@ export abstract class Harness {
    * @returns {string | null} The version incompatibility, or null when the run may proceed.
    */
   private readOnlyVersionError(options: InvocationOptions): string | null {
-    const floor = this.invocation?.readOnlyMinVersion;
-    if (floor === undefined || options.readOnly !== true) return null;
-    const installed = this.version;
-    const error = `Harness ${this.id} requires version ${floor} or newer for read-only runs`;
-    if (installed === null) return `${error}; installed version unknown`;
-    if (compareVersions(installed, floor) < 0) return `${error}; installed ${installed}`;
-    return null;
+    if (this.invocation?.readOnlyMinVersion === undefined || options.readOnly !== true) return null;
+    return readOnlyVersionError(this.id, this.invocation, this.version);
   }
 
   /**
