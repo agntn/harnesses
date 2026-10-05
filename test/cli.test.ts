@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 import { describe, expect, it } from "vite-plus/test";
+import { getHarness, listHarnesses } from "../src/index.ts";
 
 const root = resolve(import.meta.dirname, "..");
 const cli = resolve(root, "src/cli.ts");
@@ -131,6 +132,23 @@ describe("harnesses usage paths", () => {
 
     expect(result.status).toBe(1);
     expect(JSON.parse(result.stdout)).toMatchObject({ error: "Unknown harness: unknown" });
+  });
+
+  it("harnesses detect --json lists the run modes harnesses run takes", () => {
+    const result = runCli(["detect", "--json"], "", { PATH: "" });
+
+    expect(result.status).toBe(0);
+    const modes = listHarnesses().map((id) => {
+      const harness = getHarness(id);
+      return {
+        id,
+        installed: false,
+        advisor: harness.invocationError({ tools: false }) === null,
+        readOnly: harness.invocationError({ tools: true, readOnly: true }) === null,
+        agent: harness.invocationError({ tools: true }) === null,
+      };
+    });
+    expect(JSON.parse(result.stdout)).toMatchObject(modes);
   });
 
   it("harnesses run rejects --read-only beside --no-tools", () => {

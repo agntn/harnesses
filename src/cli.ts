@@ -5,7 +5,13 @@ import { consola } from "consola";
 import { encode as toToon } from "@toon-format/toon";
 import { version, type AvailableModel, type InvokeResult } from "./types.ts";
 import { getAllHarnesses, getHarness, isHarnessId, listHarnesses } from "./registry.ts";
-import { listHarnessModels, type ModelsOutcome, type RunFailure } from "./tool-operations.ts";
+import {
+  detectHarnesses,
+  listHarnessModels,
+  type HarnessStatus,
+  type ModelsOutcome,
+  type RunFailure,
+} from "./tool-operations.ts";
 import { exitOnClosedPipe } from "./commands/output.ts";
 
 const s = {
@@ -111,6 +117,10 @@ function modelDescription(model: Readonly<AvailableModel>): string {
   return parts.join(" · ");
 }
 
+function runModes(status: Readonly<HarnessStatus>): string[] {
+  return (["advisor", "readOnly", "agent"] as const).filter((mode) => status[mode]);
+}
+
 function renderModels(details: ModelsOutcome): void {
   const harness = getHarness(details.id);
   consola.log(header(`${details.id} models`));
@@ -156,25 +166,28 @@ const list = defineCommand({
 });
 
 const detect = defineCommand({
-  meta: { description: "Detect installed harnesses and versions" },
+  meta: { description: "Detect installed harnesses, versions and run modes" },
   args: { ...formatArgs },
   run({ args }) {
-    const harnesses = getAllHarnesses();
-    const results = harnesses.map((harness) => {
-      const installed = harness.isInstalled();
-      const v = installed ? harness.version : null;
-      return { id: harness.id, name: harness.name, installed, version: v };
-    });
+    const results = detectHarnesses().details.harnesses;
 
     if (emit(results, args)) return;
 
     consola.log(header("System Scan"));
     consola.log("");
     const maxId = Math.max(...results.map((r) => r.id.length));
+    const installed = results.filter((r) => r.installed);
+    const maxName = Math.max(...installed.map((r) => r.name.length));
+    const maxVersion = Math.max(...installed.map((r) => (r.version ? r.version.length + 1 : 0)));
     for (const r of results) {
       if (r.installed) {
-        const ver = r.version ? `  ${s.dim(`v${r.version}`)}` : "";
-        consola.log(entry(`${s.green("●")} ${s.hi(r.id.padEnd(maxId))}  ${r.name}${ver}`));
+        const ver = (r.version ? `v${r.version}` : "").padEnd(maxVersion);
+        const modes = runModes(r).join(" · ") || "no headless mode";
+        consola.log(
+          entry(
+            `${s.green("●")} ${s.hi(r.id.padEnd(maxId))}  ${r.name.padEnd(maxName)}  ${s.dim(ver)}  ${s.dim(modes)}`,
+          ),
+        );
       } else {
         consola.log(entry(`${s.dim("○")} ${s.dim(r.id.padEnd(maxId))}  ${s.dim(r.name)}`));
       }

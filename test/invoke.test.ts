@@ -9,6 +9,7 @@ import { Harness } from "../src/harness.ts";
 import Claude, { foldClaudeStream } from "../src/harnesses/claude.ts";
 import Cursor from "../src/harnesses/cursor.ts";
 import {
+  detectHarnesses,
   harnessInfo,
   listHarnessModels,
   runHarness,
@@ -1285,6 +1286,9 @@ describe("runHarness tool operation", () => {
 
         const agent = await runHarness("cursor", "review", { tools: true });
         expect(agent.isError).toBeUndefined();
+        expect(detectHarnesses().details.harnesses.find(({ id }) => id === "cursor")).toMatchObject(
+          { installed: true, readOnly: false, agent: true },
+        );
       } finally {
         registerHarness(Cursor);
       }
@@ -1311,6 +1315,10 @@ describe("runHarness tool operation", () => {
 
       expect(result.isError).toBeUndefined();
       expect(result.details).toMatchObject({ stdout: "read:review\n", readOnly: true });
+      expect(detectHarnesses().details.harnesses.find(({ id }) => id === "cursor")).toMatchObject({
+        installed: true,
+        readOnly: true,
+      });
     } finally {
       registerHarness(Cursor);
     }

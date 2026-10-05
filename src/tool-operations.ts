@@ -28,7 +28,7 @@ import type { PromptSyncReport } from "./prompt-sync.ts";
 export type { SkillsSyncReport } from "./skills-sync.ts";
 import { syncSkills } from "./skills-sync.ts";
 import type { SkillsSyncReport } from "./skills-sync.ts";
-import { selectionError } from "./harness.ts";
+import { readOnlyVersionError, selectionError } from "./harness.ts";
 import type { Harness } from "./harness.ts";
 import type {
   AvailableModel,
@@ -55,12 +55,18 @@ export interface ToolResult<Details> {
   isError?: boolean;
 }
 
-/** Install state of one harness on this machine. */
+/** Install state of one harness on this machine, plus the runs harnesses_run takes for it. */
 export interface HarnessStatus {
   id: HarnessId;
   name: string;
   installed: boolean;
   version: string | null;
+  /** Takes `tools: false`, an advisor without tools. */
+  advisor: boolean;
+  /** Takes `tools: true` with `readOnly: true`; false while the installed CLI is too old for it. */
+  readOnly: boolean;
+  /** Takes `tools: true`, the full agent. */
+  agent: boolean;
 }
 
 /** Every registered harness with its install state, as scanned by {@link detectHarnesses}. */
@@ -289,7 +295,7 @@ function unsupportedInvocation(
 }
 
 /**
- * Scans every registered harness for its binaries and version.
+ * Scans every registered harness for its binaries and version, next to the modes it runs in.
  *
  * @returns {ToolResult<HarnessListing>} The complete installation listing.
  */
@@ -297,11 +303,18 @@ export function detectHarnesses(): ToolResult<HarnessListing> {
   const details: HarnessListing = {
     harnesses: getAllHarnesses().map((harness) => {
       const installed = harness.isInstalled();
+      const version = installed ? harness.version : null;
+      const { advisor, readOnly, agent } = harness.invocationModes;
+      const belowFloor =
+        installed && readOnlyVersionError(harness.id, harness.invocation, version) !== null;
       return {
         id: harness.id,
         name: harness.name,
         installed,
-        version: installed ? harness.version : null,
+        version,
+        advisor,
+        readOnly: readOnly && !belowFloor,
+        agent,
       };
     }),
   };

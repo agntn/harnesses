@@ -45,22 +45,22 @@ npx @agntn/harnesses detect
 ```
   System Scan
 
-    ● antigravity     Google Antigravity CLI  v1.2.5
-    ● claude          Anthropic Claude Code  v2.1.276
-    ● codex           OpenAI Codex CLI  v0.154.0
+    ● antigravity     Google Antigravity CLI  v1.2.14   agent
+    ● claude          Anthropic Claude Code   v2.1.289  advisor · readOnly · agent
+    ● codex           OpenAI Codex CLI        v0.160.0  readOnly · agent
     ○ cursor          Cursor
-    ● freebuff        Freebuff
+    ● freebuff        Freebuff                v0.0.204  no headless mode
     ○ gemini          Google Gemini CLI
     ○ github-copilot  GitHub Copilot
-    ● grok            xAI Grok CLI  v1.0.34
-    ● mastracode      Mastra Code
-    ● omp             OMP (oh-my-pi)  v18.2.4
-    ● opencode        OpenCode CLI  v2.0.5
-    ● prime-agent     Prime Agent  v0.9.5
-    ● pi              Pi Coding Agent  v0.85.1
+    ● grok            xAI Grok CLI            v1.0.41   readOnly · agent
+    ● mastracode      Mastra Code             v0.10.2   no headless mode
+    ● omp             OMP (oh-my-pi)          v18.6.1   agent
+    ● opencode        OpenCode CLI            v2.0.22   agent
+    ● prime-agent     Prime Agent             v0.9.5    advisor · agent
+    ● pi              Pi Coding Agent         v1.0.2    advisor · readOnly · agent
 ```
 
-No key, no config. No network either. `detect` looks at `PATH`. Filled dot is installed, hollow is not. After `pnpm add`, the same command is `pnpm exec harnesses`, or install it once with `pnpm add -g @agntn/harnesses`.
+No key, no config. No network either. `detect` looks at `PATH`. Filled dot is installed, hollow is not. The tail says how `run` can drive it: `advisor` without tools, `readOnly` behind the harness's own read-only lock, `agent` with everything. Codex has no advisor, and now you learn that here, not from a refused run. After `pnpm add`, the same command is `pnpm exec harnesses`, or install it once with `pnpm add -g @agntn/harnesses`.
 
 Same binary, more commands:
 
@@ -84,7 +84,7 @@ harnesses skills sync --check
 | Command        | What it does                                           | Example                                     |
 | -------------- | ------------------------------------------------------ | ------------------------------------------- |
 | `list`         | Every known harness, id and name                       | `harnesses list`                            |
-| `detect`       | Which ones are installed, with versions                | `harnesses detect`                          |
+| `detect`       | Which ones are installed, and how each one runs        | `harnesses detect`                          |
 | `info`         | Registry entry: modes, capabilities, path templates    | `harnesses info claude`                     |
 | `paths`        | Those templates expanded for this machine              | `harnesses paths pi`                        |
 | `models`       | Models the harness can use, through its native listing | `harnesses models pi`                       |

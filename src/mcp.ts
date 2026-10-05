@@ -52,7 +52,8 @@ const tools: ToolDefinition[] = [
   {
     name: "harnesses_detect",
     title: "Harnesses Detect",
-    description: "List every known AI coding harness with its install state and version.",
+    description:
+      "List every known AI coding harness with its install state, version and the harnesses_run modes it takes: advisor (tools=false), readOnly (tools=true with readOnly=true) and agent (tools=true).",
     inputSchema: schemas.detect,
     annotations: READ_ONLY,
     execute: ({ detectHarnesses }) => detectHarnesses(),
@@ -85,7 +86,7 @@ const tools: ToolDefinition[] = [
     name: "harnesses_run",
     title: "Harnesses Run",
     description:
-      "Run one prompt through an AI coding harness's normalized non-interactive invocation and return its output. Pass tools=true whenever the task needs harness tools, including Grok native X search. Add readOnly=true to require native read-only tool enforcement. Pass tools=false only for an advisor without tools. Unsupported modes never widen access.",
+      "Run one prompt through an AI coding harness's normalized non-interactive invocation and return its output. Pass tools=true whenever the task needs harness tools, including Grok native X search. Add readOnly=true to require native read-only tool enforcement. Pass tools=false only for an advisor without tools. Unsupported modes never widen access; harnesses_detect shows which modes each harness takes.",
     inputSchema: schemas.run,
     annotations: {
       readOnlyHint: false,
