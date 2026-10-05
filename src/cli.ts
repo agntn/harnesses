@@ -8,6 +8,7 @@ import { getAllHarnesses, getHarness, isHarnessId, listHarnesses } from "./regis
 import {
   detectHarnesses,
   listHarnessModels,
+  TOOL_CALL_TEXT_WARNING,
   type HarnessStatus,
   type ModelsOutcome,
   type RunFailure,
@@ -140,6 +141,7 @@ function renderModels(details: ModelsOutcome): void {
 function finishInvocation(result: InvokeResult, timeoutSeconds: number | undefined): never {
   if (result.stdout) process.stdout.write(result.stdout);
   if (result.stderr) process.stderr.write(result.stderr);
+  if (result.toolCallsAsText) consola.warn(TOOL_CALL_TEXT_WARNING);
   if (result.timedOut) {
     const idle =
       result.idleMs === undefined

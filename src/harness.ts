@@ -326,6 +326,9 @@ function isDirectory(path: string): boolean {
   }
 }
 
+/** An `<invoke>` or `<function_calls>` tag, with or without a namespace prefix. */
+const TOOL_CALL_TEXT = /<(?:[\w-]+:)?(?:invoke|function_calls)\b/u;
+
 function executeCommand(
   command: string,
   args: readonly string[],
@@ -601,13 +604,18 @@ export abstract class Harness {
     if (versionError) return Promise.reject(new Error(versionError));
 
     const command = { ...options, env: { ...options.env, [PARENT_ENV]: this.id } };
+    const advisor = requestedInvocationMode(invocationOptions).startsWith("advisor");
     const streamArgs = options.structured ? undefined : this.invocation?.streamArgs;
-    if (!streamArgs) return executeCommand(built.command, built.args, command);
-    return executeCommand(built.command, [...built.args, ...streamArgs], command).then(
-      (result) => ({
-        ...result,
-        stdout: this.foldStreamOutput(result.stdout, !result.timedOut && !result.aborted),
-      }),
+    const run = streamArgs
+      ? executeCommand(built.command, [...built.args, ...streamArgs], command).then((result) => ({
+          ...result,
+          stdout: this.foldStreamOutput(result.stdout, !result.timedOut && !result.aborted),
+        }))
+      : executeCommand(built.command, built.args, command);
+    return run.then((result) =>
+      advisor && TOOL_CALL_TEXT.test(result.stdout)
+        ? { ...result, toolCallsAsText: true as const }
+        : result,
     );
   }
 
