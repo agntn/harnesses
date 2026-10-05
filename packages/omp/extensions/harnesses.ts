@@ -133,6 +133,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       return runHarness(params.id, params.prompt, {
         cwd: params.cwd,
         model: params.model,
+        effort: params.effort,
         timeoutSeconds: params.timeoutSeconds,
         signal,
         structured: params.structured,

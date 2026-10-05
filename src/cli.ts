@@ -188,6 +188,11 @@ const info = defineCommand({
   args: { id: harnessArg, ...formatArgs },
   run({ args }) {
     const harness = resolveHarness(args.id as string);
+    const modelFeatures = {
+      listing: harness.modelListing !== null,
+      selection: harness.invocation?.modelArgs !== undefined,
+      effort: harness.invocation?.effortArgs !== undefined,
+    };
 
     if (
       emit(
@@ -197,8 +202,9 @@ const info = defineCommand({
           binaries: harness.binaries,
           capabilities: harness.capabilities,
           invocationModes: harness.invocationModes,
-          modelListing: harness.modelListing !== null,
-          modelSelection: harness.invocation?.modelArgs !== undefined,
+          modelListing: modelFeatures.listing,
+          modelSelection: modelFeatures.selection,
+          effortSelection: modelFeatures.effort,
           config: harness.config,
           sessions: harness.sessions,
           instructions: harness.instructions,
@@ -234,10 +240,6 @@ const info = defineCommand({
     consola.log(entry(modes));
 
     consola.log(section("Models"));
-    const modelFeatures = {
-      listing: harness.modelListing !== null,
-      selection: harness.invocation?.modelArgs !== undefined,
-    };
     consola.log(
       entry(
         Object.entries(modelFeatures)
@@ -352,6 +354,10 @@ const run = defineCommand({
     },
     cwd: { type: "string" as const, description: "Working directory for the run" },
     model: { type: "string" as const, description: "Harness-native model id or selector" },
+    effort: {
+      type: "string" as const,
+      description: "Reasoning effort in the harness's own words (low, high, max)",
+    },
     timeout: { type: "string" as const, description: "Wall-clock budget in seconds" },
     json: {
       type: "boolean" as const,
@@ -373,7 +379,13 @@ const run = defineCommand({
     const readOnly = args["read-only"] === true;
     const tools = args.tools ?? readOnly;
 
-    const invocationOptions = { model: args.model, structured, tools, readOnly };
+    const invocationOptions = {
+      model: args.model,
+      effort: args.effort,
+      structured,
+      tools,
+      readOnly,
+    };
     if (!harness.buildInvocation("", invocationOptions)) {
       consola.error(harness.invocationError(invocationOptions) ?? "Invalid invocation");
       process.exit(1);
@@ -388,6 +400,7 @@ const run = defineCommand({
     const result = await harness.invoke(args.prompt as string, {
       cwd: args.cwd,
       model: args.model,
+      effort: args.effort,
       timeoutMs: timeoutSeconds === undefined ? undefined : timeoutSeconds * 1000,
       structured,
       tools,

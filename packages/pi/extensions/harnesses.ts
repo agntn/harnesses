@@ -146,7 +146,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     name: "harnesses_run",
     label: HARNESS_TOOL_LABELS.harnesses_run,
     description:
-      "Run one prompt through an AI coding harness's normalized non-interactive invocation, optionally selecting a model, and return its output",
+      "Run one prompt through an AI coding harness's normalized non-interactive invocation, optionally selecting a model and reasoning effort, and return its output",
     promptSnippet: "Use harnesses_run to delegate one prompt to another installed coding harness.",
     promptGuidelines: [
       "Always choose tools explicitly. Set true whenever the task needs harness tools, including Grok native X search.",
@@ -166,6 +166,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       return runHarness(params.id, params.prompt, {
         cwd: params.cwd,
         model: params.model,
+        effort: params.effort,
         timeoutSeconds: params.timeoutSeconds,
         signal,
         structured: params.structured,

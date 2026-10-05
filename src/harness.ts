@@ -64,6 +64,7 @@ const PARENT_ENV = "AGNTN_HARNESSES_PARENT";
 
 type InvocationOptions = Readonly<{
   model?: string;
+  effort?: string;
   structured?: boolean;
   tools?: boolean;
   readOnly?: boolean;
@@ -100,6 +101,32 @@ function requestedInvocationMode(options: InvocationOptions): InvocationMode {
   }
   if (options.tools === true) return options.structured === true ? "agentStructured" : "agent";
   return options.structured === true ? "advisorStructured" : "advisor";
+}
+
+/** One lowercase word, so an effort can never turn into a flag of its own. */
+const EFFORT_PATTERN = /^[a-z]+$/u;
+
+/**
+ * Rejects a model or effort the harness can't take. No mode switch fixes that, so no retry.
+ *
+ * @param id - Harness id for the message.
+ * @param invocation - Templates that decide which selections exist.
+ * @param options - Requested model and effort.
+ * @returns {string | null} The rejection, or null when both are accepted.
+ */
+export function selectionError(
+  id: string,
+  invocation: HarnessInvocation,
+  options: InvocationOptions,
+): string | null {
+  if (options.model !== undefined && !invocation.modelArgs) {
+    return `Harness ${id} does not support model selection`;
+  }
+  if (options.effort === undefined) return null;
+  if (!invocation.effortArgs) return `Harness ${id} does not support reasoning effort`;
+  return EFFORT_PATTERN.test(options.effort)
+    ? null
+    : "Reasoning effort must be one lowercase word, such as low or high";
 }
 
 /**
@@ -194,17 +221,26 @@ function compareVersions(a: string, b: string): number {
   return Number(aPre === undefined) - Number(bPre === undefined);
 }
 
+function fillArgs(
+  args: readonly string[] | undefined,
+  placeholder: string,
+  value: string | undefined,
+): string[] {
+  if (value === undefined || !args) return [];
+  return args.map((arg) => arg.replaceAll(placeholder, () => value));
+}
+
 function buildInvocationArgs(
   template: readonly string[],
   prompt: string,
-  modelArgs: readonly string[] | undefined,
-  model: string | undefined,
+  invocation: HarnessInvocation,
+  options: InvocationOptions,
 ): string[] {
-  const args = template.map((arg) => arg.replaceAll("{prompt}", () => prompt));
-  if (model !== undefined && modelArgs) {
-    args.push(...modelArgs.map((arg) => arg.replaceAll("{model}", () => model)));
-  }
-  return args;
+  return [
+    ...fillArgs(template, "{prompt}", prompt),
+    ...fillArgs(invocation.modelArgs, "{model}", options.model),
+    ...fillArgs(invocation.effortArgs, "{effort}", options.effort),
+  ];
 }
 
 function signalProcessGroup(pid: number, signal: NodeJS.Signals): void {
@@ -480,14 +516,11 @@ export abstract class Harness {
     if (!this.invocation) return null;
     const command = this.invocation.binary ?? this.binaries[0];
     if (!command) return null;
-    if (options.model !== undefined && !this.invocation.modelArgs) return null;
+    if (selectionError(this.id, this.invocation, options) !== null) return null;
     if (accessConflictError(this.id, this.invocation, options) !== null) return null;
     const template = invocationTemplate(this.invocation, requestedInvocationMode(options));
     if (!template) return null;
-    return {
-      command,
-      args: buildInvocationArgs(template, prompt, this.invocation.modelArgs, options.model),
-    };
+    return { command, args: buildInvocationArgs(template, prompt, this.invocation, options) };
   }
 
   /**
@@ -498,9 +531,8 @@ export abstract class Harness {
    */
   invocationError(options: InvocationOptions = {}): string | null {
     if (!this.invocation) return `Harness ${this.id} has no non-interactive invocation`;
-    if (options.model !== undefined && !this.invocation.modelArgs) {
-      return `Harness ${this.id} does not support model selection`;
-    }
+    const unsupported = selectionError(this.id, this.invocation, options);
+    if (unsupported !== null) return unsupported;
     const conflict = accessConflictError(this.id, this.invocation, options);
     if (conflict !== null) return conflict;
     const mode = requestedInvocationMode(options);
@@ -533,6 +565,7 @@ export abstract class Harness {
 
     const invocationOptions = {
       model: options.model,
+      effort: options.effort,
       structured: options.structured,
       tools: options.tools,
       readOnly: options.readOnly,

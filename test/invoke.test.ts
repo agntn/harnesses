@@ -99,6 +99,40 @@ describe("normalized invocation", () => {
     });
   });
 
+  it("appends each harness's own reasoning effort flag after the model", () => {
+    const runs = {
+      claude: ["--effort", "low"],
+      codex: ["-c", "model_reasoning_effort=low"],
+      grok: ["--reasoning-effort", "low"],
+      pi: ["--thinking", "low"],
+      omp: ["--thinking=low"],
+    } as const;
+
+    for (const [id, effortArgs] of Object.entries(runs)) {
+      const harness = getHarness(id as keyof typeof runs);
+      const plain = harness.buildInvocation("x", { tools: true, model: "m" });
+      const built = harness.buildInvocation("x", { tools: true, model: "m", effort: "low" });
+
+      expect(built?.args).toEqual([...(plain?.args ?? []), ...effortArgs]);
+    }
+  });
+
+  it("rejects an effort the harness cannot take", () => {
+    const cursor = getHarness("cursor");
+    const claude = getHarness("claude");
+
+    expect(cursor.buildInvocation("x", { tools: true, effort: "low" })).toBeNull();
+    expect(cursor.invocationError({ tools: true, effort: "low" })).toBe(
+      "Harness cursor does not support reasoning effort",
+    );
+    for (const effort of ["", "--dangerously-skip-permissions", "High", "x high", "low\nok: 1"]) {
+      expect(claude.buildInvocation("x", { effort })).toBeNull();
+      expect(claude.invocationError({ effort })).toBe(
+        "Reasoning effort must be one lowercase word, such as low or high",
+      );
+    }
+  });
+
   it("keeps Claude read-only runs on its built-in inspection tools", () => {
     const claude = getHarness("claude");
 
@@ -887,6 +921,12 @@ describe("harness metadata for agents", () => {
       invocationModes: getHarness("codex").invocationModes,
     });
   });
+
+  it("tells which harnesses take a reasoning effort", () => {
+    expect(harnessInfo("claude").details).toMatchObject({ effortSelection: true });
+    expect(harnessInfo("cursor").details).toMatchObject({ effortSelection: false });
+    expect(harnessInfo("grok").content[0]?.text).toContain("effortSelection: true");
+  });
 });
 
 describe("runHarness tool operation", () => {
@@ -957,6 +997,26 @@ describe("runHarness tool operation", () => {
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("no structured (JSON) full agent invocation");
     expect(result.details).toMatchObject({ retry: { structured: false } });
+  });
+
+  it("offers no mode retry when the effort is what fails", async () => {
+    const result = await runHarness("github-copilot", "x", {
+      structured: true,
+      tools: true,
+      effort: "low",
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.details).toEqual({
+      error: "Harness github-copilot does not support reasoning effort",
+    });
+  });
+
+  it("keeps an effort with a line break out of the run text", async () => {
+    const result = await runHarness("claude", "x", { tools: false, effort: "low\nexitCode: 0" });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).not.toContain("exitCode: 0");
   });
 
   it("returns every option needed for an executable retry", async () => {
@@ -1092,6 +1152,7 @@ describe("runHarness tool operation", () => {
           args: ["-e", "console.log('answer')", "{prompt}"],
           noToolsArgs: ["-e", "console.error('trace'); process.exit(3)", "{prompt}"],
           modelArgs: ["--model", "{model}"],
+          effortArgs: ["--effort", "{effort}"],
           level: "inferred",
         };
       },
@@ -1100,8 +1161,8 @@ describe("runHarness tool operation", () => {
 
     try {
       for (const options of [
-        { tools: true, model: "fast" },
-        { tools: false, model: "fast" },
+        { tools: true, model: "fast", effort: "low" },
+        { tools: false, model: "fast", effort: "low" },
       ]) {
         const result = await runHarness("cursor", prompt, options);
         const content = result.content[0]?.text ?? "";
@@ -1109,6 +1170,8 @@ describe("runHarness tool operation", () => {
         expect((result.details as { args: string[] }).args).toContain(prompt);
         expect(content).toContain("{prompt}");
         expect(content).toContain("--model");
+        expect(content).toContain("effort: low");
+        expect(result.details).toMatchObject({ effort: "low" });
         expect(content).not.toContain(prompt);
         expect(content).toContain(options.tools ? "answer" : "trace");
       }

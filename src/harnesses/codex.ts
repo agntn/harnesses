@@ -124,6 +124,7 @@ export default class Codex extends Harness {
       "{prompt}",
     ],
     modelArgs: ["--model", "{model}"],
+    effortArgs: ["-c", "model_reasoning_effort={effort}"],
     level: "official",
     note: "Non-interactive exec subcommand; add --json for structured output.",
   };
