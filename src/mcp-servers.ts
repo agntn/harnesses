@@ -895,7 +895,9 @@ function requiredMasterServerMap(
   path: string,
 ): Record<string, unknown> {
   const map = drill(root as Record<string, unknown>, ["mcpServers"]);
-  if (!map) throw new Error(`Master MCP list at ${path} has no mcpServers object`);
+  if (!map || Array.isArray(map)) {
+    throw new Error(`Master MCP list at ${path} has no mcpServers object`);
+  }
   return map;
 }
 
