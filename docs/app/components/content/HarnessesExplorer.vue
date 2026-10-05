@@ -429,6 +429,7 @@ watch([id, platform, homeDir, projectRoot, mode, model, effort, prompt], () => {
 <style scoped>
 .explorer {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 28px;
 }
 .explorer > :deep(.console-panel) {
