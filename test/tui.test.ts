@@ -16,6 +16,18 @@ describe("shared extension TUI", () => {
     expect(line).not.toContain("timed out");
   });
 
+  it("marks an advisor answer with a tool call written as text", () => {
+    const line = renderToolResult(
+      "harnesses_run",
+      { details: { id: "claude", exitCode: 0, timedOut: false, warning: "made up" } },
+      false,
+      {},
+      plainTheme,
+    );
+    expect(line).toContain("exit 0");
+    expect(line).toContain("tool call as text");
+  });
+
   it("sanitizes external values before terminal rendering", () => {
     const escape = String.fromCodePoint(0x1b);
     const bell = String.fromCodePoint(0x07);

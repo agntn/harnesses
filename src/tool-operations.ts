@@ -126,6 +126,10 @@ export const RUN_DEFAULT_TIMEOUT_SECONDS = RUN_TIMEOUT_DEFAULT_SECONDS;
 /** The run tool's per-stream cap: harness output is unbounded, model context is not. */
 export const RUN_MAX_OUTPUT_CHARS = 8000;
 
+/** What the run tool and the CLI say about an advisor answer with a tool call written as text. */
+export const TOOL_CALL_TEXT_WARNING =
+  "The advisor wrote a tool call as text. Nothing ran it, so any result it reports from that call is unverified";
+
 function text(data: unknown): Array<{ type: "text"; text: string }> {
   return [{ type: "text", text: toToon(data) }];
 }
@@ -255,6 +259,7 @@ function completedRun(
     timedOut: result.timedOut,
     aborted: result.aborted,
     ...(result.idleMs === undefined ? {} : { idleMs: result.idleMs }),
+    ...(result.toolCallsAsText ? { warning: TOOL_CALL_TEXT_WARNING } : {}),
   };
   const stdout = truncate(result.stdout);
   const stderr = truncate(result.stderr);
@@ -567,6 +572,8 @@ export interface RunOutcome {
   aborted: boolean;
   /** Milliseconds without output before the run was stopped; absent when it exited on its own. */
   idleMs?: number;
+  /** Present when an advisor answer holds a tool call written as text. */
+  warning?: string;
   stdout: string;
   stderr: string;
 }

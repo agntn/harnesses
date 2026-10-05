@@ -14,6 +14,7 @@ import {
   listHarnessModels,
   runHarness,
   RUN_MAX_OUTPUT_CHARS,
+  TOOL_CALL_TEXT_WARNING,
 } from "../src/tool-operations.ts";
 
 /**
@@ -86,18 +87,51 @@ describe("normalized invocation", () => {
 
   it("keeps Claude advisor runs free of built-in and MCP tools", () => {
     const claude = getHarness("claude");
-    expect(claude.buildInvocation("answer this")).toEqual({
-      command: "claude",
-      args: ["-p", "answer this", "--strict-mcp-config", "--tools", ""],
-    });
+    const advisor = claude.buildInvocation("answer this")?.args ?? [];
+    const systemPrompt = advisor[advisor.indexOf("--append-system-prompt") + 1] ?? "";
+    const noTools = ["--append-system-prompt", systemPrompt, "--strict-mcp-config", "--tools", ""];
+
+    expect(systemPrompt).toContain("no tools");
+    expect(advisor).toEqual(["-p", "answer this", ...noTools]);
     expect(claude.buildInvocation("answer this", { structured: true })).toEqual({
       command: "claude",
-      args: ["-p", "--output-format", "json", "answer this", "--strict-mcp-config", "--tools", ""],
+      args: ["-p", "--output-format", "json", "answer this", ...noTools],
     });
     expect(claude.buildInvocation("answer this", { model: "sonnet" })).toEqual({
       command: "claude",
-      args: ["-p", "answer this", "--strict-mcp-config", "--tools", "", "--model", "sonnet"],
+      args: ["-p", "answer this", ...noTools, "--model", "sonnet"],
     });
+    expect(claude.buildInvocation("answer this", { tools: true })?.args).not.toContain(
+      "--append-system-prompt",
+    );
+  });
+
+  it("flags a tool call an advisor wrote as text, and only an advisor's", async () => {
+    const script = `console.log('Checking in node.\\n<invoke name="Bash">')`;
+    registerHarness(
+      class extends FakeCursor {
+        override readonly invocation: Harness["invocation"] = {
+          args: ["-e", script],
+          noToolsArgs: ["-e", script],
+          noToolsJsonArgs: ["-e", "console.log(JSON.stringify({ result: '<x:function_calls>' }))"],
+          level: "inferred",
+        };
+      },
+    );
+
+    try {
+      const cursor = getHarness("cursor");
+      expect((await cursor.invoke("x")).toolCallsAsText).toBe(true);
+      expect((await cursor.invoke("x", { tools: true })).toolCallsAsText).toBeUndefined();
+      expect((await cursor.invoke("x", { structured: true })).toolCallsAsText).toBe(true);
+
+      const run = await runHarness("cursor", "x");
+      expect(run.isError).toBeUndefined();
+      expect(run.details).toMatchObject({ warning: TOOL_CALL_TEXT_WARNING });
+      expect(run.content[0]?.text).toContain(TOOL_CALL_TEXT_WARNING);
+    } finally {
+      registerHarness(Cursor);
+    }
   });
 
   it("appends each harness's own reasoning effort flag after the model", () => {
@@ -1037,6 +1071,7 @@ describe("runHarness tool operation", () => {
     expect(outcome.stdout.trim()).toBe("advisor:ping");
     expect(outcome.exitCode).toBe(0);
     expect(outcome.tools).toBe(false);
+    expect(outcome).not.toHaveProperty("warning");
   });
 
   it("hands the model the output as plain text under the status block", async () => {

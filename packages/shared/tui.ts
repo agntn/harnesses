@@ -251,6 +251,7 @@ function runMeta(details: ResultDetails): string[] {
   } else if (typeof details.exitCode === "number") {
     meta.push(`exit ${details.exitCode}`);
   }
+  if (typeof details.warning === "string") meta.push("tool call as text");
   return meta;
 }
 

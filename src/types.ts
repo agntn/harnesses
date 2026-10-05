@@ -188,6 +188,8 @@ export interface InvokeResult {
   aborted: boolean;
   /** Milliseconds without output on either stream before a deadline or cancellation stopped the process. */
   idleMs?: number;
+  /** Set when an advisor wrote a tool call as text. Nothing ran it, so its output is made up. */
+  toolCallsAsText?: true;
 }
 
 /** Result of one native model-listing command. */
