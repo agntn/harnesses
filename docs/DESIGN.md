@@ -70,4 +70,4 @@ Departures from the shared rules, recorded for the shared package:
 
 ## Checks
 
-Beyond the shared checks: the landing at 1440, 1024, 390 and 320 px with the heights of the seven landing instruments through all thirteen samples, `/explorer?id=codex&platform=win32&mode=readOnly`, `/harnesses` and one harness page.
+Beyond the shared checks: the landing at 1440, 1024, 390 and 320 px with the heights of the seven landing instruments through all thirteen samples, `/explorer?id=codex&platform=win32&mode=readOnly`, the rejected `/explorer?id=github-copilot&mode=advisorStructured` (its bar titles once stretched every panel to 511 px at 390), `/harnesses` and one harness page.
