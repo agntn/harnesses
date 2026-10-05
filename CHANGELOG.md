@@ -1,6 +1,25 @@
 # Changelog
 
 
+## v0.4.1
+
+[compare changes](https://github.com/agntn/harnesses/compare/v0.4.0...v0.4.1)
+
+### 🚀 Enhancements
+
+- Choose how hard a run thinks ([#136](https://github.com/agntn/harnesses/pull/136))
+- Show how each harness runs in detect ([#138](https://github.com/agntn/harnesses/pull/138))
+- Ask Codex for its models instead of guessing ([#139](https://github.com/agntn/harnesses/pull/139))
+
+### 🩹 Fixes
+
+- **docs:** Fit the explorer on a phone ([#140](https://github.com/agntn/harnesses/pull/140))
+
+### ❤️ Contributors
+
+- Ori
+- Aeitwoen
+
 ## v0.4.0
 
 [compare changes](https://github.com/agntn/harnesses/compare/v0.3.1...v0.4.0)
