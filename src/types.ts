@@ -135,6 +135,8 @@ export interface HarnessModelListing {
 export interface AvailableModel {
   provider: string;
   id: string;
+  /** Display name, where the adapter reads one from the listing; Codex so far. */
+  name?: string;
   /** Absent when the native listing prints only ids, like Grok's. */
   contextWindow?: number;
   maxOutputTokens?: number;

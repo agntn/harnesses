@@ -1,4 +1,54 @@
 import { Harness } from "../harness.ts";
+import type { AvailableModel } from "../types.ts";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Maps one catalog entry, or skips it when Codex hides it from its own picker.
+ *
+ * @param entry - One element of `models`.
+ * @returns {AvailableModel | undefined} The model, or undefined for a hidden one.
+ */
+function codexModel(entry: unknown): AvailableModel | undefined {
+  if (!isRecord(entry) || typeof entry["slug"] !== "string")
+    throw new Error(`Unexpected Codex model-list entry: ${JSON.stringify(entry)?.slice(0, 200)}`);
+  if (entry["visibility"] === "hide") return undefined;
+  const {
+    display_name: name,
+    context_window: contextWindow,
+    supported_reasoning_levels: levels,
+    input_modalities: input,
+  } = entry;
+  return {
+    provider: "openai",
+    id: entry["slug"],
+    ...(typeof name === "string" ? { name } : {}),
+    ...(typeof contextWindow === "number" ? { contextWindow } : {}),
+    ...(Array.isArray(levels) ? { thinking: levels.length > 0 } : {}),
+    ...(Array.isArray(input) ? { images: input.includes("image") } : {}),
+  };
+}
+
+/**
+ * Parses `codex debug models`, the catalog Codex picks from, minus the models it hides.
+ *
+ * @param stdout - Native model-listing output.
+ * @returns {AvailableModel[]} The listed models, in the CLI's order.
+ */
+export function parseCodexModels(stdout: string): AvailableModel[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stdout);
+  } catch {
+    throw new Error(`Unexpected Codex model-list output: ${JSON.stringify(stdout.slice(0, 200))}`);
+  }
+  if (!isRecord(parsed) || !Array.isArray(parsed["models"]))
+    throw new Error(`Unexpected Codex model-list output: ${JSON.stringify(stdout.slice(0, 200))}`);
+
+  return parsed["models"].flatMap((entry: unknown) => codexModel(entry) ?? []);
+}
 
 export default class Codex extends Harness {
   readonly id = "codex";
@@ -128,6 +178,11 @@ export default class Codex extends Harness {
     level: "official",
     note: "Non-interactive exec subcommand; add --json for structured output.",
   };
+  override readonly modelListing: Harness["modelListing"] = {
+    args: ["debug", "models"],
+    level: "official",
+    note: "Prints the model catalog as JSON, refreshed from OpenAI unless --bundled, with no filter of its own; hidden models are left out. It lives under debug, so the shape can move between releases; verified with 0.160.0.",
+  };
   override readonly mcpConfigs: Harness["mcpConfigs"] = [
     {
       path: "~/.codex/config.toml",
@@ -160,4 +215,18 @@ export default class Codex extends Harness {
     envVars: [],
     projectMarkers: [".codex", "AGENTS.md", "AGENTS.override.md", ".agents/skills"],
   };
+
+  /**
+   * `codex --model` takes the bare slug, so the selector leaves `openai/` off.
+   *
+   * @param model - A model returned by {@link listModels}.
+   * @returns {string} The model id.
+   */
+  override modelSelector(model: Readonly<AvailableModel>): string {
+    return model.id;
+  }
+
+  protected override parseModelListingOutput(stdout: string): AvailableModel[] {
+    return parseCodexModels(stdout);
+  }
 }
