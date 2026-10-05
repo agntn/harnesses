@@ -783,6 +783,7 @@ export function mcpRemove(
 
 /**
  * Pushes the master MCP list from ~/.config/agntn/mcp.jsonc into harness configs.
+ * A misspelled id in excludes or keep fails the run before the first write.
  *
  * @param id - Optional harness id; omission targets every harness.
  * @returns {ToolResult<SyncReport | RunFailure>} The sync report or failure.
@@ -791,12 +792,18 @@ export function mcpSync(id?: string): ToolResult<SyncReport | RunFailure> {
   if (id !== undefined && !isHarnessId(id)) return unknownHarness(id);
 
   try {
-    // Preflight before any write: a typo in excludes must fail the whole run,
-    // not silently leave the misspelled harness unprotected.
-    const unknown = readMasterMcpServers().excludes.filter((entry) => !isHarnessId(entry));
+    const master = readMasterMcpServers();
+    const unknown = [
+      ...master.excludes
+        .filter((entry) => !isHarnessId(entry))
+        .map((entry) => `${entry} (excludes)`),
+      ...Object.keys(master.keep)
+        .filter((entry) => !isHarnessId(entry))
+        .map((entry) => `${entry} (keep)`),
+    ];
     if (unknown.length > 0) {
       const details: RunFailure = {
-        error: `Master MCP list excludes unknown harnesses: ${unknown.join(", ")}`,
+        error: `Master MCP list names unknown harnesses: ${unknown.join(", ")}`,
         known: listHarnesses(),
       };
       return { content: text(details), details, isError: true };

@@ -847,7 +847,7 @@ export interface SyncTargetResult {
   excluded?: true;
   results: Array<{
     name: string;
-    action: "added" | "replaced" | "removed" | "unchanged" | "skipped";
+    action: "added" | "replaced" | "removed" | "kept" | "unchanged" | "skipped";
     /** Why a master server could not be written to this harness. */
     reason?: string;
   }>;
@@ -912,27 +912,43 @@ function normalizeMasterServers(
   return servers;
 }
 
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
 function masterExcludes(value: unknown, path: string): string[] {
   if (value === undefined) return [];
-  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
+  if (!isStringArray(value)) {
     throw new Error(
       `Master MCP list at ${path} has an invalid excludes: expected an array of harness ids`,
     );
   }
-  return value as string[];
+  return value;
+}
+
+function masterKeep(value: unknown, path: string): Record<string, string[]> {
+  if (value === undefined) return {};
+  if (!isObjectRecord(value) || !Object.values(value).every(isStringArray)) {
+    throw new Error(
+      `Master MCP list at ${path} has an invalid keep: expected harness ids mapped to arrays of server names`,
+    );
+  }
+  return value as Record<string, string[]>;
 }
 
 /**
  * Reads and normalizes the master list; throws when the file is missing or invalid.
  *
  * @param options - Path-resolution overrides.
- * @returns {{ path: string, servers: McpServerConfig[], excludes: string[] }} The master list.
+ * @returns {{ path: string, servers: McpServerConfig[], excludes: string[], keep: Record<string, string[]> }} The master list.
  */
 export function readMasterMcpServers(options: ResolveOptions = {}): {
   path: string;
   servers: McpServerConfig[];
   /** Harness ids the master list opts out of syncing. */
   excludes: string[];
+  /** Per harness id, its own server names that sync leaves in place. */
+  keep: Record<string, string[]>;
 } {
   const path = masterMcpPath(options);
   const raw = readIfExists(path);
@@ -945,6 +961,7 @@ export function readMasterMcpServers(options: ResolveOptions = {}): {
     path,
     servers: normalizeMasterServers(map, options.homeDir ?? homedir()),
     excludes: masterExcludes(root.excludes, path),
+    keep: masterKeep(root.keep, path),
   };
 }
 
@@ -952,6 +969,7 @@ type MasterSyncInput = Readonly<{
   path: string;
   servers: readonly McpServerConfig[];
   excludes: readonly string[];
+  keep: Readonly<Record<string, readonly string[]>>;
 }>;
 
 function optionalPath(path: string | undefined): {} | { path: string } {
@@ -992,6 +1010,31 @@ function cannotHold(error: unknown): error is McpEnvError | McpTransportError {
   return error instanceof McpEnvError || error instanceof McpTransportError;
 }
 
+function removeExtraServers(
+  harness: Harness,
+  existing: ReadonlyMap<string, string>,
+  masterNames: ReadonlySet<string>,
+  keep: Readonly<Record<string, readonly string[]>>,
+  options: ResolveOptions,
+): { path?: string; results: SyncTargetResult["results"] } {
+  const kept = (Object.hasOwn(keep, harness.id) ? keep[harness.id] : undefined) ?? [];
+  const results: SyncTargetResult["results"] = [];
+  let path: string | undefined;
+  for (const name of existing.keys()) {
+    if (masterNames.has(name)) continue;
+    if (kept.includes(name)) {
+      results.push({ name, action: "kept" });
+      continue;
+    }
+    const removed = removeMcpServer(harness, name, "user", options);
+    if (removed.removed) {
+      path = removed.path;
+      results.push({ name, action: "removed" });
+    }
+  }
+  return { ...optionalPath(path), results };
+}
+
 function syncIncludedHarness(
   harness: Harness,
   master: MasterSyncInput,
@@ -1019,15 +1062,9 @@ function syncIncludedHarness(
       results.push({ name: server.name, action: "skipped", reason: error.message });
     }
   }
-  for (const name of existing.keys()) {
-    if (masterNames.has(name)) continue;
-    const removed = removeMcpServer(harness, name, "user", options);
-    if (removed.removed) {
-      path = removed.path;
-      results.push({ name, action: "removed" });
-    }
-  }
-  return { id: harness.id, ...optionalPath(path), results };
+  const extras = removeExtraServers(harness, existing, masterNames, master.keep, options);
+  results.push(...extras.results);
+  return { id: harness.id, ...optionalPath(extras.path ?? path), results };
 }
 
 function syncMcpTarget(
@@ -1067,7 +1104,8 @@ function syncMcpTarget(
 /**
  * Resets each harness's user-scope MCP config to exactly the master list:
  * missing servers are added, drifted ones replaced, and servers absent from
- * the master are removed. The master file is the single source of truth.
+ * the master are removed unless its `keep` names them for that harness. The
+ * master file is the single source of truth, exceptions included.
  *
  * @param harnesses - Harnesses to synchronize.
  * @param options - Platform and path-resolution overrides.

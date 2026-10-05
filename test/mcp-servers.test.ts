@@ -14,7 +14,7 @@ import {
   type SyncTargetResult,
 } from "../src/index.ts";
 import Cursor from "../src/harnesses/cursor.ts";
-import { mcpList } from "../src/tool-operations.ts";
+import { mcpList, mcpSync } from "../src/tool-operations.ts";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -1048,6 +1048,94 @@ describe("syncMcpServers", () => {
     } finally {
       if (previousXdg !== undefined) process.env.XDG_CONFIG_HOME = previousXdg;
     }
+  });
+
+  it("leaves a harness's own servers alone when keep names them", () => {
+    const dirs = fixtureDirs();
+    const previousXdg = process.env.XDG_CONFIG_HOME;
+    delete process.env.XDG_CONFIG_HOME;
+    try {
+      writeMaster(
+        dirs.homeDir,
+        `{
+  // only codex can run node_repl
+  "keep": { "codex": ["node_repl"] },
+  "mcpServers": { "probe": { "command": "node" } },
+}`,
+      );
+      mkdirSync(join(dirs.homeDir, ".codex"), { recursive: true });
+      writeFileSync(
+        join(dirs.homeDir, ".codex", "config.toml"),
+        '[mcp_servers.node_repl]\ncommand = "node_repl"\n\n[mcp_servers.stray]\ncommand = "stray"\n',
+      );
+      addMcpServer(
+        getHarness("claude"),
+        { name: "node_repl", transport: "stdio", command: "node_repl" },
+        "user",
+        dirs,
+      );
+      const targets = [getHarness("codex"), getHarness("claude")];
+
+      const first = syncMcpServers(targets, dirs);
+      expect(targetResults(first.targets, "codex")).toEqual([
+        { name: "probe", action: "added" },
+        { name: "node_repl", action: "kept" },
+        { name: "stray", action: "removed" },
+      ]);
+      expect(targetResults(first.targets, "claude")).toEqual([
+        { name: "probe", action: "added" },
+        { name: "node_repl", action: "removed" },
+      ]);
+      const codexServers = listMcpServers(getHarness("codex"), dirs).find(
+        (l) => l.scope === "user",
+      )?.servers;
+      expect(codexServers?.map((s) => s.name).sort()).toEqual(["node_repl", "probe"]);
+
+      const second = syncMcpServers(targets, dirs);
+      expect(targetResults(second.targets, "codex")).toEqual([
+        { name: "probe", action: "unchanged" },
+        { name: "node_repl", action: "kept" },
+      ]);
+    } finally {
+      if (previousXdg !== undefined) process.env.XDG_CONFIG_HOME = previousXdg;
+    }
+  });
+
+  it("rejects a keep field that does not map harness ids to server names", () => {
+    const dirs = fixtureDirs();
+    const previousXdg = process.env.XDG_CONFIG_HOME;
+    delete process.env.XDG_CONFIG_HOME;
+    try {
+      for (const keep of [["codex"], { codex: "node_repl" }, { codex: [1] }]) {
+        writeMaster(dirs.homeDir, JSON.stringify({ keep, mcpServers: {} }));
+        expect(() => syncMcpServers([getHarness("claude")], dirs)).toThrow(/invalid keep/);
+      }
+    } finally {
+      if (previousXdg !== undefined) process.env.XDG_CONFIG_HOME = previousXdg;
+    }
+  });
+
+  it("refuses to sync when keep names an unknown harness", () => {
+    const dirs = fixtureDirs();
+    vi.stubEnv("HOME", dirs.homeDir);
+    vi.stubEnv("XDG_CONFIG_HOME", join(dirs.homeDir, ".config"));
+    onTestFinished(() => {
+      vi.unstubAllEnvs();
+    });
+    writeMaster(
+      dirs.homeDir,
+      JSON.stringify({
+        keep: { codxe: ["node_repl"] },
+        mcpServers: { probe: { command: "node" } },
+      }),
+    );
+
+    const result = mcpSync("claude");
+
+    expect(result.isError).toBe(true);
+    expect(result.details).toMatchObject({
+      error: "Master MCP list names unknown harnesses: codxe (keep)",
+    });
   });
 
   it("rejects an excludes field that is not an array of strings", () => {

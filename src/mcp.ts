@@ -133,7 +133,7 @@ const tools: ToolDefinition[] = [
     name: "harnesses_mcp_sync",
     title: "Harnesses MCP Sync",
     description:
-      "Reset every harness's user-scope MCP config to exactly the master list from ~/.config/agntn/mcp.jsonc: servers are added, replaced, and extras removed. Excluded harnesses keep their own servers, but master-listed names are withdrawn from them.",
+      "Reset every harness's user-scope MCP config to exactly the master list from ~/.config/agntn/mcp.jsonc: servers are added, replaced, and extras removed unless the list's keep names them for that harness. Excluded harnesses keep their own servers, but master-listed names are withdrawn from them.",
     inputSchema: schemas.mcpSync,
     annotations: CONFIG_WRITE,
     execute: ({ mcpSync }, args) => mcpSync(args.id as string | undefined),
