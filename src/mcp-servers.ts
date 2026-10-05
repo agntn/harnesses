@@ -928,7 +928,11 @@ function masterExcludes(value: unknown, path: string): string[] {
 
 function masterKeep(value: unknown, path: string): Record<string, string[]> {
   if (value === undefined) return {};
-  if (!isObjectRecord(value) || !Object.values(value).every(isStringArray)) {
+  if (
+    !isObjectRecord(value) ||
+    Array.isArray(value) ||
+    !Object.values(value).every(isStringArray)
+  ) {
     throw new Error(
       `Master MCP list at ${path} has an invalid keep: expected harness ids mapped to arrays of server names`,
     );

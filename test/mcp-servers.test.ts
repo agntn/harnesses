@@ -1106,7 +1106,7 @@ describe("syncMcpServers", () => {
     const previousXdg = process.env.XDG_CONFIG_HOME;
     delete process.env.XDG_CONFIG_HOME;
     try {
-      for (const keep of [["codex"], { codex: "node_repl" }, { codex: [1] }]) {
+      for (const keep of [[], ["codex"], { codex: "node_repl" }, { codex: [1] }]) {
         writeMaster(dirs.homeDir, JSON.stringify({ keep, mcpServers: {} }));
         expect(() => syncMcpServers([getHarness("claude")], dirs)).toThrow(/invalid keep/);
       }
