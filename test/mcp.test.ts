@@ -2,7 +2,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { createMcpServer } from "../src/mcp.ts";
-import { listHarnesses, registerHarness } from "../src/index.ts";
+import { decode as fromToon } from "@toon-format/toon";
+import { getHarness, listHarnesses, registerHarness } from "../src/index.ts";
 import type { InvokeOptions, InvokeResult, ListModelsOptions } from "../src/index.ts";
 import Cursor from "../src/harnesses/cursor.ts";
 
@@ -134,6 +135,26 @@ describe("harnesses MCP server", () => {
         openWorldHint: tool.name === "harnesses_run" || tool.name === "harnesses_models",
       });
     }
+  });
+
+  it("lists the run modes harnesses_run takes for each harness", async () => {
+    const client = await connectTestClient();
+
+    const response = await client.callTool({ name: "harnesses_detect", arguments: {} });
+
+    expect(response.isError).not.toBe(true);
+    const harnesses = listHarnesses().map((id) => {
+      const harness = getHarness(id);
+      return {
+        id,
+        advisor: harness.invocationError({ tools: false }) === null,
+        readOnly: harness.invocationError({ tools: true, readOnly: true }) === null,
+        agent: harness.invocationError({ tools: true }) === null,
+      };
+    });
+    expect(harnesses).toContainEqual({ id: "codex", advisor: false, readOnly: true, agent: true });
+    expect(harnesses).toContainEqual({ id: "claude", advisor: true, readOnly: true, agent: true });
+    expect(fromToon(onlyTextContent(response.content))).toMatchObject({ harnesses });
   });
 
   it("returns full metadata for a known harness id", async () => {

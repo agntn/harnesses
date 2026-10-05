@@ -55,12 +55,18 @@ export interface ToolResult<Details> {
   isError?: boolean;
 }
 
-/** Install state of one harness on this machine. */
+/** Install state of one harness on this machine, plus the runs harnesses_run takes for it. */
 export interface HarnessStatus {
   id: HarnessId;
   name: string;
   installed: boolean;
   version: string | null;
+  /** Takes `tools: false`, an advisor without tools. */
+  advisor: boolean;
+  /** Takes `tools: true` with `readOnly: true`, under native read-only enforcement. */
+  readOnly: boolean;
+  /** Takes `tools: true`, the full agent. */
+  agent: boolean;
 }
 
 /** Every registered harness with its install state, as scanned by {@link detectHarnesses}. */
@@ -289,7 +295,7 @@ function unsupportedInvocation(
 }
 
 /**
- * Scans every registered harness for its binaries and version.
+ * Scans every registered harness for its binaries and version, next to the modes it runs in.
  *
  * @returns {ToolResult<HarnessListing>} The complete installation listing.
  */
@@ -297,11 +303,15 @@ export function detectHarnesses(): ToolResult<HarnessListing> {
   const details: HarnessListing = {
     harnesses: getAllHarnesses().map((harness) => {
       const installed = harness.isInstalled();
+      const { advisor, readOnly, agent } = harness.invocationModes;
       return {
         id: harness.id,
         name: harness.name,
         installed,
         version: installed ? harness.version : null,
+        advisor,
+        readOnly,
+        agent,
       };
     }),
   };

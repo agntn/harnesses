@@ -67,7 +67,8 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "harnesses_detect",
     label: HARNESS_TOOL_LABELS.harnesses_detect,
-    description: "List every known AI coding harness with its install state and version",
+    description:
+      "List every known AI coding harness with its install state, version and the harnesses_run modes it takes: advisor (tools=false), readOnly (tools=true with readOnly=true) and agent (tools=true)",
     parameters: schemas.detect,
     approval: HARNESS_TOOL_APPROVALS.harnesses_detect,
     async execute(_toolCallId, _params): Promise<AgentToolResult<HarnessTools.HarnessListing>> {
@@ -121,7 +122,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     name: "harnesses_run",
     label: HARNESS_TOOL_LABELS.harnesses_run,
     description:
-      "Run one prompt through a harness. Always choose tools explicitly. Add readOnly when tools is true to require native read-only enforcement, or use tools false for an advisor without tools.",
+      "Run one prompt through a harness. Always choose tools explicitly. Add readOnly when tools is true to require native read-only enforcement, or use tools false for an advisor without tools. harnesses_detect shows which modes each harness takes.",
     parameters: schemas.run,
     approval: HARNESS_TOOL_APPROVALS.harnesses_run,
     async execute(

@@ -305,7 +305,7 @@ export function shellLine(built: BuiltCommand): string {
 
 /** The agent tools the MCP server, the Pi extension and the OMP extension expose. */
 export const TOOLS = [
-  { name: "harnesses_detect", kind: "read", does: "Installed harnesses and their versions" },
+  { name: "harnesses_detect", kind: "read", does: "Installed harnesses, versions and how each one runs" },
   { name: "harnesses_info", kind: "read", does: "Full metadata for one id or a batch of up to 20" },
   { name: "harnesses_models", kind: "exec", does: "Models a harness can use right now" },
   { name: "harnesses_run", kind: "exec", does: "One prompt through another harness" },

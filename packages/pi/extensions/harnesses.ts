@@ -79,10 +79,13 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "harnesses_detect",
     label: HARNESS_TOOL_LABELS.harnesses_detect,
-    description: "List every known AI coding harness with its install state and version",
-    promptSnippet: "Use harnesses_detect to see which AI coding harnesses are installed.",
+    description:
+      "List every known AI coding harness with its install state, version and the harnesses_run modes it takes: advisor (tools=false), readOnly (tools=true with readOnly=true) and agent (tools=true)",
+    promptSnippet:
+      "Use harnesses_detect to see which AI coding harnesses are installed and how each one runs.",
     promptGuidelines: [
       "The scan checks binaries on PATH. Versions come from native metadata or the CLI.",
+      "advisor, readOnly and agent say whether harnesses_run takes tools false, tools true with readOnly, or tools true for that harness.",
     ],
     parameters: schemas.detect,
     ...statusRenderers("harnesses_detect"),
@@ -152,7 +155,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       "Always choose tools explicitly. Set true whenever the task needs harness tools, including Grok native X search.",
       "Add readOnly when tools is true to require native read-only enforcement. Unsupported harnesses reject it instead of widening access.",
       "Set tools false only for an advisor without tools. It never silently falls back to a full agent.",
-      "An unsupported mode returns an explicit retry when the alternate mode is available.",
+      "An unsupported mode returns an explicit retry when the alternate mode is available. harnesses_detect shows the modes up front.",
       "Output is capped for context; long runs stop at the timeout.",
     ],
     parameters: schemas.run,
