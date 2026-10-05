@@ -188,7 +188,13 @@ describe("harnesses usage paths", () => {
   it("harnesses models prints Codex slugs and keeps the catalog's names from steering the terminal", () => {
     const binDir = mkdtempSync(join(tmpdir(), "harnesses-codex-"));
     const catalog = JSON.stringify({
-      models: [{ slug: "gpt-5.5", display_name: "GPT\u001B]0;owned\u0007-5.5\u202Eevil" }],
+      models: [
+        {
+          slug: "gpt-5.5",
+          visibility: "list",
+          display_name: "GPT\u001B]0;owned\u0007-5.5\u202Eevil",
+        },
+      ],
     });
     try {
       writeFileSync(join(binDir, "codex"), `#!/bin/sh\nprintf '%s\\n' '${catalog}'\n`, {

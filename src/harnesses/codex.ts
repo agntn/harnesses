@@ -6,7 +6,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Maps one catalog entry, or skips it when Codex hides it from its own picker.
+ * Maps one catalog entry, or skips it when Codex leaves it out of its own picker.
  *
  * @param entry - One element of `models`.
  * @returns {AvailableModel | undefined} The model, or undefined for a hidden one.
@@ -14,7 +14,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function codexModel(entry: unknown): AvailableModel | undefined {
   if (!isRecord(entry) || typeof entry["slug"] !== "string")
     throw new Error(`Unexpected Codex model-list entry: ${JSON.stringify(entry)?.slice(0, 200)}`);
-  if (entry["visibility"] === "hide") return undefined;
+  if (entry["visibility"] !== "list") return undefined;
   const {
     display_name: name,
     context_window: contextWindow,
@@ -181,7 +181,7 @@ export default class Codex extends Harness {
   override readonly modelListing: Harness["modelListing"] = {
     args: ["debug", "models"],
     level: "official",
-    note: "Prints the model catalog as JSON, refreshed from OpenAI unless --bundled, with no filter of its own; hidden models are left out. It lives under debug, so the shape can move between releases; verified with 0.160.0.",
+    note: "Prints the model catalog as JSON, refreshed from OpenAI unless --bundled, with no filter of its own; only models Codex shows in its picker are kept. It lives under debug, so the shape can move between releases; verified with 0.160.0.",
   };
   override readonly mcpConfigs: Harness["mcpConfigs"] = [
     {

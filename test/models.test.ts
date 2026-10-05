@@ -478,9 +478,10 @@ describe("model listing", () => {
     ]);
     expect(
       parseCodexModels(
-        '{"models":[{"slug":"tiny","supported_reasoning_levels":[],"input_modalities":["text"]}]}',
+        '{"models":[{"slug":"tiny","visibility":"list","supported_reasoning_levels":[],"input_modalities":["text"]}]}',
       ),
     ).toEqual([{ provider: "openai", id: "tiny", thinking: false, images: false }]);
+    expect(parseCodexModels('{"models":[{"slug":"internal","visibility":"none"}]}')).toEqual([]);
   });
 
   it("rejects Codex output it does not recognize", () => {
