@@ -121,6 +121,28 @@ if (model) await agy.invoke("Review this patch", { tools: true, model: agy.model
 
 That's most of it, really. `getHarness` wants an exact id. `detectHarness` uses env vars first, then a single project marker. `invoke()` talks to the CLI, and `effort` decides how hard it thinks for that one run. `listModels()` asks it what it can run, and `modelSelector()` turns one of those into what `model` takes, since Pi wants `provider/id` while Antigravity and Codex want the bare id. A mode the CLI cannot run comes back as an error, not a quieter one. The rest: [Registry](https://harnesses.agntn.dev/guide/registry), [Invoke](https://harnesses.agntn.dev/guide/invoke), [MCP servers](https://harnesses.agntn.dev/guide/mcp-servers), [Instructions files](https://harnesses.agntn.dev/guide/agents-sync).
 
+### MCP servers
+
+One list in `~/.config/agntn/mcp.jsonc`, every harness synced to it:
+
+```jsonc
+{
+  "keep": { "codex": ["node_repl"] },
+  "mcpServers": {
+    "harnesses": { "command": "npx", "args": ["-y", "@agntn/harnesses", "mcp"] },
+  },
+}
+```
+
+```ts
+import { getHarness, syncMcpServers } from "@agntn/harnesses";
+
+syncMcpServers([getHarness("codex")]).targets[0]?.results;
+// [{ name: "harnesses", action: "added" }, { name: "node_repl", action: "kept" }]
+```
+
+Anything not on the list gets removed. That's the point. But what about a server only one harness can run? Name it under `keep` and it stays. The rest is in the [MCP servers guide](https://harnesses.agntn.dev/guide/mcp-servers).
+
 ### Prompt templates
 
 Put canonical Markdown templates in `$XDG_DATA_HOME/agntn/prompts/`, or
