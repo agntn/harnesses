@@ -37,6 +37,7 @@ class McpListFixtureHarness extends Cursor {
 
 function fixtureDirs(): { homeDir: string; projectRoot: string } {
   const root = mkdtempSync(join(tmpdir(), "harnesses-mcp-"));
+  onTestFinished(() => rmSync(root, { recursive: true, force: true }));
   const homeDir = join(root, "home");
   const projectRoot = join(root, "project");
   mkdirSync(homeDir, { recursive: true });
@@ -54,7 +55,6 @@ function withMcpListFixture(run: () => void): void {
   } finally {
     registerHarness(Cursor);
     mcpListFixturePath = "";
-    rmSync(dirname(dirs.projectRoot), { recursive: true, force: true });
   }
 }
 
@@ -265,7 +265,6 @@ describe("listMcpServers", () => {
 
   it("reads Pi mcp.json at both scopes", () => {
     const dirs = fixtureDirs();
-    onTestFinished(() => rmSync(dirname(dirs.homeDir), { recursive: true, force: true }));
     const userConfig = join(dirs.homeDir, ".pi", "agent", "mcp.json");
     const projectConfig = join(dirs.projectRoot, ".pi", "mcp.json");
     mkdirSync(dirname(userConfig), { recursive: true });
@@ -465,7 +464,6 @@ describe("addMcpServer / removeMcpServer", () => {
 
   it("keeps the fields Pi adds to an entry while its transport stays", () => {
     const dirs = fixtureDirs();
-    onTestFinished(() => rmSync(dirname(dirs.homeDir), { recursive: true, force: true }));
     const pi = getHarness("pi");
     const config = join(dirs.homeDir, ".pi", "agent", "mcp.json");
     mkdirSync(dirname(config), { recursive: true });
@@ -501,7 +499,6 @@ describe("addMcpServer / removeMcpServer", () => {
 
   it("refuses an sse server for Pi", () => {
     const dirs = fixtureDirs();
-    onTestFinished(() => rmSync(dirname(dirs.homeDir), { recursive: true, force: true }));
 
     expect(() =>
       addMcpServer(
@@ -834,7 +831,6 @@ describe("syncMcpServers", () => {
 
   it("syncs Pi and skips an sse server it cannot hold", () => {
     const dirs = fixtureDirs();
-    onTestFinished(() => rmSync(dirname(dirs.homeDir), { recursive: true, force: true }));
     const previousXdg = process.env.XDG_CONFIG_HOME;
     delete process.env.XDG_CONFIG_HOME;
     try {
@@ -1164,9 +1160,6 @@ describe("syncMcpServers", () => {
 
   it("refuses a master list whose mcpServers is not an object, before touching any harness", () => {
     const dirs = fixtureDirs();
-    onTestFinished(() => {
-      rmSync(dirname(dirs.homeDir), { recursive: true, force: true });
-    });
     const previousXdg = process.env.XDG_CONFIG_HOME;
     delete process.env.XDG_CONFIG_HOME;
     try {
