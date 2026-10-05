@@ -81,6 +81,8 @@ export interface HarnessMetadata {
   binaries: string[];
   capabilities: HarnessCapabilities;
   invocationModes: HarnessInvocationModes;
+  /** Network for what a read-only run starts here, MCP servers included; null when unknown. */
+  readOnlyNetwork: boolean | null;
   modelListing: boolean;
   modelSelection: boolean;
   effortSelection: boolean;
@@ -337,6 +339,7 @@ function harnessInfoResult(id: string): HarnessInfoResult {
     binaries: harness.binaries,
     capabilities: harness.capabilities,
     invocationModes: harness.invocationModes,
+    readOnlyNetwork: harness.readOnlyNetwork(),
     modelListing: harness.modelListing !== null,
     modelSelection: harness.invocation?.modelArgs !== undefined,
     effortSelection: harness.invocation?.effortArgs !== undefined,
@@ -394,6 +397,7 @@ function harnessInfoText(result: HarnessInfoResult): HarnessInfoText {
     binaries,
     capabilities,
     invocationModes,
+    readOnlyNetwork,
     modelListing,
     modelSelection,
     effortSelection,
@@ -408,6 +412,7 @@ function harnessInfoText(result: HarnessInfoResult): HarnessInfoText {
     binaries,
     capabilities,
     invocationModes,
+    readOnlyNetwork,
     modelListing,
     modelSelection,
     effortSelection,

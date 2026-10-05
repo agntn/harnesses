@@ -37,6 +37,19 @@ function entry(content: string) {
   return `    ${content}`;
 }
 
+/**
+ * Read-only Grok loses the network on Linux, so info says it right under the modes.
+ *
+ * @param network - The harness's answer for this platform.
+ * @returns {string} One coloured line, dim when nobody checked.
+ */
+function readOnlyNetworkLine(network: boolean | null): string {
+  if (network === null) return s.dim("readOnly network: unknown");
+  return network
+    ? s.green("readOnly network: kept")
+    : s.red("readOnly network: cut, MCP servers included");
+}
+
 function renderPathSection(
   title: string,
   entries: readonly {
@@ -222,6 +235,7 @@ const info = defineCommand({
           binaries: harness.binaries,
           capabilities: harness.capabilities,
           invocationModes: harness.invocationModes,
+          readOnlyNetwork: harness.readOnlyNetwork(),
           modelListing: modelFeatures.listing,
           modelSelection: modelFeatures.selection,
           effortSelection: modelFeatures.effort,
@@ -258,6 +272,7 @@ const info = defineCommand({
       .map(([k, v]) => (v ? s.green(k) : s.dim(k)))
       .join(s.dim("  ·  "));
     consola.log(entry(modes));
+    consola.log(entry(readOnlyNetworkLine(harness.readOnlyNetwork())));
 
     consola.log(section("Models"));
     consola.log(

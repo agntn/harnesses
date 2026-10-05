@@ -295,6 +295,32 @@ describe("normalized invocation", () => {
     });
   });
 
+  it("says a read-only Grok run loses the network on Linux only", () => {
+    const grok = getHarness("grok");
+
+    expect(grok.readOnlyNetwork("linux")).toBe(false);
+    expect(grok.readOnlyNetwork("darwin")).toBe(true);
+    expect(grok.readOnlyNetwork("win32")).toBeNull();
+    expect(grok.readOnlyNetwork("constructor")).toBeNull();
+    expect(getHarness("codex").readOnlyNetwork("linux")).toBeNull();
+    expect(getHarness("gemini").readOnlyNetwork("linux")).toBeNull();
+  });
+
+  it("keeps the network answer of a harness that only reads JSON in read-only mode", () => {
+    class JsonOnlyReadOnly extends FakeCursor {
+      override readonly invocation: Harness["invocation"] = {
+        args: ["{prompt}"],
+        readOnlyJsonArgs: ["--json", "{prompt}"],
+        readOnlyNetwork: { linux: false },
+        level: "inferred",
+      };
+    }
+    const harness = new JsonOnlyReadOnly();
+
+    expect(harness.invocationModes.readOnlyStructured).toBe(true);
+    expect(harness.readOnlyNetwork("linux")).toBe(false);
+  });
+
   it("rejects OMP advisor mode because --no-tools only disables bundled tools", () => {
     const omp = getHarness("omp");
 

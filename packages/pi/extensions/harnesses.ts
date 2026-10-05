@@ -99,7 +99,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     name: "harnesses_info",
     label: HARNESS_TOOL_LABELS.harnesses_info,
     description:
-      "Full metadata for one or more AI coding harnesses, including supported invocation and model operations, configuration, sessions, instructions, skills, commands, prompt templates, hooks, temp directories, the env variables that move them, and resolved paths",
+      "Full metadata for one or more AI coding harnesses, including supported invocation and model operations, whether a read-only run keeps its network, configuration, sessions, instructions, skills, commands, prompt templates, hooks, temp directories, the env variables that move them, and resolved paths",
     promptSnippet: "Use harnesses_info to look up where coding harnesses store their data.",
     promptGuidelines: [
       "Pass one harness id from harnesses_detect, or batch several ids in one call.",
@@ -154,6 +154,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     promptGuidelines: [
       "Always choose tools explicitly. Set true whenever the task needs harness tools, including Grok native X search.",
       "Add readOnly when tools is true to require native read-only enforcement. Unsupported harnesses reject it instead of widening access.",
+      "A run that needs the web checks readOnlyNetwork in harnesses_info first: false means its MCP servers get no network under readOnly.",
       "Set tools false only for an advisor without tools. It never silently falls back to a full agent.",
       "An unsupported mode returns an explicit retry when the alternate mode is available. harnesses_detect shows the modes up front.",
       "Output is capped for context; long runs stop at the timeout.",

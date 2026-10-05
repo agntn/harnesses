@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
+import { getHarness } from "../src/index.ts";
 import { HARNESS_INFO_MAX_ITEMS, harnessInfo } from "../src/tool-operations.ts";
 
 describe("harness info", () => {
@@ -32,6 +33,15 @@ describe("harness info", () => {
     expect(text).toMatch(/^  temp\[/m);
     const overrides = "envOverrides" in result.details ? result.details.envOverrides : [];
     expect(overrides.map((entry) => entry.path)).toContain("${TMPDIR}");
+  });
+
+  it("tells whether a read-only run keeps its network here", () => {
+    const result = harnessInfo("grok");
+    const text = result.content[0]?.text ?? "";
+    const network = getHarness("grok").readOnlyNetwork();
+
+    expect(result.details).toMatchObject({ id: "grok", readOnlyNetwork: network });
+    expect(text).toMatch(new RegExp(`^readOnlyNetwork: ${String(network)}$`, "m"));
   });
 
   it("drops the templates from every batch entry", () => {

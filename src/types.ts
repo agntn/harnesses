@@ -94,6 +94,8 @@ export interface HarnessInvocation {
   readOnlyJsonArgs?: string[];
   /** Lowest CLI version whose read-only enforcement was verified; older or unknown versions reject read-only runs. */
   readOnlyMinVersion?: string;
+  /** Per platform, whether read-only child processes reach the network; unlisted is unchecked. */
+  readOnlyNetwork?: Partial<Record<Platform, boolean>>;
   /** Arguments appended when a model is selected; every "{model}" is replaced. */
   modelArgs?: string[];
   /** Arguments appended when a reasoning effort is selected; every "{effort}" is replaced. */

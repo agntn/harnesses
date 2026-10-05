@@ -525,6 +525,19 @@ export abstract class Harness {
   }
 
   /**
+   * Whether a read-only run still has network for what it starts, MCP servers included.
+   *
+   * @param platform - Platform to answer for; defaults to this one.
+   * @returns {boolean | null} The checked answer, or null when nobody checked.
+   */
+  readOnlyNetwork(platform: string = process.platform): boolean | null {
+    const { readOnly, readOnlyStructured } = this.invocationModes;
+    const network = readOnly || readOnlyStructured ? this.invocation?.readOnlyNetwork : undefined;
+    if (network === undefined || !Object.hasOwn(network, platform)) return null;
+    return network[platform as Platform] ?? null;
+  }
+
+  /**
    * Expands the invocation template for one prompt, without spawning anything.
    * Returns null when the harness has no headless mode, or no structured mode
    * when `structured` is requested.
