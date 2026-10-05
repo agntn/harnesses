@@ -28,7 +28,13 @@ type OutputFormat = Readonly<{ json?: boolean; toon?: boolean }>;
 const UNSAFE_TERMINAL_CONTROLS = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F]/g;
 const UNSAFE_UNICODE_FORMATTING = /[\p{Cf}\p{Zl}\p{Zp}]/gu;
 
-function sanitize(text: string | undefined): string {
+/**
+ * Drops terminal sequences, control bytes and Unicode formatting from text meant for a person.
+ *
+ * @param text - Text that may echo an outside value.
+ * @returns {string} The text, safe to print.
+ */
+export function sanitize(text: string | undefined): string {
   return stripVTControlCharacters(text ?? "")
     .replace(UNSAFE_TERMINAL_CONTROLS, " ")
     .replace(UNSAFE_UNICODE_FORMATTING, " ");

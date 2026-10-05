@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { getHarness, registerHarness } from "../src/index.ts";
 import Antigravity, { parseAntigravityModels } from "../src/harnesses/antigravity.ts";
+import Codex, { parseCodexModels } from "../src/harnesses/codex.ts";
 import Grok, { parseGrokModels } from "../src/harnesses/grok.ts";
 import Omp, { parseOmpModels } from "../src/harnesses/omp.ts";
 import Pi, { parsePiModelTable } from "../src/harnesses/pi.ts";
@@ -40,6 +41,22 @@ const OMP_MODELS_OUTPUT = `{"models":[
 {"provider":"opencode-go","kind":"chat","id":"omen-alpha","selector":"opencode-go/omen-alpha","name":"omen-alpha","contextWindow":null,"maxTokens":null,"reasoning":false,"thinking":null,"input":["text"],"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0},"pricingStatus":"unknown"}
 ]}
 `;
+
+/** `codex debug models` from codex-cli 0.160.0, cut to the fields the parser reads. */
+const CODEX_MODELS_OUTPUT = `{"models":[
+{"slug":"gpt-5.5","display_name":"GPT-5.5","visibility":"list","supported_reasoning_levels":[{"effort":"low"},{"effort":"medium"},{"effort":"high"},{"effort":"xhigh"}],"context_window":272000,"input_modalities":["text","image"]},
+{"slug":"codex-auto-review","display_name":"Codex Auto Review","visibility":"hide","supported_reasoning_levels":[{"effort":"low"},{"effort":"medium"},{"effort":"high"},{"effort":"xhigh"},{"effort":"max"}],"context_window":272000,"input_modalities":["text","image"]},
+{"slug":"gpt-daybreak-blue-latest","display_name":"Daybreak Blue","visibility":"list","supported_reasoning_levels":[{"effort":"low"},{"effort":"medium"},{"effort":"high"},{"effort":"xhigh"},{"effort":"max"},{"effort":"ultra"}],"context_window":272000,"input_modalities":["text","image"]}
+]}
+`;
+
+class FakeCodex extends Codex {
+  override readonly binaries = ["node"];
+  override readonly modelListing: Codex["modelListing"] = {
+    args: ["-e", `process.stdout.write(${JSON.stringify(CODEX_MODELS_OUTPUT)})`],
+    level: "inferred",
+  };
+}
 
 class FakeOmp extends Omp {
   override readonly binaries = ["node"];
@@ -96,6 +113,7 @@ describe("model listing", () => {
     registerHarness(FakeGrok);
     registerHarness(FakeAntigravity);
     registerHarness(FakeOmp);
+    registerHarness(FakeCodex);
   });
 
   afterAll(() => {
@@ -103,6 +121,7 @@ describe("model listing", () => {
     registerHarness(Grok);
     registerHarness(Antigravity);
     registerHarness(Omp);
+    registerHarness(Codex);
   });
 
   it("exposes the Pi model-listing command", () => {
@@ -423,5 +442,68 @@ describe("model listing", () => {
     expect(result.isError).toBeUndefined();
     expect("models" in result.details ? result.details.models : []).toHaveLength(3);
     expect(result.content[0]?.text).toContain("openai-codex/gpt-5.5");
+  });
+
+  it("exposes the Codex catalog dump and filters it locally", () => {
+    const codex = new Codex();
+
+    expect(codex.buildModelListInvocation()).toEqual({
+      command: "codex",
+      args: ["debug", "models"],
+    });
+    expect(codex.buildModelListInvocation("--bundled")).toEqual({
+      command: "codex",
+      args: ["debug", "models"],
+    });
+  });
+
+  it("parses the Codex catalog and leaves out the models Codex hides", () => {
+    expect(parseCodexModels(CODEX_MODELS_OUTPUT)).toEqual([
+      {
+        provider: "openai",
+        id: "gpt-5.5",
+        name: "GPT-5.5",
+        contextWindow: 272_000,
+        thinking: true,
+        images: true,
+      },
+      {
+        provider: "openai",
+        id: "gpt-daybreak-blue-latest",
+        name: "Daybreak Blue",
+        contextWindow: 272_000,
+        thinking: true,
+        images: true,
+      },
+    ]);
+    expect(
+      parseCodexModels(
+        '{"models":[{"slug":"tiny","visibility":"list","supported_reasoning_levels":[],"input_modalities":["text"]}]}',
+      ),
+    ).toEqual([{ provider: "openai", id: "tiny", thinking: false, images: false }]);
+    expect(parseCodexModels('{"models":[{"slug":"internal","visibility":"none"}]}')).toEqual([]);
+  });
+
+  it("rejects Codex output it does not recognize", () => {
+    expect(() => parseCodexModels("Error: not logged in\n")).toThrow(
+      "Unexpected Codex model-list output",
+    );
+    expect(() => parseCodexModels('{"models":{}}')).toThrow("Unexpected Codex model-list output");
+    expect(() => parseCodexModels('{"models":[{"display_name":"GPT-5.5"}]}')).toThrow(
+      "Unexpected Codex model-list entry",
+    );
+  });
+
+  it("selects a Codex model by its bare slug", () => {
+    expect(new Codex().modelSelector({ provider: "openai", id: "gpt-5.5" })).toBe("gpt-5.5");
+  });
+
+  it("lists Codex models through the shared tool operation, searching ids locally", async () => {
+    const result = await listHarnessModels("codex", { search: "DAYBREAK" });
+
+    expect(result.isError).toBeUndefined();
+    expect("models" in result.details ? result.details.models : []).toEqual([
+      expect.objectContaining({ id: "gpt-daybreak-blue-latest" }),
+    ]);
   });
 });

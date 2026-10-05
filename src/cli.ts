@@ -12,7 +12,7 @@ import {
   type ModelsOutcome,
   type RunFailure,
 } from "./tool-operations.ts";
-import { exitOnClosedPipe } from "./commands/output.ts";
+import { exitOnClosedPipe, sanitize } from "./commands/output.ts";
 
 const s = {
   cyan: (t: string) => `\x1B[36m${t}\x1B[0m`,
@@ -107,6 +107,7 @@ function modelFailureMessage(details: ModelsOutcome | RunFailure): string {
 
 function modelDescription(model: Readonly<AvailableModel>): string {
   const parts: string[] = [];
+  if (model.name !== undefined) parts.push(model.name);
   if (model.default) parts.push("default");
   if (model.contextWindow !== undefined) parts.push(`${model.contextWindow} context`);
   if (model.maxOutputTokens !== undefined) parts.push(`${model.maxOutputTokens} max-out`);
@@ -126,7 +127,11 @@ function renderModels(details: ModelsOutcome): void {
   consola.log(header(`${details.id} models`));
   consola.log("");
   for (const model of details.models) {
-    consola.log(entry(`${s.hi(harness.modelSelector(model))}  ${s.dim(modelDescription(model))}`));
+    consola.log(
+      entry(
+        `${s.hi(sanitize(harness.modelSelector(model)))}  ${s.dim(sanitize(modelDescription(model)))}`,
+      ),
+    );
   }
   if (details.models.length === 0) consola.log(entry(s.dim("No models found")));
   consola.log("");

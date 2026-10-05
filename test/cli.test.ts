@@ -185,6 +185,36 @@ describe("harnesses usage paths", () => {
     }
   });
 
+  it("harnesses models prints Codex slugs and keeps the catalog's names from steering the terminal", () => {
+    const binDir = mkdtempSync(join(tmpdir(), "harnesses-codex-"));
+    const catalog = JSON.stringify({
+      models: [
+        {
+          slug: "gpt-5.5",
+          visibility: "list",
+          display_name: "GPT\u001B]0;owned\u0007-5.5\u202Eevil",
+        },
+      ],
+    });
+    try {
+      writeFileSync(join(binDir, "codex"), `#!/bin/sh\nprintf '%s\\n' '${catalog}'\n`, {
+        mode: 0o755,
+      });
+      const result = runCli(["models", "codex"], "", {
+        CONSOLA_LEVEL: "3",
+        PATH: `${binDir}:${process.env.PATH ?? ""}`,
+      });
+
+      expect(result.status).toBe(0);
+      expect(stripVTControlCharacters(result.stdout)).toMatch(/\sgpt-5\.5\s+GPT-5\.5 evil/u);
+      expect(result.stdout).not.toContain("openai/");
+      expect(result.stdout).not.toContain("owned");
+      expect(result.stdout).not.toContain("\u202E");
+    } finally {
+      rmSync(binDir, { recursive: true, force: true });
+    }
+  });
+
   it("harnesses prompts sync sanitizes Unicode formatting in human errors", () => {
     const bidiOverride = String.fromCodePoint(0x202e);
     const result = runCli(["prompts", "sync", `bad${bidiOverride}id`]);
