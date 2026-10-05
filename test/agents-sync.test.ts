@@ -5,12 +5,13 @@ import {
   readFileSync,
   readlinkSync,
   realpathSync,
+  rmSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, sep } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { afterEach, describe, expect, it, onTestFinished, vi } from "vite-plus/test";
 import { getHarness, syncAgentsFiles } from "../src/index.ts";
 
 // Rename failures by destination directory, standing in for a mount point.
@@ -35,6 +36,7 @@ afterEach(() => renameErrors.clear());
 
 function fixture(): { homeDir: string } {
   const root = mkdtempSync(join(tmpdir(), "harnesses-agents-"));
+  onTestFinished(() => rmSync(root, { recursive: true, force: true }));
   const homeDir = join(root, "home");
   mkdirSync(join(homeDir, ".config", "agntn"), { recursive: true });
   return { homeDir };
