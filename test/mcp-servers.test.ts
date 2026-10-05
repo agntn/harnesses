@@ -1161,4 +1161,24 @@ describe("syncMcpServers", () => {
       if (previousXdg !== undefined) process.env.XDG_CONFIG_HOME = previousXdg;
     }
   });
+
+  it("refuses a master list whose mcpServers is not an object, before touching any harness", () => {
+    const dirs = fixtureDirs();
+    const previousXdg = process.env.XDG_CONFIG_HOME;
+    delete process.env.XDG_CONFIG_HOME;
+    try {
+      const codexConfig = join(dirs.homeDir, ".codex", "config.toml");
+      mkdirSync(dirname(codexConfig), { recursive: true });
+      writeFileSync(codexConfig, '[mcp_servers.mine]\ncommand = "mine"\n');
+      for (const master of [{}, { mcpServers: [] }, { mcpServers: ["probe"] }]) {
+        writeMaster(dirs.homeDir, JSON.stringify(master));
+        expect(() => syncMcpServers([getHarness("codex")], dirs)).toThrow(
+          /has no mcpServers object/,
+        );
+        expect(readFileSync(codexConfig, "utf8")).toBe('[mcp_servers.mine]\ncommand = "mine"\n');
+      }
+    } finally {
+      if (previousXdg !== undefined) process.env.XDG_CONFIG_HOME = previousXdg;
+    }
+  });
 });
