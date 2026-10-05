@@ -139,10 +139,11 @@ export default class Grok extends Harness {
     readOnlyArgs: ["-p", "{prompt}", "--sandbox", "read-only"],
     readOnlyJsonArgs: ["-p", "{prompt}", "--sandbox", "read-only", "--output-format", "json"],
     readOnlyMinVersion: "1.0.13",
+    readOnlyNetwork: { linux: false, darwin: true },
     modelArgs: ["--model", "{model}"],
     effortArgs: ["--reasoning-effort", "{effort}"],
     level: "official",
-    note: "-p is short for --single; add --output-format json for structured output. --sandbox read-only is kernel-enforced (Landlock, Seatbelt) regardless of the inherited permission mode and still allows writes to ~/.grok and temp dirs; verified on Linux with 1.0.13 and 1.0.25.",
+    note: "-p is short for --single; add --output-format json for structured output. --sandbox read-only is kernel-enforced (Landlock, Seatbelt) regardless of the inherited permission mode and still allows writes to ~/.grok and temp dirs; verified on Linux with 1.0.13 and 1.0.25. On Linux it also cuts the network of every child process through seccomp, MCP servers included, so their lookups die on EAI_AGAIN while Grok's own web search keeps working; seen with 1.0.41. macOS skips that part.",
   };
   override readonly modelListing: Harness["modelListing"] = {
     args: ["models"],

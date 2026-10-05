@@ -295,6 +295,17 @@ describe("normalized invocation", () => {
     });
   });
 
+  it("says a read-only Grok run loses the network on Linux only", () => {
+    const grok = getHarness("grok");
+
+    expect(grok.readOnlyNetwork("linux")).toBe(false);
+    expect(grok.readOnlyNetwork("darwin")).toBe(true);
+    expect(grok.readOnlyNetwork("win32")).toBeNull();
+    expect(grok.readOnlyNetwork("constructor")).toBeNull();
+    expect(getHarness("codex").readOnlyNetwork("linux")).toBeNull();
+    expect(getHarness("gemini").readOnlyNetwork("linux")).toBeNull();
+  });
+
   it("rejects OMP advisor mode because --no-tools only disables bundled tools", () => {
     const omp = getHarness("omp");
 
