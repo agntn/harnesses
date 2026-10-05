@@ -531,8 +531,8 @@ export abstract class Harness {
    * @returns {boolean | null} The checked answer, or null when nobody checked.
    */
   readOnlyNetwork(platform: string = process.platform): boolean | null {
-    const network =
-      this.invocation?.readOnlyArgs === undefined ? undefined : this.invocation.readOnlyNetwork;
+    const { readOnly, readOnlyStructured } = this.invocationModes;
+    const network = readOnly || readOnlyStructured ? this.invocation?.readOnlyNetwork : undefined;
     if (network === undefined || !Object.hasOwn(network, platform)) return null;
     return network[platform as Platform] ?? null;
   }
