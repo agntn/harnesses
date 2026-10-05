@@ -1164,6 +1164,9 @@ describe("syncMcpServers", () => {
 
   it("refuses a master list whose mcpServers is not an object, before touching any harness", () => {
     const dirs = fixtureDirs();
+    onTestFinished(() => {
+      rmSync(dirname(dirs.homeDir), { recursive: true, force: true });
+    });
     const previousXdg = process.env.XDG_CONFIG_HOME;
     delete process.env.XDG_CONFIG_HOME;
     try {
