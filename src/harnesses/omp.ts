@@ -200,6 +200,7 @@ export default class Omp extends Harness {
     args: ["-p", "{prompt}"],
     jsonArgs: ["-p", "--mode", "json", "{prompt}"],
     modelArgs: ["--model={model}"],
+    effortArgs: ["--thinking={effort}"],
     level: "official",
     note: "Add --mode json for structured event output. --no-tools disables only OMP's bundled tools, so it cannot provide an advisor mode without tools.",
   };

@@ -28,6 +28,7 @@ import type { PromptSyncReport } from "./prompt-sync.ts";
 export type { SkillsSyncReport } from "./skills-sync.ts";
 import { syncSkills } from "./skills-sync.ts";
 import type { SkillsSyncReport } from "./skills-sync.ts";
+import { selectionError } from "./harness.ts";
 import type { Harness } from "./harness.ts";
 import type {
   AvailableModel,
@@ -76,6 +77,7 @@ export interface HarnessMetadata {
   invocationModes: HarnessInvocationModes;
   modelListing: boolean;
   modelSelection: boolean;
+  effortSelection: boolean;
   config: PathCandidate[];
   sessions: PathCandidate[];
   instructions: PathCandidate[];
@@ -138,6 +140,7 @@ function truncate(output: string): string {
 
 type RunInvocationOptions = Readonly<{
   model?: string;
+  effort?: string;
   structured: boolean;
   tools: boolean;
   readOnly: boolean;
@@ -238,6 +241,7 @@ function completedRun(
     command: result.command,
     args: [...templateArgs],
     ...(options.model === undefined ? {} : { model: options.model }),
+    ...(options.effort === undefined ? {} : { effort: options.effort }),
     structured: options.structured,
     tools: options.tools,
     readOnly: options.readOnly,
@@ -266,9 +270,11 @@ function unsupportedInvocation(
   const error = harness.invocationError(options) ?? `Invalid ${id} invocation`;
   const invocationModes = harness.invocationModes;
   const mode = selectedInvocationMode(options.structured, options.tools, options.readOnly);
-  const modelUnsupported =
-    options.model !== undefined && harness.invocation?.modelArgs === undefined;
-  if (invocationModes[mode] || harness.invocation === null || modelUnsupported) {
+  if (
+    invocationModes[mode] ||
+    harness.invocation === null ||
+    selectionError(harness.id, harness.invocation, options) !== null
+  ) {
     const details: RunFailure = { error };
     return { content: text(details), details, isError: true };
   }
@@ -315,6 +321,7 @@ function harnessInfoResult(id: string): HarnessInfoResult {
     invocationModes: harness.invocationModes,
     modelListing: harness.modelListing !== null,
     modelSelection: harness.invocation?.modelArgs !== undefined,
+    effortSelection: harness.invocation?.effortArgs !== undefined,
     config: harness.config,
     sessions: harness.sessions,
     instructions: harness.instructions,
@@ -371,6 +378,7 @@ function harnessInfoText(result: HarnessInfoResult): HarnessInfoText {
     invocationModes,
     modelListing,
     modelSelection,
+    effortSelection,
     envOverrides,
     persistence,
     detection,
@@ -384,6 +392,7 @@ function harnessInfoText(result: HarnessInfoResult): HarnessInfoText {
     invocationModes,
     modelListing,
     modelSelection,
+    effortSelection,
     envOverrides: getHarness(id).resolveCandidates(envOverrides),
     persistence,
     detection,
@@ -515,6 +524,8 @@ export interface RunOptions {
   cwd?: string;
   /** Harness-native model id or selector. */
   model?: string;
+  /** Reasoning effort in the harness's own words; rejected where `effortArgs` is missing. */
+  effort?: string;
   /** Wall-clock budget in seconds; defaults to {@link RUN_DEFAULT_TIMEOUT_SECONDS}. */
   timeoutSeconds?: number;
   /** Cancel the owned command through the host request signal. */
@@ -534,6 +545,7 @@ export interface RunOutcome {
   /** Expanded arguments; the model's text keeps "{prompt}" instead, it wrote the prompt itself. */
   args: string[];
   model?: string;
+  effort?: string;
   structured: boolean;
   tools: boolean;
   readOnly: boolean;
@@ -569,7 +581,7 @@ function normalizedRunAccess(options: Readonly<RunOptions>): {
  *
  * Tool use defaults to a native advisor without tools invocation. Harnesses that
  * cannot disable tools reject that mode; setting `tools` selects their full
- * agent invocation. `model` is translated through the harness-specific recipe.
+ * agent invocation. `model` and `effort` are translated through the harness-specific recipe.
  * This layer also closes stdin, enforces the timeout, caps the echoed output,
  * and leaves the prompt out of the echoed invocation.
  *
@@ -588,7 +600,13 @@ export async function runHarness(
   const harness = getHarness(id);
   const structured = options.structured ?? false;
   const { tools, readOnly } = normalizedRunAccess(options);
-  const invocationOptions = { model: options.model, structured, tools, readOnly };
+  const invocationOptions = {
+    model: options.model,
+    effort: options.effort,
+    structured,
+    tools,
+    readOnly,
+  };
   const template = harness.buildInvocation("{prompt}", invocationOptions);
   if (!template) {
     return unsupportedInvocation(harness, id, invocationOptions);
@@ -601,6 +619,7 @@ export async function runHarness(
     result = await harness.invoke(prompt, {
       cwd: options.cwd,
       model: options.model,
+      effort: options.effort,
       timeoutMs: timeoutSeconds * 1000,
       signal: options.signal,
       structured,

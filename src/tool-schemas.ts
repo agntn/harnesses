@@ -117,6 +117,15 @@ export function harnessToolSchemas<I, S>(Type: McpSchemaBuilder<I, S>) {
           maxLength: 512,
         }),
       ),
+      effort: Type.Optional(
+        Type.String({
+          description:
+            "Reasoning effort in the harness's own words, such as low or high. Harnesses without effortSelection in harnesses_info reject it.",
+          minLength: 1,
+          maxLength: 32,
+          pattern: "^[a-z]+$",
+        }),
+      ),
       timeoutSeconds: Type.Optional(
         Type.Integer({
           description: `Wall-clock budget in seconds (default ${RUN_TIMEOUT_DEFAULT_SECONDS})`,
@@ -226,6 +235,7 @@ export interface RunParams {
   prompt: string;
   cwd?: string;
   model?: string;
+  effort?: string;
   timeoutSeconds?: number;
   structured?: boolean;
   tools: boolean;

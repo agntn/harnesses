@@ -96,6 +96,8 @@ export interface HarnessInvocation {
   readOnlyMinVersion?: string;
   /** Arguments appended when a model is selected; every "{model}" is replaced. */
   modelArgs?: string[];
+  /** Arguments appended when a reasoning effort is selected; every "{effort}" is replaced. */
+  effortArgs?: string[];
   /**
    * Arguments appended to a plain text run so a CLI that holds its answer until
    * the end reports it as events instead; `invoke` folds them back into that text,
@@ -158,6 +160,8 @@ export interface InvokeOptions {
   env?: Record<string, string>;
   /** Harness-native model id or selector. */
   model?: string;
+  /** Reasoning effort in the harness's own words (`low`, `high`, `max`), passed through as is. */
+  effort?: string;
   /** Enable the spawned harness's tools; defaults to advisor without tools mode. */
   tools?: boolean;
   /** Require native enforcement of read-only tool access. Implies `tools: true` when `tools` is omitted; `tools: false` rejects the run. */

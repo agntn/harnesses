@@ -249,6 +249,7 @@ export default class Claude extends Harness {
     ],
     readOnlyMinVersion: "2.1.175",
     modelArgs: ["--model", "{model}"],
+    effortArgs: ["--effort", "{effort}"],
     streamArgs: ["--output-format", "stream-json", "--verbose", "--include-partial-messages"],
     level: "official",
     note: "Headless print mode; add --output-format json for structured output. Plain text runs stream events instead and fold them back, since text mode prints nothing until the answer is complete and a timeout would lose all of it; --include-partial-messages streams a single long answer too, checked on 2.1.280. --tools only covers the built-in set, so every mode without the full agent adds --strict-mcp-config to drop configured MCP servers too; without it an advisor still sees every user and project MCP tool, checked on 2.1.280. Read-only runs keep the built-in Read, Glob and Grep tools, so no write tool exists whatever permission mode the settings carry; verified on 2.1.175 and 2.1.268. --permission-mode plan does not qualify: its shell commands run through the auto mode classifier, which let a file write through.",

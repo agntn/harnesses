@@ -97,6 +97,7 @@ const tools: ToolDefinition[] = [
       runHarness(args.id as string, args.prompt as string, {
         cwd: args.cwd as string | undefined,
         model: args.model as string | undefined,
+        effort: args.effort as string | undefined,
         timeoutSeconds: args.timeoutSeconds as number | undefined,
         signal,
         structured: args.structured as boolean | undefined,

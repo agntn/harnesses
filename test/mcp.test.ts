@@ -235,6 +235,18 @@ describe("harnesses MCP server", () => {
     expect(onlyTextContent(response.content)).toContain("Invalid arguments");
   });
 
+  it("rejects an effort that could pass for a flag", async () => {
+    const client = await connectTestClient();
+
+    const response = await client.callTool({
+      name: "harnesses_run",
+      arguments: { id: "claude", prompt: "x", tools: false, effort: "--yolo" },
+    });
+
+    expect(response.isError).toBe(true);
+    expect(onlyTextContent(response.content)).toContain("Invalid arguments at /effort");
+  });
+
   it("names an argument the schema does not know instead of dropping it", async () => {
     const client = await connectTestClient();
 
