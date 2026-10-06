@@ -836,11 +836,9 @@ describe.each([
     "cleans up the %s fixture within the deadline and cleanup budget",
     async (mode) => {
       const directory = await mkdtemp(join(tmpdir(), "harness-timeout-"));
+      /** Shrugs off SIGTERM. The root writes its PID, so a slow boot can't hide it. */
       const leaf = `
-        const { writeFileSync } = require('node:fs');
-        const { join } = require('node:path');
         process.on('SIGTERM', () => {});
-        writeFileSync(join(process.argv[1], 'leaf'), String(process.pid));
         setTimeout(() => process.exit(0), 5000);
       `;
       const script = `
@@ -855,9 +853,10 @@ describe.each([
           });
           console.log('ready');
         } else {
-          require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(leaf)}, process.argv[1]], {
+          const child = require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(leaf)}], {
             stdio: process.argv[2] === 'inherit' ? 'inherit' : 'ignore'
           });
+          writeFileSync(join(process.argv[1], 'leaf'), String(child.pid));
         }
         setTimeout(() => process.exit(0), 5000);
       `;
