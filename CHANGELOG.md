@@ -1,6 +1,30 @@
 # Changelog
 
 
+## v0.4.2
+
+[compare changes](https://github.com/agntn/harnesses/compare/v0.4.1...v0.4.2)
+
+### 🚀 Enhancements
+
+- Let MCP sync spare a harness's own servers ([#141](https://github.com/agntn/harnesses/pull/141))
+- Say when a read-only run has no network ([#147](https://github.com/agntn/harnesses/pull/147))
+
+### 🩹 Fixes
+
+- Don't let one stray bracket wipe the sync ([#143](https://github.com/agntn/harnesses/pull/143))
+- **run:** Keep advisors from faking tool calls ([#146](https://github.com/agntn/harnesses/pull/146))
+- **docs:** Stop offering an MCP server that 404s ([#150](https://github.com/agntn/harnesses/pull/150))
+
+### ✅ Tests
+
+- Make fixtures take out their own trash ([#145](https://github.com/agntn/harnesses/pull/145))
+
+### ❤️ Contributors
+
+- Aeitwoen ([@aeitwoen](https://github.com/aeitwoen))
+- Ori ([@oritwoen](https://github.com/oritwoen))
+
 ## v0.4.1
 
 [compare changes](https://github.com/agntn/harnesses/compare/v0.4.0...v0.4.1)
