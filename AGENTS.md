@@ -9,7 +9,7 @@ pnpm install              # install deps
 pnpm lint                 # build, then vp lint + vp fmt check
 pnpm lint:fix             # auto-fix lint/format
 pnpm typecheck            # tsgo on src, build, then tsgo on the Pi/OMP extensions
-pnpm build                # vp pack (library, CLI, MCP server, tool modules)
+pnpm build                # obuild (library, CLI, MCP server, tool modules)
 pnpm test:run             # vp test run
 pnpm test                 # vp test watch
 
@@ -44,7 +44,8 @@ src/
   schemas/              # type-only session formats (claude, codex, gemini, opencode)
 packages/               # shipped Pi and OMP extension adapters plus their shared TUI
 test/                   # one Vitest file per area; index.test.ts covers registry, detection, resolution
-vite.config.ts          # Vite+ config: one pack bundle over five inputs, so entries share registry state; lint, fmt and test
+build.config.ts         # obuild config: one bundle over five inputs, so entries share registry state; typebox inlined
+vite.config.ts          # Vite+ config: lint, fmt and test
 docs/                   # Docus site for harnesses.agntn.dev; own AGENTS.md, reads the registry from ../src at build time
 ```
 
@@ -66,7 +67,7 @@ Each harness class has: `config`, `sessions`, `persistence`, `instructions`, `sk
 
 - ESM-only, no CommonJS. `sideEffects: false` is safe because built-in harnesses are referenced explicitly by the constructor registry.
 - All local imports use `.ts` extensions (`import { Harness } from "./harness.ts"`) - required by nodenext moduleResolution.
-- `vp pack` builds artifacts. `tsgo` is typecheck-only (`noEmit: true`).
+- obuild builds artifacts from `build.config.ts` and writes the inlined typebox notice to `dist/THIRD-PARTY-LICENSES.md`. `tsgo` is typecheck-only (`noEmit: true`).
 - Tests import the Vitest API from `vite-plus/test`, not `vitest`.
 - Public API is barrel-driven via `src/index.ts`. Don't export from submodules directly.
 - Types from `src/schemas/` are type-only re-exports - no runtime code, no validators.
@@ -87,7 +88,7 @@ Don't weaken these. Fix the code instead.
 - No `as any`, `@ts-ignore`, or `@ts-expect-error`
 - No provider-specific data shapes in the top-level public API
 - No tests that depend on network or external services
-- No bypassing `vite.config.ts` with ad-hoc build scripts
+- No bypassing `build.config.ts` with ad-hoc build scripts
 - Don't commit CLAUDE.md files (gitignored, they're local context-mode config)
 
 ## Git

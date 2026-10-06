@@ -248,7 +248,7 @@ pnpm lint        # builds first, then vp lint and vp fmt --check
 pnpm lint:fix
 pnpm typecheck
 pnpm test:run
-pnpm build       # vp pack
+pnpm build       # obuild
 pnpm docs        # the Docus site, bundles src/ itself
 ```
 
