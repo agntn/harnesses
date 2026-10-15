@@ -13,6 +13,7 @@ import OpenCode from "./opencode.ts";
 import Pi from "./pi.ts";
 import PrimeAgent from "./prime-agent.ts";
 
+/** Env detection walks this list in order, so a fork that keeps its parent's marker goes first. */
 export const harnesses: HarnessConstructor[] = [
   Antigravity,
   Claude,
