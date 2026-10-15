@@ -1,14 +1,12 @@
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import type { AgentToolResult, ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
-import { Text } from "@oh-my-pi/pi-coding-agent";
-import type { TSchema } from "@oh-my-pi/pi-ai";
-import type { AnySchema } from "@oh-my-pi/omptype/typebox";
+import type { AgentToolResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
+import { Type, type TSchema } from "typebox";
 
-import type * as HarnessTools from "../../../dist/tool-operations.d.mts";
+import type * as HarnessTools from "../../dist/tool-operations.d.mts";
 import {
-  HARNESS_TOOL_APPROVALS,
   HARNESS_TOOL_LABELS,
   type HarnessToolName,
   type RenderedToolResult,
@@ -16,41 +14,58 @@ import {
   renderToolCall,
   renderToolResult,
   type StatusTheme,
-} from "../../shared/tui.ts";
+} from "../shared/tui.ts";
 // Schemas must exist synchronously at registration, so unlike the executors
 // below they load from dist; `pnpm build` keeps it current in the checkout.
-import { harnessToolSchemas } from "../../../dist/tool-schemas.mjs";
-import type * as HarnessSchemas from "../../../dist/tool-schemas.d.mts";
+import { harnessToolSchemas } from "../../dist/tool-schemas.mjs";
+import type * as HarnessSchemas from "../../dist/tool-schemas.d.mts";
 
-const sourceModulePath = fileURLToPath(new URL("../../../src/tool-operations.ts", import.meta.url));
+const sourceModuleUrl = new URL("../../src/tool-operations.ts", import.meta.url);
+const distributionModuleUrl = new URL("../../dist/tool-operations.mjs", import.meta.url);
 let toolOperationsPromise: Promise<typeof HarnessTools> | undefined;
 
 /**
- * Loads the tool executors shared with the Pi extension, so the tool answers
- * stay identical across surfaces. Both specifiers stay literal on purpose:
- * OMP's compiled loader rewrites bare dependencies only for imports it can
- * see statically.
+ * Loads the tool executors shared with the OMP extension, so the tool answers
+ * stay identical across surfaces.
  *
  * @returns {Promise<typeof HarnessTools>} The shared executor module.
  */
 function loadToolOperations(): Promise<typeof HarnessTools> {
-  toolOperationsPromise ??= (
-    existsSync(sourceModulePath)
-      ? import("../../../src/tool-operations.ts")
-      : import("../../../dist/tool-operations.mjs")
+  toolOperationsPromise ??= import(
+    existsSync(fileURLToPath(sourceModuleUrl)) ? sourceModuleUrl.href : distributionModuleUrl.href
   ) as Promise<typeof HarnessTools>;
 
   return toolOperationsPromise;
 }
 
+function prepareInfoArguments(args: unknown): unknown {
+  if (typeof args !== "object" || args === null || !("id" in args) || typeof args.id !== "string") {
+    return args;
+  }
+
+  try {
+    const id: unknown = JSON.parse(args.id);
+    return Array.isArray(id) && id.every((value) => typeof value === "string")
+      ? { ...args, id }
+      : args;
+  } catch {
+    return args;
+  }
+}
+
 function statusRenderers(tool: HarnessToolName) {
   return {
-    renderCall(args: unknown, options: RenderOptions, theme: StatusTheme) {
-      return new Text(renderToolCall(tool, args, options, theme), 0, 0);
+    renderCall(args: unknown, theme: StatusTheme, context: RenderOptions) {
+      return new Text(renderToolCall(tool, args, context, theme), 0, 0);
     },
-    renderResult(result: RenderedToolResult, options: RenderOptions, theme: StatusTheme) {
+    renderResult(
+      result: RenderedToolResult,
+      options: RenderOptions,
+      theme: StatusTheme,
+      context?: Readonly<{ isError?: boolean }>,
+    ) {
       return new Text(
-        renderToolResult(tool, result, result.isError === true, options, theme),
+        renderToolResult(tool, result, context?.isError === true, options, theme),
         0,
         0,
       );
@@ -59,23 +74,25 @@ function statusRenderers(tool: HarnessToolName) {
 }
 
 export default function harnessesExtension(pi: ExtensionAPI): void {
-  // OMP validates tool parameters with its own TypeBox build, so schemas must
-  // come from the host-injected facade rather than a standalone typebox import.
-  const schemas = harnessToolSchemas<AnySchema, TSchema>(pi.typebox.Type);
-  pi.setLabel("Harnesses");
+  const schemas = harnessToolSchemas<TSchema, TSchema>(Type);
 
   pi.registerTool({
     name: "harnesses_detect",
     label: HARNESS_TOOL_LABELS.harnesses_detect,
     description:
       "List every known AI coding harness with its install state, version and the harnesses_run modes it takes: advisor (tools=false), readOnly (tools=true with readOnly=true) and agent (tools=true)",
+    promptSnippet:
+      "Use harnesses_detect to see which AI coding harnesses are installed and how each one runs.",
+    promptGuidelines: [
+      "The scan checks binaries on PATH. Versions come from native metadata or the CLI.",
+      "advisor, readOnly and agent say whether harnesses_run takes tools false, tools true with readOnly, or tools true for that harness.",
+    ],
     parameters: schemas.detect,
-    approval: HARNESS_TOOL_APPROVALS.harnesses_detect,
+    ...statusRenderers("harnesses_detect"),
     async execute(_toolCallId, _params): Promise<AgentToolResult<HarnessTools.HarnessListing>> {
       const { detectHarnesses } = await loadToolOperations();
       return detectHarnesses();
     },
-    ...statusRenderers("harnesses_detect"),
   });
 
   pi.registerTool({
@@ -83,8 +100,14 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     label: HARNESS_TOOL_LABELS.harnesses_info,
     description:
       "Full metadata for one or more AI coding harnesses, including supported invocation and model operations, whether a read-only run keeps its network, configuration, sessions, instructions, skills, commands, prompt templates, hooks, temp directories, the env variables that move them, and resolved paths",
+    promptSnippet: "Use harnesses_info to look up where coding harnesses store their data.",
+    promptGuidelines: [
+      "Pass one harness id from harnesses_detect, or batch several ids in one call.",
+      "Resolved paths are absolute for the current platform and home directory.",
+    ],
     parameters: schemas.info,
-    approval: HARNESS_TOOL_APPROVALS.harnesses_info,
+    prepareArguments: prepareInfoArguments,
+    ...statusRenderers("harnesses_info"),
     async execute(
       _toolCallId,
       params: HarnessSchemas.InfoParams,
@@ -92,7 +115,6 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       const { harnessInfo } = await loadToolOperations();
       return harnessInfo(params.id);
     },
-    ...statusRenderers("harnesses_info"),
   });
 
   pi.registerTool({
@@ -100,8 +122,14 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     label: HARNESS_TOOL_LABELS.harnesses_models,
     description:
       "List the models currently available to one AI coding harness through its native CLI",
+    promptSnippet:
+      "Use harnesses_models to inspect models available to an installed coding harness.",
+    promptGuidelines: [
+      "An optional search filter is passed only to harnesses that support native filtering.",
+      "The harness command may load configuration and extensions from cwd.",
+    ],
     parameters: schemas.models,
-    approval: HARNESS_TOOL_APPROVALS.harnesses_models,
+    ...statusRenderers("harnesses_models"),
     async execute(
       _toolCallId,
       params: HarnessSchemas.ModelsParams,
@@ -115,16 +143,24 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
         signal,
       });
     },
-    ...statusRenderers("harnesses_models"),
   });
 
   pi.registerTool({
     name: "harnesses_run",
     label: HARNESS_TOOL_LABELS.harnesses_run,
     description:
-      "Run one prompt through a harness. Always choose tools explicitly. Add readOnly when tools is true to require native read-only enforcement, or use tools false for an advisor without tools. harnesses_detect shows which modes each harness takes.",
+      "Run one prompt through an AI coding harness's normalized non-interactive invocation, optionally selecting a model and reasoning effort, and return its output",
+    promptSnippet: "Use harnesses_run to delegate one prompt to another installed coding harness.",
+    promptGuidelines: [
+      "Always choose tools explicitly. Set true whenever the task needs harness tools, including Grok native X search.",
+      "Add readOnly when tools is true to require native read-only enforcement. Unsupported harnesses reject it instead of widening access.",
+      "A run that needs the web checks readOnlyNetwork in harnesses_info first: false means its MCP servers get no network under readOnly.",
+      "Set tools false only for an advisor without tools. It never silently falls back to a full agent.",
+      "An unsupported mode returns an explicit retry when the alternate mode is available. harnesses_detect shows the modes up front.",
+      "Output is capped for context; long runs stop at the timeout.",
+    ],
     parameters: schemas.run,
-    approval: HARNESS_TOOL_APPROVALS.harnesses_run,
+    ...statusRenderers("harnesses_run"),
     async execute(
       _toolCallId,
       params: HarnessSchemas.RunParams,
@@ -142,7 +178,6 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
         readOnly: params.readOnly,
       });
     },
-    ...statusRenderers("harnesses_run"),
   });
 
   pi.registerTool({
@@ -150,8 +185,11 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     label: HARNESS_TOOL_LABELS.harnesses_mcp_list,
     description:
       "List the MCP servers configured in each harness's config files, normalized across dialects",
+    promptSnippet:
+      "Use harnesses_mcp_list to see which MCP servers each coding harness has configured.",
+    promptGuidelines: ["Omit id to scan every harness."],
     parameters: schemas.mcpList,
-    approval: HARNESS_TOOL_APPROVALS.harnesses_mcp_list,
+    ...statusRenderers("harnesses_mcp_list"),
     async execute(
       _toolCallId,
       params: HarnessSchemas.McpListParams,
@@ -159,7 +197,6 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       const { mcpList } = await loadToolOperations();
       return mcpList(params.id);
     },
-    ...statusRenderers("harnesses_mcp_list"),
   });
 
   pi.registerTool({
@@ -168,7 +205,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     description:
       "Add or replace one MCP server in a harness config; TOML configs get a surgical, comment-preserving edit",
     parameters: schemas.mcpAdd,
-    approval: HARNESS_TOOL_APPROVALS.harnesses_mcp_add,
+    ...statusRenderers("harnesses_mcp_add"),
     async execute(
       _toolCallId,
       params: HarnessSchemas.McpAddParams,
@@ -176,7 +213,6 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       const { mcpAdd } = await loadToolOperations();
       return mcpAdd(params.id, params, params.scope ?? "user");
     },
-    ...statusRenderers("harnesses_mcp_add"),
   });
 
   pi.registerTool({
@@ -185,7 +221,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     description:
       "Reset every harness's user-scope MCP config to exactly the master list from ~/.config/agntn/mcp.jsonc; extras are removed unless the list's keep names them for that harness, a server's own excludes replaces the global one, and master names a harness is excluded from are withdrawn from it",
     parameters: schemas.mcpSync,
-    approval: HARNESS_TOOL_APPROVALS.harnesses_mcp_sync,
+    ...statusRenderers("harnesses_mcp_sync"),
     async execute(
       _toolCallId,
       params: HarnessSchemas.McpSyncParams,
@@ -193,7 +229,6 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       const { mcpSync } = await loadToolOperations();
       return mcpSync(params.id);
     },
-    ...statusRenderers("harnesses_mcp_sync"),
   });
 
   pi.registerTool({
@@ -202,7 +237,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     description:
       "Link every harness's global instructions file and declared companions to the master bundle; diverged copies are backed up and relinked. Pass check to only report",
     parameters: schemas.agentsSync,
-    approval: HARNESS_TOOL_APPROVALS.harnesses_agents_sync,
+    ...statusRenderers("harnesses_agents_sync"),
     async execute(
       _toolCallId,
       params: HarnessSchemas.AgentsSyncParams,
@@ -210,7 +245,6 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       const { agentsSync } = await loadToolOperations();
       return agentsSync(params.id, params.check === true);
     },
-    ...statusRenderers("harnesses_agents_sync"),
   });
 
   pi.registerTool({
@@ -219,7 +253,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     description:
       "Sync canonical Markdown prompt templates from the agntn XDG data directory into supported harnesses; Gemini receives generated TOML. Diverged files are backed up. Pass check to only report",
     parameters: schemas.promptsSync,
-    approval: HARNESS_TOOL_APPROVALS.harnesses_prompts_sync,
+    ...statusRenderers("harnesses_prompts_sync"),
     async execute(
       _toolCallId,
       params: Readonly<HarnessSchemas.PromptsSyncParams>,
@@ -227,7 +261,6 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       const { promptsSync } = await loadToolOperations();
       return promptsSync(params.id, params.check === true);
     },
-    ...statusRenderers("harnesses_prompts_sync"),
   });
 
   pi.registerTool({
@@ -236,7 +269,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     description:
       "Link supported harness skills directories to the canonical skills directory in the agntn XDG data directory. Links to single skills are replaced; anything else is backed up. Pass check to only report",
     parameters: schemas.skillsSync,
-    approval: HARNESS_TOOL_APPROVALS.harnesses_skills_sync,
+    ...statusRenderers("harnesses_skills_sync"),
     async execute(
       _toolCallId,
       params: Readonly<HarnessSchemas.SkillsSyncParams>,
@@ -244,7 +277,6 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       const { skillsSync } = await loadToolOperations();
       return skillsSync(params.id, params.check === true);
     },
-    ...statusRenderers("harnesses_skills_sync"),
   });
 
   pi.registerTool({
@@ -253,7 +285,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     description:
       "Remove one MCP server from a harness config; TOML configs get a surgical, comment-preserving edit",
     parameters: schemas.mcpRemove,
-    approval: HARNESS_TOOL_APPROVALS.harnesses_mcp_remove,
+    ...statusRenderers("harnesses_mcp_remove"),
     async execute(
       _toolCallId,
       params: HarnessSchemas.McpRemoveParams,
@@ -261,6 +293,5 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       const { mcpRemove } = await loadToolOperations();
       return mcpRemove(params.id, params.name, params.scope ?? "user");
     },
-    ...statusRenderers("harnesses_mcp_remove"),
   });
 }

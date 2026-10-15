@@ -15,9 +15,9 @@
   },
   "files": [
     "dist",
-    "packages/omp/extensions",
-    "packages/pi/extensions",
-    "packages/shared"
+    "extensions/omp",
+    "extensions/pi",
+    "extensions/shared"
   ],
   "type": "module",
   "sideEffects": false,
@@ -97,12 +97,12 @@
   "packageManager": "pnpm@12.4.2",
   "omp": {
     "extensions": [
-      "./packages/omp/extensions/harnesses.ts"
+      "./extensions/omp/harnesses.ts"
     ]
   },
   "pi": {
     "extensions": [
-      "./packages/pi/extensions/harnesses.ts"
+      "./extensions/pi/harnesses.ts"
     ],
     "image": "https://harnesses.agntn.dev/image.png"
   }

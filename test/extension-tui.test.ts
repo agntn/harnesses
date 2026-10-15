@@ -17,9 +17,9 @@ vi.mock("@oh-my-pi/pi-coding-agent", () => ({
   },
 }));
 
-import ompExtension from "../packages/omp/extensions/harnesses.ts";
-import piExtension from "../packages/pi/extensions/harnesses.ts";
-import { HARNESS_TOOL_LABELS } from "../packages/shared/tui.ts";
+import ompExtension from "../extensions/omp/harnesses.ts";
+import piExtension from "../extensions/pi/harnesses.ts";
+import { HARNESS_TOOL_LABELS } from "../extensions/shared/tui.ts";
 import { registerHarness } from "../src/index.ts";
 import { Harness } from "../src/harness.ts";
 import Cursor from "../src/harnesses/cursor.ts";
