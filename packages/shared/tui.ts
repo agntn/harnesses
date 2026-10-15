@@ -16,6 +16,7 @@ export const HARNESS_TOOL_LABELS = {
 
 export type HarnessToolName = keyof typeof HARNESS_TOOL_LABELS;
 
+/** Spawning a harness is `exec` even for a read-only run, since the child can do anything. */
 export const HARNESS_TOOL_APPROVALS: Record<HarnessToolName, "read" | "exec" | "write"> = {
   harnesses_detect: "read",
   harnesses_info: "read",
