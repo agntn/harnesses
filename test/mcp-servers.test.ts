@@ -1097,6 +1097,129 @@ describe("syncMcpServers", () => {
     }
   });
 
+  describe("a server's own excludes", () => {
+    function masterWith(
+      excludes: readonly string[],
+      cloud: Readonly<Record<string, unknown>> = {},
+    ): string {
+      return JSON.stringify({
+        excludes,
+        mcpServers: {
+          probe: { command: "node" },
+          cloud: { url: "https://example.com/mcp", ...cloud },
+        },
+      });
+    }
+
+    function claudeServerNames(dirs: Readonly<{ homeDir: string }>): string[] {
+      const listing = listMcpServers(getHarness("claude"), dirs).find((l) => l.scope === "user");
+      return (listing?.servers ?? []).map((s) => s.name).sort();
+    }
+
+    it("lets an excluded harness have the one server that opts back in", () => {
+      const dirs = fixtureDirs();
+      vi.stubEnv("XDG_CONFIG_HOME", join(dirs.homeDir, ".config"));
+      writeMaster(dirs.homeDir, masterWith(["claude", "codex"], { excludes: [] }));
+      addMcpServer(
+        getHarness("claude"),
+        { name: "mine", transport: "stdio", command: "own-server" },
+        "user",
+        dirs,
+      );
+      const targets = [getHarness("claude"), getHarness("codex")];
+
+      const first = syncMcpServers(targets, dirs);
+
+      const claude = first.targets.find((t) => t.id === "claude");
+      expect(claude?.excluded).toBe(true);
+      expect(claude?.results).toEqual([{ name: "cloud", action: "added" }]);
+      expect(targetResults(first.targets, "codex")).toEqual([{ name: "cloud", action: "added" }]);
+      expect(claudeServerNames(dirs)).toEqual(["cloud", "mine"]);
+      const raw = JSON.parse(readFileSync(join(dirs.homeDir, ".claude.json"), "utf8")) as Record<
+        string,
+        unknown
+      >;
+      expect(nestedRecord(nestedRecord(raw, "mcpServers"), "cloud")).not.toHaveProperty("excludes");
+
+      const second = syncMcpServers(targets, dirs);
+      expect(targetResults(second.targets, "claude")).toEqual([
+        { name: "cloud", action: "unchanged" },
+      ]);
+    });
+
+    it("keeps out only the harnesses a server's own excludes names", () => {
+      const dirs = fixtureDirs();
+      vi.stubEnv("XDG_CONFIG_HOME", join(dirs.homeDir, ".config"));
+      writeMaster(dirs.homeDir, masterWith(["claude", "codex"], { excludes: ["codex"] }));
+
+      const report = syncMcpServers([getHarness("claude"), getHarness("codex")], dirs);
+
+      expect(targetResults(report.targets, "claude")).toEqual([{ name: "cloud", action: "added" }]);
+      expect(targetResults(report.targets, "codex")).toEqual([]);
+      const codex = listMcpServers(getHarness("codex"), dirs).find((l) => l.scope === "user");
+      expect(codex?.exists).toBe(false);
+    });
+
+    it("withdraws a server once its own excludes shuts the harness out again", () => {
+      const dirs = fixtureDirs();
+      vi.stubEnv("XDG_CONFIG_HOME", join(dirs.homeDir, ".config"));
+      const claude = [getHarness("claude")];
+      writeMaster(dirs.homeDir, masterWith([]));
+      syncMcpServers(claude, dirs);
+
+      writeMaster(dirs.homeDir, masterWith([], { excludes: ["claude"] }));
+      expect(targetResults(syncMcpServers(claude, dirs).targets, "claude")).toEqual([
+        { name: "probe", action: "unchanged" },
+        { name: "cloud", action: "removed" },
+      ]);
+      expect(claudeServerNames(dirs)).toEqual(["probe"]);
+
+      addMcpServer(
+        getHarness("claude"),
+        { name: "mine", transport: "stdio", command: "own-server" },
+        "user",
+        dirs,
+      );
+      writeMaster(dirs.homeDir, masterWith(["claude"], { excludes: [] }));
+      expect(targetResults(syncMcpServers(claude, dirs).targets, "claude")).toEqual([
+        { name: "cloud", action: "added" },
+        { name: "probe", action: "removed" },
+      ]);
+
+      writeMaster(dirs.homeDir, masterWith(["claude"]));
+      expect(targetResults(syncMcpServers(claude, dirs).targets, "claude")).toEqual([
+        { name: "cloud", action: "removed" },
+      ]);
+      expect(claudeServerNames(dirs)).toEqual(["mine"]);
+    });
+
+    it("rejects a server excludes that is not an array of strings", () => {
+      const dirs = fixtureDirs();
+      vi.stubEnv("XDG_CONFIG_HOME", join(dirs.homeDir, ".config"));
+      for (const excludes of ["codex", {}, [1]]) {
+        writeMaster(dirs.homeDir, masterWith([], { excludes }));
+        expect(() => syncMcpServers([getHarness("claude")], dirs)).toThrow(
+          /invalid excludes on cloud/,
+        );
+      }
+    });
+
+    it("refuses to sync when a server excludes names an unknown harness", () => {
+      const dirs = fixtureDirs();
+      vi.stubEnv("HOME", dirs.homeDir);
+      vi.stubEnv("XDG_CONFIG_HOME", join(dirs.homeDir, ".config"));
+      writeMaster(dirs.homeDir, masterWith([], { excludes: ["codxe"] }));
+
+      const result = mcpSync("claude");
+
+      expect(result.isError).toBe(true);
+      expect(result.details).toMatchObject({
+        error: "Master MCP list names unknown harnesses: codxe (excludes of cloud)",
+      });
+      expect(existsSync(join(dirs.homeDir, ".claude.json"))).toBe(false);
+    });
+  });
+
   it("rejects a keep field that does not map harness ids to server names", () => {
     const dirs = fixtureDirs();
     const previousXdg = process.env.XDG_CONFIG_HOME;

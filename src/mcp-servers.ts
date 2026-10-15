@@ -843,7 +843,7 @@ export interface SyncTargetResult {
   path?: string;
   /** Reason this harness could not be targeted; `results` is empty then. */
   skipped?: string;
-  /** Set when the master list excludes this harness; master-listed names are withdrawn. */
+  /** The global `excludes` names this harness, so its own servers stay. */
   excluded?: true;
   results: Array<{
     name: string;
@@ -928,6 +928,23 @@ function masterExcludes(value: unknown, path: string): string[] {
   return value;
 }
 
+function masterServerExcludes(
+  map: Readonly<Record<string, unknown>>,
+  path: string,
+): Record<string, string[]> {
+  const overrides: Array<[string, string[]]> = [];
+  for (const [name, rawEntry] of Object.entries(map)) {
+    if (!isObjectRecord(rawEntry) || rawEntry.excludes === undefined) continue;
+    if (!isStringArray(rawEntry.excludes)) {
+      throw new Error(
+        `Master MCP list at ${path} has an invalid excludes on ${name}: expected an array of harness ids`,
+      );
+    }
+    overrides.push([name, rawEntry.excludes]);
+  }
+  return Object.fromEntries(overrides);
+}
+
 function masterKeep(value: unknown, path: string): Record<string, string[]> {
   if (value === undefined) return {};
   if (
@@ -946,13 +963,15 @@ function masterKeep(value: unknown, path: string): Record<string, string[]> {
  * Reads and normalizes the master list; throws when the file is missing or invalid.
  *
  * @param options - Path-resolution overrides.
- * @returns {{ path: string, servers: McpServerConfig[], excludes: string[], keep: Record<string, string[]> }} The master list.
+ * @returns {{ path: string, servers: McpServerConfig[], excludes: string[], serverExcludes: Record<string, string[]>, keep: Record<string, string[]> }} The master list.
  */
 export function readMasterMcpServers(options: ResolveOptions = {}): {
   path: string;
   servers: McpServerConfig[];
   /** Harness ids the master list opts out of syncing. */
   excludes: string[];
+  /** Per server name, its own `excludes`, which replaces the global one for that server. */
+  serverExcludes: Record<string, string[]>;
   /** Per harness id, its own server names that sync leaves in place. */
   keep: Record<string, string[]>;
 } {
@@ -967,6 +986,7 @@ export function readMasterMcpServers(options: ResolveOptions = {}): {
     path,
     servers: normalizeMasterServers(map, options.homeDir ?? homedir()),
     excludes: masterExcludes(root.excludes, path),
+    serverExcludes: masterServerExcludes(map, path),
     keep: masterKeep(root.keep, path),
   };
 }
@@ -975,8 +995,12 @@ type MasterSyncInput = Readonly<{
   path: string;
   servers: readonly McpServerConfig[];
   excludes: readonly string[];
+  serverExcludes: Readonly<Record<string, readonly string[]>>;
   keep: Readonly<Record<string, readonly string[]>>;
 }>;
+
+/** What one step of a harness sync changed, and in which file. */
+type SyncStep = { path?: string; results: SyncTargetResult["results"] };
 
 function optionalPath(path: string | undefined): {} | { path: string } {
   return path === undefined ? {} : { path };
@@ -986,24 +1010,38 @@ function existingServers(listing: McpConfigListing | undefined): Map<string, str
   return new Map((listing?.servers ?? []).map((server) => [server.name, canonical(server)]));
 }
 
-function withdrawMasterServersFromExcludedHarness(
+/**
+ * A server's own `excludes` wins over the global one, `[]` included.
+ *
+ * @param master - Master list with every exclusion it declares.
+ * @param name - Master server name.
+ * @param id - Target harness id.
+ * @returns {boolean} Whether this server stays out of this harness.
+ */
+function excludedFrom(master: MasterSyncInput, name: string, id: string): boolean {
+  const excludes = Object.hasOwn(master.serverExcludes, name)
+    ? master.serverExcludes[name]
+    : master.excludes;
+  return excludes?.includes(id) === true;
+}
+
+function withdrawMasterServers(
   harness: Harness,
   existing: ReadonlyMap<string, string>,
-  masterNames: ReadonlySet<string>,
-  initialPath: string | undefined,
+  withdrawn: ReadonlySet<string>,
   options: ResolveOptions,
-): SyncTargetResult {
+): SyncStep {
   const results: SyncTargetResult["results"] = [];
-  let path = initialPath;
+  let path: string | undefined;
   for (const name of existing.keys()) {
-    if (!masterNames.has(name)) continue;
+    if (!withdrawn.has(name)) continue;
     const removed = removeMcpServer(harness, name, "user", options);
     if (removed.removed) {
       path = removed.path;
       results.push({ name, action: "removed" });
     }
   }
-  return { id: harness.id, ...optionalPath(path), excluded: true, results };
+  return { ...optionalPath(path), results };
 }
 
 /**
@@ -1022,7 +1060,7 @@ function removeExtraServers(
   masterNames: ReadonlySet<string>,
   keep: Readonly<Record<string, readonly string[]>>,
   options: ResolveOptions,
-): { path?: string; results: SyncTargetResult["results"] } {
+): SyncStep {
   const kept = (Object.hasOwn(keep, harness.id) ? keep[harness.id] : undefined) ?? [];
   const results: SyncTargetResult["results"] = [];
   let path: string | undefined;
@@ -1041,18 +1079,17 @@ function removeExtraServers(
   return { ...optionalPath(path), results };
 }
 
-function syncIncludedHarness(
+function writeMasterServers(
   harness: Harness,
-  master: MasterSyncInput,
+  servers: readonly McpServerConfig[],
   existing: ReadonlyMap<string, string>,
-  masterNames: ReadonlySet<string>,
-  initialPath: string | undefined,
   options: ResolveOptions,
-): SyncTargetResult {
+): SyncStep {
   const results: SyncTargetResult["results"] = [];
-  let path = initialPath;
+  let path: string | undefined;
+  if (servers.length === 0) return { results };
   const { dialect } = writableConfig(harness, "user", options).entry;
-  for (const server of master.servers) {
+  for (const server of servers) {
     try {
       const resolved = shapeForDialect(server, dialect);
       if (existing.get(server.name) === canonical(resolved)) {
@@ -1068,9 +1105,37 @@ function syncIncludedHarness(
       results.push({ name: server.name, action: "skipped", reason: error.message });
     }
   }
-  const extras = removeExtraServers(harness, existing, masterNames, master.keep, options);
-  results.push(...extras.results);
-  return { id: harness.id, ...optionalPath(extras.path ?? path), results };
+  return { ...optionalPath(path), results };
+}
+
+/**
+ * Writes the servers this harness may have and withdraws the other master names.
+ *
+ * @param harness - Target harness with a readable user-scope config.
+ * @param master - Master list to sync from.
+ * @param existing - Servers the harness config holds now, by name.
+ * @param masterNames - Every server name on the master list.
+ * @param options - Path-resolution overrides.
+ * @returns {SyncStep[]} The outcome of each step, in order.
+ */
+function syncMasterServers(
+  harness: Harness,
+  master: MasterSyncInput,
+  existing: ReadonlyMap<string, string>,
+  masterNames: ReadonlySet<string>,
+  options: ResolveOptions,
+): SyncStep[] {
+  const allowed = master.servers.filter((server) => !excludedFrom(master, server.name, harness.id));
+  const allowedNames = new Set(allowed.map((server) => server.name));
+  const withdrawn = new Set([...masterNames].filter((name) => !allowedNames.has(name)));
+  const steps = [
+    writeMasterServers(harness, allowed, existing, options),
+    withdrawMasterServers(harness, existing, withdrawn, options),
+  ];
+  if (!master.excludes.includes(harness.id)) {
+    steps.push(removeExtraServers(harness, existing, masterNames, master.keep, options));
+  }
+  return steps;
 }
 
 function syncMcpTarget(
@@ -1094,23 +1159,21 @@ function syncMcpTarget(
     };
   }
 
-  const existing = existingServers(listing);
-  if (master.excludes.includes(harness.id)) {
-    return withdrawMasterServersFromExcludedHarness(
-      harness,
-      existing,
-      masterNames,
-      listing?.path,
-      options,
-    );
-  }
-  return syncIncludedHarness(harness, master, existing, masterNames, listing?.path, options);
+  const steps = syncMasterServers(harness, master, existingServers(listing), masterNames, options);
+  const path = steps.findLast((step) => step.path !== undefined)?.path ?? listing?.path;
+  return {
+    id: harness.id,
+    ...optionalPath(path),
+    ...(master.excludes.includes(harness.id) ? { excluded: true as const } : {}),
+    results: steps.flatMap((step) => step.results),
+  };
 }
 
 /**
  * Resets each harness's user-scope MCP config to exactly the master list:
  * missing servers are added, drifted ones replaced, and servers absent from
- * the master are removed unless its `keep` names them for that harness. The
+ * the master are removed unless its `keep` names them for that harness. A
+ * server's own `excludes` replaces the global one for that server. The
  * master file is the single source of truth, exceptions included.
  *
  * @param harnesses - Harnesses to synchronize.
