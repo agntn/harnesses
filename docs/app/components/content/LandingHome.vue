@@ -74,7 +74,7 @@ const toolWord = countWord(TOOLS.length);
       :checks="[
         'listMcpServers reads JSON and TOML, standard, OpenCode, VS Code and Antigravity shapes, into one McpServerConfig',
         'sync makes each user scope config exactly the master list; extras are removed, not merged around',
-        'excludes keeps a harness\'s own servers, but names on the master list are withdrawn from it',
+        'excludes keeps a harness\'s own servers and pulls master names out of it, unless a server opts back in with its own',
       ]"
     >
       <code class="harnesses-code">~/.config/agntn/mcp.jsonc</code> is the only place a server is

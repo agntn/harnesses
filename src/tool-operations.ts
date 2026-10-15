@@ -809,6 +809,11 @@ export function mcpSync(id?: string): ToolResult<SyncReport | RunFailure> {
       ...master.excludes
         .filter((entry) => !isHarnessId(entry))
         .map((entry) => `${entry} (excludes)`),
+      ...Object.entries(master.serverExcludes).flatMap(([name, excludes]) =>
+        excludes
+          .filter((entry) => !isHarnessId(entry))
+          .map((entry) => `${entry} (excludes of ${name})`),
+      ),
       ...Object.keys(master.keep)
         .filter((entry) => !isHarnessId(entry))
         .map((entry) => `${entry} (keep)`),
