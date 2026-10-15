@@ -15,7 +15,6 @@ import {
   cpSync,
   lstatSync,
   mkdirSync,
-  readFileSync,
   readlinkSync,
   renameSync,
   rmSync,
@@ -23,8 +22,9 @@ import {
   unlinkSync,
 } from "node:fs";
 import { basename, dirname, isAbsolute, join, posix, resolve, win32 } from "node:path";
+import { readIfExists } from "./files.ts";
 import type { Harness } from "./harness.ts";
-import { parseJsonc } from "./mcp-servers.ts";
+import { parseJsonc } from "./jsonc.ts";
 import { agntnConfigDir, resolvePathTemplate } from "./resolve.ts";
 import type { ResolveOptions } from "./types.ts";
 
@@ -67,15 +67,6 @@ export interface AgentsSyncReport {
   source: string;
   check: boolean;
   targets: AgentsTargetResult[];
-}
-
-function readIfExists(path: string): string | null {
-  try {
-    return readFileSync(path, "utf8");
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
-    throw error;
-  }
 }
 
 function agentsConfigRecord(raw: string, configPath: string): Record<string, unknown> {
