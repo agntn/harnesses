@@ -14,7 +14,7 @@ The docs site has its own install: `pnpm --dir docs install`, then `pnpm docs`.
 2. Write `src/harnesses/<id>.ts`, a class extending `Harness`. Every path is a `PathCandidate` with its scope and evidence level, and whatever you couldn't verify stays empty, `null` or `inferred`. A guessed path is worse than a missing one.
 3. Import it in `src/harnesses/index.ts`. The list order is the env detection order, so a fork that still sets its parent's env marker goes before the parent.
 4. Give it a row in the README harnesses table.
-5. Put the id in `should expose stable harness ids` and in the audio and video table in `test/index.test.ts`.
+5. Put the id in `should expose stable harness ids` and in the audio and video table in `test/index.test.ts`. A harness with a headless mode also gets a test of its invocation in `test/invoke.test.ts`.
 6. Add its icon, label and blurb to `PRESENTATION` in `docs/app/utils/harnesses.ts`, and a page in `docs/content/2.harnesses/` that opens with `::harness-facts{id="<id>"}`.
 
 Forget step 4 or 6 and `test/docs.test.ts` tells you which one.

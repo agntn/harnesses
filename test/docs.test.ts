@@ -59,7 +59,8 @@ describe("docs site", () => {
 
   /** The OG file is named after this description, and Nitro skips a prerender path holding `..`. */
   it("keeps the landing SEO description free of a trailing period", () => {
-    const description = /^ {2}description: (.*)$/mu.exec(read("docs/content/index.md"))?.[1] ?? "";
+    const raw = /^ {2}description: (.*)$/mu.exec(read("docs/content/index.md"))?.[1] ?? "";
+    const description = raw.trim().replace(/^(["'])(.*)\1$/u, "$2");
     expect(description).not.toBe("");
     expect(description).not.toMatch(/\.\s*$/u);
   });
