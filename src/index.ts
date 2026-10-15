@@ -45,11 +45,11 @@ export {
   syncMcpServers,
   readMasterMcpServers,
   masterMcpPath,
-  parseJsonc,
   McpEnvError,
   McpTransportError,
 } from "./mcp-servers.ts";
 export type { McpConfigListing, SyncReport, SyncTargetResult } from "./mcp-servers.ts";
+export { parseJsonc } from "./jsonc.ts";
 export { syncAgentsFiles, readAgentsConfig } from "./agents-sync.ts";
 export type {
   AgentsConfig,
