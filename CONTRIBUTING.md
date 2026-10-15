@@ -34,7 +34,7 @@ Forget step 4 or 6 and `test/docs.test.ts` tells you which one.
 ## Agent tools and extensions
 
 - Schemas live in `src/tool-schemas.ts`, executors in `src/tool-operations.ts`. The Pi and OMP adapters reuse both, load the executors lazily and register every tool, so a fix lands on all surfaces at once.
-- `packages/shared/tui.ts` returns plain strings and keeps collapsed status lines short. Every outside value gets sanitized before a terminal sees it.
+- `extensions/shared/tui.ts` returns plain strings and keeps collapsed status lines short. Every outside value gets sanitized before a terminal sees it.
 
 ## Tests
 
