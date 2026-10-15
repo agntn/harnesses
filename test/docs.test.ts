@@ -57,6 +57,29 @@ describe("docs site", () => {
     );
   });
 
+  /** Agents read llms.txt and the SEO blurbs as fact, and "twelve" outlived Prime Agent there. */
+  it("spells the harness count the registry actually has", () => {
+    const spelled = /const WORDS = \[([^\]]*)\]/u.exec(read("docs/app/utils/format.ts"))?.[1] ?? "";
+    const numbers = [...spelled.matchAll(/"(\w+)"/gu)].map((match) => match[1]?.toLowerCase());
+    const counted = new RegExp(
+      `\\b(${numbers.join("|")})\\s+(?:(?:AI\\s+)?coding\\s+(?:agents|CLIs|harnesses)\\b|harnesses,|built-ins\\b)`,
+      "giu",
+    );
+    const pages = readdirSync(resolve(root, "docs/content"), { recursive: true, encoding: "utf8" })
+      .filter((path) => path.endsWith(".md"))
+      .map((path) => `docs/content/${path}`);
+    const expected = numbers[listHarnesses().length];
+    expect(expected).toBeDefined();
+    let checked = 0;
+    for (const path of ["README.md", "docs/nuxt.config.ts", "docs/app/app.config.ts", ...pages]) {
+      for (const match of read(path).matchAll(counted)) {
+        expect(match[1]?.toLowerCase(), `${path}: ${match[0]}`).toBe(expected);
+        checked += 1;
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
   /** The OG file is named after this description, and Nitro skips a prerender path holding `..`. */
   it("keeps the landing SEO description free of a trailing period", () => {
     const raw = /^ {2}description: (.*)$/mu.exec(read("docs/content/index.md"))?.[1] ?? "";

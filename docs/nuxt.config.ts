@@ -15,7 +15,7 @@ export default defineNuxtConfig({
     domain: "https://harnesses.agntn.dev",
     title: "@agntn/harnesses",
     description:
-      "Metadata registry for twelve AI coding harnesses: paths with evidence levels, detection, headless invocation, MCP and AGENTS.md sync.",
+      "Metadata registry for thirteen AI coding harnesses: paths with evidence levels, detection, headless invocation, MCP and AGENTS.md sync.",
     sections: [
       {
         title: "Tools",
