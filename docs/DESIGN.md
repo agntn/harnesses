@@ -59,7 +59,7 @@ Controls are Nuxt UI components; `app.config.ts` gives each variant its family l
 
 Departures from the shared rules, recorded for the shared package:
 
-- The tool call has no `03 Full tool response` row. `harnesses_info` answers in TOON through `@toon-format/toon`, and the site must not import npm code into the registry subgraph (Workers Builds installs `docs/` only), so it cannot print the real text. The readout shows the fields the answer carries instead.
+- The tool call has no `03 Full tool response` row. `harnesses_info` answers in TOON through `@toon-format/toon`, which the site doesn't import, so it can't print the real text. The readout shows the fields the answer carries instead.
 - The landing instruments walk the registry itself, not recorded samples: nothing is fetched, so there is no `recorded` or `live` in the meta.
 - The sync and aider files fold what their section doesn't talk about on screen and hand out the whole file on copy, so they stand about as tall as the text beside them.
 - Beside the text at 1024 px the sync and registry cells shed their second detail (format, id) through a container query instead of dropping to two columns.

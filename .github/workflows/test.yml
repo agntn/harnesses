@@ -43,4 +43,6 @@ jobs:
         with:
           node-version: 26.10.0
           cache: true
+          run-install: |
+            - args: ['--frozen-lockfile', '--filter', '@agntn/harnesses']
       - run: pnpm exec vp test run test/invoke.test.ts -t "deadline cleanup|cancellation cleanup"

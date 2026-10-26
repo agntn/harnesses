@@ -1,5 +1,5 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { globSync, readdirSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vite-plus/test";
 import { listHarnesses } from "../src/index.ts";
@@ -7,24 +7,27 @@ import { listHarnesses } from "../src/index.ts";
 const root = fileURLToPath(new URL("..", import.meta.url));
 const read = (path: string): string => readFileSync(resolve(root, path), "utf8");
 
-/* Every module the docs registry loads at runtime, with the bare specifiers it imports. */
-function runtimeGraph(entries: readonly string[]): { files: Set<string>; bare: Set<string> } {
-  const files = new Set<string>();
-  const bare = new Set<string>();
-  const pending = entries.map((entry) => resolve(root, entry));
-  for (let file = pending.pop(); file !== undefined; file = pending.pop()) {
-    if (files.has(file)) continue;
-    files.add(file);
-    const source = readFileSync(file, "utf8");
-    const imports =
-      /^(?:import|export) (?!type )[^;]*?from "([^"]+)"|^import "([^"]+)"|import\("([^"]+)"\)/gmu;
-    for (const match of source.matchAll(imports)) {
-      const specifier = match[1] ?? match[2] ?? match[3] ?? "";
-      if (specifier.startsWith(".")) pending.push(resolve(dirname(file), specifier));
-      else bare.add(specifier);
+/** A bare specifier after `from` or in `import()`. Sample code in a string matches too. */
+const SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(\s*)["']([@a-z][^"'\s]*)["']/gu;
+
+/* Packages the site imports, minus `node:` and the library, which the landing only quotes. */
+function docsImports(): Set<string> {
+  const sources = [
+    "app/**/*.{ts,vue}",
+    "modules/**/*.ts",
+    "server/**/*.ts",
+    "shared/**/*.ts",
+    "*.ts",
+  ];
+  const names = new Set<string>();
+  for (const file of globSync(sources, { cwd: resolve(root, "docs") })) {
+    for (const match of read(`docs/${file}`).matchAll(SPECIFIER)) {
+      const parts = (match[1] ?? "").split("/");
+      const name = parts[0]?.startsWith("@") ? parts.slice(0, 2).join("/") : (parts[0] ?? "");
+      if (!name.startsWith("node:") && name !== "@agntn/harnesses") names.add(name);
     }
   }
-  return { files, bare };
+  return names;
 }
 
 describe("docs site", () => {
@@ -42,11 +45,18 @@ describe("docs site", () => {
     }
   });
 
-  /** Workers Builds installs docs/ alone, so one npm import in this graph breaks the deploy. */
-  it("loads the registry without a single npm package", () => {
-    const { files, bare } = runtimeGraph(["src/registry.ts", "src/types.ts"]);
-    expect(files.size).toBeGreaterThan(listHarnesses().length);
-    expect([...bare].filter((specifier) => !specifier.startsWith("node:"))).toEqual([]);
+  /** Nothing is hoisted, so a package the site forgets is missing on Workers Builds. */
+  it("declares every package the site imports", () => {
+    const manifest = JSON.parse(read("docs/package.json")) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    const declared = new Set(
+      Object.keys({ ...manifest.dependencies, ...manifest.devDependencies }),
+    );
+    const imported = docsImports();
+    expect(imported.size).toBeGreaterThan(0);
+    expect([...imported].filter((name) => !declared.has(name))).toEqual([]);
   });
 
   /** Workers Builds takes Node from .node-version and never reads engines. */

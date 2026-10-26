@@ -6,8 +6,7 @@ import type { HarnessRecord } from "../shared/types/registry.ts";
 /**
  * Ships the registry as `#harnesses-registry`, one typed template Nuxt bundles. The library spawns
  * processes and reads files, so it stays out of the browser and the worker; this runs it once, in
- * Node, when Nuxt starts. The registry subgraph of `src/` has no third-party import, which is what
- * lets Workers Builds skip installing the repo root.
+ * Node, when Nuxt starts.
  */
 export default defineNuxtModule({
   meta: { name: "harnesses-registry" },

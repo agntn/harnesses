@@ -6,7 +6,7 @@
 
 `lint` and `typecheck` build first, because the Pi and OMP extensions import their schemas and types from `dist/`. That means `build`, `lint`, `typecheck` and packing all rewrite `dist/`. Running `harnesses mcp` or an extension straight from your checkout? Work in a separate worktree, or the live server gets a new bundle under its feet.
 
-The docs site has its own install: `pnpm --dir docs install`, then `pnpm docs`.
+The docs site rides along for free. `docs/` is a workspace member, so the same install and the one lockfile cover it. `pnpm run docs` starts it. The `run` isn't optional: bare `pnpm docs` is pnpm 12's own command, and it just asks which package you meant.
 
 ## Adding a harness
 
@@ -45,7 +45,9 @@ Forget step 4 or 6 and `test/docs.test.ts` tells you which one.
 
 ## Docs site
 
-- `docs/modules/registry.ts` runs `getAllHarnesses()` at build time and hands the pages every path, template and marker they show. Workers Builds installs `docs/` alone, so that import graph stays free of npm packages. `test/docs.test.ts` keeps it honest.
+- `docs/modules/registry.ts` runs `getAllHarnesses()` at build time and hands the pages every path, template and marker they show.
+- Workers Builds runs its install in `docs/`, and pnpm walks up to the root lockfile and fills the whole workspace. Node still comes from the root `.node-version` only, never from `engines`.
+- Nothing is hoisted, so every package the site imports sits in `docs/package.json`. Forget one and `test/docs.test.ts` names it. Versions live in the `deps` and `dev` catalogs of `pnpm-workspace.yaml`, so one line bumps the library and the site together.
 - `resolveTemplate` and `buildCommand` in `docs/app/utils/harnesses.ts` are browser ports of `resolvePathTemplate` and `Harness.buildInvocation`. Change the library's expansion or argument order and change them too, or the explorer starts making things up.
 - Values render the same on server and client: no `Math.random`, no clock inside a computed.
 - Visitor input renders as text, never through `v-html`.

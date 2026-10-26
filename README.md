@@ -243,13 +243,13 @@ Want a fourteenth? One class extending `Harness`, then `registerHarness`. `getHa
 ## 🛠️ Development
 
 ```bash
-pnpm install
+pnpm install     # docs/ too: one workspace, one lockfile
 pnpm lint        # builds first, then vp lint and vp fmt --check
 pnpm lint:fix
 pnpm typecheck
 pnpm test:run
 pnpm build       # obuild
-pnpm docs        # the Docus site, bundles src/ itself
+pnpm run docs    # the Docus site; plain `pnpm docs` is a pnpm 12 builtin
 ```
 
 ## 💛 Thanks

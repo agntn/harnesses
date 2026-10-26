@@ -18,6 +18,8 @@ jobs:
         with:
           node-version: 26.10.0
           cache: true
+          run-install: |
+            - args: ['--filter', '@agntn/harnesses']
 
       - name: Fix lint issues
         run: pnpm run lint:fix
