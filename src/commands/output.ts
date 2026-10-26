@@ -36,8 +36,8 @@ const UNSAFE_UNICODE_FORMATTING = /[\p{Cf}\p{Zl}\p{Zp}]/gu;
  */
 export function sanitize(text: string | undefined): string {
   return stripVTControlCharacters(text ?? "")
-    .replace(UNSAFE_TERMINAL_CONTROLS, " ")
-    .replace(UNSAFE_UNICODE_FORMATTING, " ");
+    .replaceAll(UNSAFE_TERMINAL_CONTROLS, " ")
+    .replaceAll(UNSAFE_UNICODE_FORMATTING, " ");
 }
 
 /**

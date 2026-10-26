@@ -219,7 +219,7 @@ const OUTPUT_CONTROLS = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F]/g;
  * @returns {string} The stream as plain text.
  */
 function plainOutput(output: string): string {
-  return stripVTControlCharacters(output).replaceAll("\r\n", "\n").replace(OUTPUT_CONTROLS, " ");
+  return stripVTControlCharacters(output).replaceAll("\r\n", "\n").replaceAll(OUTPUT_CONTROLS, " ");
 }
 
 /**
