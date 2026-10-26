@@ -69,7 +69,7 @@ function clip(text: string, max: number): string {
 
 function cleanTerminalText(text: string): string {
   return stripVTControlCharacters(text.replaceAll(MALFORMED_SURROGATE, "�"))
-    .replace(TERMINAL_UNSAFE, " ")
+    .replaceAll(TERMINAL_UNSAFE, " ")
     .replaceAll(/\p{Zs}+/gu, " ")
     .trim();
 }
