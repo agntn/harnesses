@@ -1,10 +1,7 @@
-import { fileURLToPath } from "node:url";
 import { harnessesTheme } from "./shiki-theme";
 
 export default defineNuxtConfig({
   extends: ["docus"],
-  /** The repo root is its own pnpm workspace; Nuxt must not treat it as this site's. */
-  workspaceDir: fileURLToPath(new URL("./", import.meta.url)),
   devtools: { enabled: false },
   telemetry: false,
   site: {

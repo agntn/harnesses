@@ -14,6 +14,14 @@ registerHooks({
   },
 });
 
+/** A full pipe takes only part of the report, so the rest goes out until every byte is written. */
 process.on("exit", () => {
-  writeSync(2, `\n@loaded ${JSON.stringify(loaded)}\n`);
+  const report = Buffer.from(`\n@loaded ${JSON.stringify(loaded)}\n`);
+  for (let offset = 0; offset < report.length;) {
+    try {
+      offset += writeSync(2, report, offset);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EAGAIN") throw error;
+    }
+  }
 });

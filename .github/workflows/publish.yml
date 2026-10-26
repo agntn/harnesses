@@ -18,6 +18,8 @@ jobs:
         with:
           node-version: 26.10.0
           registry-url: https://registry.npmjs.org
+          run-install: |
+            - args: ['--frozen-lockfile', '--filter', '@agntn/harnesses']
       - run: pnpm build
       - run: pnpm test:run
       - run: pnpm publish --no-git-checks
