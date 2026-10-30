@@ -72,9 +72,9 @@ catalogs:
     "@iconify-json/vscode-icons": 1.2.92
     "@nuxt/content": 3.16.0
     "@nuxt/ui": 4.11.0
-    "@oh-my-pi/omptype": 18.2.11
-    "@oh-my-pi/pi-ai": 18.2.11
-    "@oh-my-pi/pi-coding-agent": 18.2.11
+    "@oh-my-pi/omptype": 18.13.2
+    "@oh-my-pi/pi-ai": 18.13.2
+    "@oh-my-pi/pi-coding-agent": 18.13.2
     "@vueuse/core": 14.4.0
     changelogen: 0.6.2
     obuild: 0.4.43
