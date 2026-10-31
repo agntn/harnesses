@@ -11,6 +11,7 @@ const WALK = [
   "omp",
   "cursor",
   "antigravity",
+  "openbot",
   "github-copilot",
   "mastracode",
   "prime-agent",

@@ -45,6 +45,7 @@ describe("@agntn/harnesses", () => {
       "grok",
       "mastracode",
       "omp",
+      "openbot",
       "opencode",
       "pi",
       "prime-agent",
@@ -364,6 +365,7 @@ describe("@agntn/harnesses", () => {
       grok: { audio: false, video: false },
       mastracode: { audio: false, video: false },
       omp: { audio: false, video: false },
+      openbot: { audio: false, video: false },
       opencode: { audio: false, video: false },
       pi: { audio: false, video: false },
       "prime-agent": { audio: false, video: false },
@@ -379,6 +381,23 @@ describe("@agntn/harnesses", () => {
 
     expect(resolved.instructions.length).toBeGreaterThan(0);
     expect(resolved.instructions.some((i) => i.path === "AGENTS.md")).toBe(true);
+  });
+
+  it("should put OpenBot's database in Electron's userData and its skills beside Codex's", () => {
+    const openbot = getHarness("openbot");
+    const sessions = (platform: "linux" | "darwin") =>
+      openbot.resolve({ homeDir: "/home/test", platform }).sessions.map((entry) => entry.path);
+
+    expect(sessions("linux")).toEqual(["/home/test/.config/OpenBot/openbot.db"]);
+    expect(sessions("darwin")).toEqual([
+      "/home/test/Library/Application Support/OpenBot/openbot.db",
+    ]);
+    expect(openbot.skillsSyncTarget).toBeNull();
+    expect(openbot.skills.map((entry) => entry.path)).toContain(
+      getHarness("codex").skillsSyncTarget?.path,
+    );
+    expect(openbot.mcpConfigs).toEqual([]);
+    expect(openbot.invocation).toBeNull();
   });
 
   it("should check harness installation without throwing", () => {
@@ -453,6 +472,27 @@ describe("@agntn/harnesses", () => {
     }
   });
 
+  it("should not open the OpenBot app to read a version", () => {
+    const root = mkdtempSync(join(tmpdir(), "harnesses-openbot-"));
+    const appMarker = join(root, "app-ran");
+
+    try {
+      writeFileSync(
+        join(root, "openbot"),
+        `#!/usr/bin/env node\nrequire("node:fs").writeFileSync(${JSON.stringify(appMarker)}, "");\nconsole.log("0.57.0");\n`,
+      );
+      chmodSync(join(root, "openbot"), 0o755);
+      vi.stubEnv("PATH", `${root}:${process.env.PATH ?? ""}`);
+
+      const openbot = getHarness("openbot");
+      expect(openbot.isInstalled()).toBe(true);
+      expect(openbot.version).toBeNull();
+      expect(existsSync(appMarker)).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("should detect a harness from env vars", () => {
     vi.stubEnv("CLAUDE_CODE", "1");
     const harness = detectHarnessFromEnv();
@@ -491,6 +531,19 @@ describe("@agntn/harnesses", () => {
     expect(detectHarnessFromEnv()?.id).toBe("prime-agent");
 
     vi.stubEnv("PRIME_AGENT_KERNEL_OWNER_PID", "");
+    expect(detectHarnessFromEnv()?.id).toBe("pi");
+  });
+
+  it("should name the CLI OpenBot hosts ahead of OpenBot itself", () => {
+    for (const harness of getAllHarnesses()) {
+      for (const v of harness.detection.envVars) {
+        vi.stubEnv(v, "");
+      }
+    }
+    vi.stubEnv("OPENBOT_AGENT_PROCESS", "1");
+    expect(detectHarnessFromEnv()?.id).toBe("openbot");
+
+    vi.stubEnv("PI_CODING_AGENT", "true");
     expect(detectHarnessFromEnv()?.id).toBe("pi");
   });
 

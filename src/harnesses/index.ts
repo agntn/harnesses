@@ -9,11 +9,15 @@ import GitHubCopilot from "./github-copilot.ts";
 import Grok from "./grok.ts";
 import MastraCode from "./mastracode.ts";
 import Omp from "./omp.ts";
+import OpenBot from "./openbot.ts";
 import OpenCode from "./opencode.ts";
 import Pi from "./pi.ts";
 import PrimeAgent from "./prime-agent.ts";
 
-/** Env detection walks this list in order, so a fork that keeps its parent's marker goes first. */
+/**
+ * Env detection walks this list in order, so a fork that keeps its parent's marker goes first,
+ * and OpenBot, whose marker every CLI it hosts inherits, goes last.
+ */
 export const harnesses: HarnessConstructor[] = [
   Antigravity,
   Claude,
@@ -30,4 +34,5 @@ export const harnesses: HarnessConstructor[] = [
   // env marker must be checked before Pi's.
   PrimeAgent,
   Pi,
+  OpenBot,
 ];

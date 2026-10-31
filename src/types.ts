@@ -14,6 +14,7 @@ export type HarnessId =
   | "github-copilot"
   | "mastracode"
   | "omp"
+  | "openbot"
   | "pi"
   | "prime-agent";
 export type EvidenceLevel = "official" | "community" | "inferred";

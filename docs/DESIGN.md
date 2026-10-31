@@ -11,7 +11,7 @@ The instruments harnesses owns:
 | [LandingRotatingCode.vue](app/components/content/LandingRotatingCode.vue) | "Every path, with its evidence" | the same twelve lines for every sample, as a file |
 | [LandingModes.vue](app/components/content/LandingModes.vue) | "Six modes, none of them a fallback" | the six invocation modes, the line one of them spawns, the error another one throws |
 | [LandingSync.vue](app/components/content/LandingSync.vue) | "One list, every dialect" | `mcp.jsonc` and the user configs sync rewrites |
-| [LandingRegistry.vue](app/components/content/LandingRegistry.vue) | "Thirteen harnesses, three platforms" | every harness as a cell |
+| [LandingRegistry.vue](app/components/content/LandingRegistry.vue) | "Fourteen harnesses, three platforms" | every harness as a cell |
 | [LandingToolCall.vue](app/components/content/LandingToolCall.vue) | "Eleven tools, three hosts" | `harnesses_info` arguments and the fields its answer carries |
 | [LandingCustom.vue](app/components/content/LandingCustom.vue) | "Extend Harness, call registerHarness" | a custom harness as a file |
 | [LandingStart.vue](app/components/content/LandingStart.vue) | closing section | install, notes, first lookup as a file |
@@ -63,11 +63,11 @@ Departures from the shared rules, recorded for the shared package:
 - The landing instruments walk the registry itself, not recorded samples: nothing is fetched, so there is no `recorded` or `live` in the meta.
 - The sync and aider files fold what their section doesn't talk about on screen and hand out the whole file on copy, so they stand about as tall as the text beside them.
 - Beside the text at 1024 px the sync and registry cells shed their second detail (format, id) through a container query instead of dropping to two columns.
-- Harness glyphs are `simple-icons` for the vendors that have one and Lucide for the rest (Freebuff, Mastra Code, OMP, OpenCode, Pi, Prime Agent): coding agents have no monochrome set of their own.
+- Harness glyphs are `simple-icons` for the vendors that have one and Lucide for the rest (Freebuff, Mastra Code, OMP, OpenBot, OpenCode, Pi, Prime Agent): coding agents have no monochrome set of their own.
 - The share bar under the hero metrics splits checked paths (official and community) from inferred ones. The inferred side is small; that is the data, not a styling choice.
 - The version comes from the library's `version` export; no data version exists, so ID strips and footers carry none.
 - The OG images ship local Figtree and Fira Code TTFs, the keys mechanism.
 
 ## Checks
 
-Beyond the shared checks: the landing at 1440, 1024, 390 and 320 px with the heights of the seven landing instruments through all thirteen samples, `/explorer?id=codex&platform=win32&mode=readOnly`, the rejected `/explorer?id=github-copilot&mode=advisorStructured` (its bar titles once stretched every panel to 511 px at 390), `/harnesses` and one harness page.
+Beyond the shared checks: the landing at 1440, 1024, 390 and 320 px with the heights of the seven landing instruments through all fourteen samples, `/explorer?id=codex&platform=win32&mode=readOnly`, the rejected `/explorer?id=github-copilot&mode=advisorStructured` (its bar titles once stretched every panel to 511 px at 390), `/harnesses` and one harness page.

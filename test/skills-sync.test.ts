@@ -196,10 +196,10 @@ describe("syncSkills", () => {
     });
   });
 
-  it("skips harnesses without a user-scope skills directory", () => {
+  it("skips harnesses without a user-scope skills directory of their own", () => {
     withoutXdgData(() => {
       const { homeDir } = fixture();
-      const report = syncSkills([getHarness("github-copilot")], false, {
+      const report = syncSkills([getHarness("github-copilot"), getHarness("openbot")], false, {
         homeDir,
         platform: "linux",
       });
@@ -207,7 +207,12 @@ describe("syncSkills", () => {
         {
           id: "github-copilot",
           action: "skipped",
-          detail: "no stable user-scope skills directory",
+          detail: "no user-scope skills directory of its own",
+        },
+        {
+          id: "openbot",
+          action: "skipped",
+          detail: "no user-scope skills directory of its own",
         },
       ]);
     });
