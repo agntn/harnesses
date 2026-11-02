@@ -225,16 +225,28 @@ export interface McpServerConfig {
 
 /** How one harness config file stores its MCP servers. */
 export interface McpConfigFile extends PathCandidate {
-  format: "json" | "toml";
-  /** Object path to the server map inside the file, e.g. ["mcpServers"]. */
+  format: "json" | "toml" | "sqlite";
+  /**
+   * Object path to the server map inside the file, e.g. ["mcpServers"].
+   * For SQLite, the one table that holds the servers.
+   */
   key: string[];
   /**
    * Shape of individual entries; "standard" is the {command, args, env, url}
    * family, "prime" is that family with env values as {"env": "NAME"} references,
-   * "mastracode" is that family read by its keys alone, type ignored, and "pi"
-   * is that family without sse that keeps the entry fields it doesn't manage.
+   * "mastracode" is that family read by its keys alone, type ignored, "pi"
+   * is that family without sse that keeps the entry fields it doesn't manage,
+   * and "openbot" is one table row per server, stdio or streamable HTTP.
    */
-  dialect: "standard" | "antigravity" | "mastracode" | "opencode" | "pi" | "prime" | "vscode";
+  dialect:
+    | "standard"
+    | "antigravity"
+    | "mastracode"
+    | "opencode"
+    | "openbot"
+    | "pi"
+    | "prime"
+    | "vscode";
 }
 
 export interface HarnessDetection {

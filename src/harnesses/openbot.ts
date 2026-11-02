@@ -101,6 +101,16 @@ export default class OpenBot extends Harness {
       note: "Electron's appData on Linux. --user-data-dir still wins.",
     },
   ];
+  override readonly mcpConfigs: Harness["mcpConfigs"] = inUserData("openbot.db", {
+    scope: "user",
+    level: "official",
+    note: "Servers are rows of projection_mcp_servers, written straight to the table like the app does. 32 at most.",
+  }).map((entry) => ({
+    ...entry,
+    format: "sqlite",
+    key: ["projection_mcp_servers"],
+    dialect: "openbot",
+  }));
   readonly invocation: Harness["invocation"] = null;
   readonly detection = {
     envVars: ["OPENBOT_AGENT_PROCESS"],

@@ -46,6 +46,7 @@ export {
   readMasterMcpServers,
   masterMcpPath,
   McpEnvError,
+  McpLimitError,
   McpTransportError,
 } from "./mcp-servers.ts";
 export type { McpConfigListing, SyncReport, SyncTargetResult } from "./mcp-servers.ts";

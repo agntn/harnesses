@@ -396,7 +396,17 @@ describe("@agntn/harnesses", () => {
     expect(openbot.skills.map((entry) => entry.path)).toContain(
       getHarness("codex").skillsSyncTarget?.path,
     );
-    expect(openbot.mcpConfigs).toEqual([]);
+    expect(
+      (["linux", "darwin", "win32"] as const).map((platform) =>
+        openbot
+          .resolveCandidates(openbot.mcpConfigs, { homeDir: "/home/test", platform })
+          .map((entry) => [entry.path, entry.format, entry.dialect]),
+      ),
+    ).toEqual([
+      [["/home/test/.config/OpenBot/openbot.db", "sqlite", "openbot"]],
+      [["/home/test/Library/Application Support/OpenBot/openbot.db", "sqlite", "openbot"]],
+      [[expect.stringMatching(/OpenBot[\\/]openbot\.db$/), "sqlite", "openbot"]],
+    ]);
     expect(openbot.invocation).toBeNull();
   });
 
