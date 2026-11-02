@@ -23,13 +23,13 @@ const hook = resolve(root, "test/record-loads.ts");
  * Runs `src/cli.ts` under the load hook; citty exits the process itself, so the hook reports at exit.
  * @param args - CLI arguments after the bin name.
  * @param input - Text handed to the child's stdin before it closes.
- * @param environment - Environment entries added to the child process.
+ * @param environment - Environment entries for the child; `undefined` drops an inherited one.
  * @returns {SpawnSyncReturns<string> & { loaded: string[] }} The spawn result plus every module URL the child loaded.
  */
 function runCli(
   args: readonly string[],
   input = "",
-  environment: Readonly<Record<string, string>> = {},
+  environment: Readonly<Record<string, string | undefined>> = {},
 ): SpawnSyncReturns<string> & { loaded: string[] } {
   const result = spawnSync(process.execPath, ["--import", hook, cli, ...args], {
     cwd: root,
@@ -224,6 +224,20 @@ describe("harnesses usage paths", () => {
     } finally {
       rmSync(binDir, { recursive: true, force: true });
     }
+  });
+
+  it.each([
+    { through: "a pipe", forceColor: undefined, escapes: false },
+    { through: "a pipe with FORCE_COLOR=1", forceColor: "1", escapes: true },
+  ])("harnesses info through $through writes ANSI escapes: $escapes", ({ forceColor, escapes }) => {
+    const result = runCli(["info", "claude"], "", {
+      CONSOLA_LEVEL: "3",
+      FORCE_COLOR: forceColor,
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Anthropic Claude Code");
+    expect(result.stdout.includes("\u001B[")).toBe(escapes);
   });
 
   it("harnesses prompts sync sanitizes Unicode formatting in human errors", () => {

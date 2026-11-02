@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { styleText } from "node:util";
 import { defineCommand, runMain } from "citty";
 import { consola } from "consola";
 import { encode as toToon } from "@toon-format/toon";
@@ -16,14 +17,15 @@ import {
 import { exitOnClosedPipe, sanitize } from "./commands/output.ts";
 import type { Harness } from "./harness.ts";
 
+/** `styleText` checks stdout, `NO_COLOR` and `FORCE_COLOR`, so pipes and log files stay plain. */
 const s = {
-  cyan: (t: string) => `\x1B[36m${t}\x1B[0m`,
-  hi: (t: string) => `\x1B[96m${t}\x1B[0m`,
-  green: (t: string) => `\x1B[32m${t}\x1B[0m`,
-  red: (t: string) => `\x1B[31m${t}\x1B[0m`,
-  dim: (t: string) => `\x1B[90m${t}\x1B[0m`,
-  bold: (t: string) => `\x1B[1m${t}\x1B[0m`,
-  white: (t: string) => `\x1B[97m${t}\x1B[0m`,
+  cyan: (t: string) => styleText("cyan", t),
+  hi: (t: string) => styleText("cyanBright", t),
+  green: (t: string) => styleText("green", t),
+  red: (t: string) => styleText("red", t),
+  dim: (t: string) => styleText("gray", t),
+  bold: (t: string) => styleText("bold", t),
+  white: (t: string) => styleText("whiteBright", t),
 };
 
 function header(title: string) {
