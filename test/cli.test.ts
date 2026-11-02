@@ -240,6 +240,55 @@ describe("harnesses usage paths", () => {
     expect(result.stdout.includes("\u001B[")).toBe(escapes);
   });
 
+  /** citty also goes quiet under CI or TEST, so the base would pass with them still set. */
+  it.each([
+    { command: "--help", forceColor: undefined, escapes: false },
+    { command: "info --help", forceColor: undefined, escapes: false },
+    { command: "no-such-command", forceColor: undefined, escapes: false },
+    { command: "--help", forceColor: "1", escapes: true },
+  ])(
+    "harnesses $command through a pipe with FORCE_COLOR=$forceColor colors citty: $escapes",
+    ({ command, forceColor, escapes }) => {
+      const result = runCli(command.split(" "), "", {
+        CI: undefined,
+        TEST: undefined,
+        NO_COLOR: undefined,
+        FORCE_COLOR: forceColor,
+        NODE_DISABLE_COLORS: undefined,
+        TERM: "xterm-256color",
+      });
+
+      expect(stripVTControlCharacters(result.stdout)).toMatch(/USAGE harnesses/u);
+      expect(result.stdout.includes("\u001B[")).toBe(escapes);
+      expect(result.stderr).not.toContain("\u001B[");
+    },
+  );
+
+  it("harnesses run leaves NO_COLOR to the harness it starts", () => {
+    const binDir = mkdtempSync(join(tmpdir(), "harnesses-grok-env-"));
+    try {
+      writeFileSync(
+        join(binDir, "grok"),
+        [
+          "#!/bin/sh",
+          'if [ "$1" = --version ]; then echo 1.0.41; exit 0; fi',
+          'echo "NO_COLOR=${NO_COLOR-unset}"',
+          "",
+        ].join("\n"),
+        { mode: 0o755 },
+      );
+      const result = runCli(["run", "grok", "--tools", "x"], "", {
+        NO_COLOR: undefined,
+        PATH: `${binDir}:${process.env.PATH ?? ""}`,
+      });
+
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("NO_COLOR=unset");
+    } finally {
+      rmSync(binDir, { recursive: true, force: true });
+    }
+  });
+
   it("harnesses prompts sync sanitizes Unicode formatting in human errors", () => {
     const bidiOverride = String.fromCodePoint(0x202e);
     const result = runCli(["prompts", "sync", `bad${bidiOverride}id`]);
