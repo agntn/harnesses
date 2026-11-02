@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 import { styleText } from "node:util";
-import { defineCommand, runMain } from "citty";
 import { consola } from "consola";
 import { encode as toToon } from "@toon-format/toon";
 import { version, type AvailableModel, type InvokeResult } from "./types.ts";
@@ -16,6 +15,26 @@ import {
 } from "./tool-operations.ts";
 import { exitOnClosedPipe, sanitize } from "./commands/output.ts";
 import type { Harness } from "./harness.ts";
+
+/**
+ * citty fixes its colors at load time and never asks the terminal, so `styleText` decides for it.
+ * The variable goes back after, since `run` hands this env to the harness it starts.
+ *
+ * @returns {Promise<typeof import("citty")>} citty, colored only where the listings are too.
+ */
+async function loadCitty() {
+  const inherited = process.env.NO_COLOR;
+  const streams = [process.stdout, process.stderr];
+  if (streams.some((stream) => styleText("red", "x", { stream }) === "x")) {
+    process.env.NO_COLOR = "1";
+  }
+  const citty = await import("citty");
+  if (inherited === undefined) delete process.env.NO_COLOR;
+  else process.env.NO_COLOR = inherited;
+  return citty;
+}
+
+const { defineCommand, runMain } = await loadCitty();
 
 /** `styleText` checks stdout, `NO_COLOR` and `FORCE_COLOR`, so pipes and log files stay plain. */
 const s = {
