@@ -72,8 +72,8 @@
     "vite-plus": "catalog:"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": ">=0.99.0 <1",
-    "@earendil-works/pi-tui": ">=0.84.2 <1",
+    "@earendil-works/pi-coding-agent": ">=0.99.0 <2",
+    "@earendil-works/pi-tui": ">=0.84.2 <2",
     "@oh-my-pi/pi-coding-agent": ">=18.0.0 <19",
     "typebox": "*"
   },
