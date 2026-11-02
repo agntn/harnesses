@@ -72,6 +72,17 @@ function readOnlyNetworkLine(network: boolean | null): string {
     : s.red("readOnly network: cut, MCP servers included");
 }
 
+/**
+ * Read-only Pi keeps four tools and nothing else, so info names them before a run asks for more.
+ *
+ * @param tools - The harness's read-only allowlist.
+ * @returns {string} One line, dim when a sandbox decides instead of a list.
+ */
+function readOnlyToolsLine(tools: readonly string[] | null): string {
+  if (tools === null) return s.dim("readOnly tools: no allowlist");
+  return s.white(`readOnly tools: only ${sanitize(tools.join(", "))}, no extension or MCP tools`);
+}
+
 /** The model part of `harnesses info`: three switches and the hint, when the recipe has one. */
 interface ModelSummary {
   features: Record<"listing" | "selection" | "effort", boolean>;
@@ -277,6 +288,7 @@ const info = defineCommand({
           capabilities: harness.capabilities,
           invocationModes: harness.invocationModes,
           readOnlyNetwork: harness.readOnlyNetwork(),
+          readOnlyTools: harness.readOnlyTools(),
           modelListing: models.features.listing,
           modelHint: models.hint,
           modelSelection: models.features.selection,
@@ -315,6 +327,7 @@ const info = defineCommand({
       .join(s.dim("  ·  "));
     consola.log(entry(modes));
     consola.log(entry(readOnlyNetworkLine(harness.readOnlyNetwork())));
+    consola.log(entry(readOnlyToolsLine(harness.readOnlyTools())));
 
     consola.log(section("Models"));
     consola.log(

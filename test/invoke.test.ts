@@ -332,6 +332,33 @@ describe("normalized invocation", () => {
     expect(harness.readOnlyNetwork("linux")).toBe(false);
   });
 
+  it("names the only tools a read-only Pi or Claude run keeps", () => {
+    const pi = getHarness("pi");
+    const tools = pi.readOnlyTools();
+
+    expect(tools).toEqual(["read", "grep", "find", "ls"]);
+    expect(pi.buildInvocation("review this", { readOnly: true })?.args).toContain(tools?.join(","));
+    expect(getHarness("claude").readOnlyTools()).toEqual(["Read", "Glob", "Grep"]);
+    expect(getHarness("codex").readOnlyTools()).toBeNull();
+    expect(getHarness("grok").readOnlyTools()).toBeNull();
+    expect(getHarness("prime-agent").readOnlyTools()).toBeNull();
+  });
+
+  it("hands out a copy of the allowlist and none without a read-only mode", () => {
+    class ToolsWithoutReadOnly extends FakeCursor {
+      override readonly invocation: Harness["invocation"] = {
+        args: ["{prompt}"],
+        readOnlyTools: ["read"],
+        level: "inferred",
+      };
+    }
+
+    getHarness("pi").readOnlyTools()?.push("bash");
+
+    expect(getHarness("pi").readOnlyTools()).toEqual(["read", "grep", "find", "ls"]);
+    expect(new ToolsWithoutReadOnly().readOnlyTools()).toBeNull();
+  });
+
   it("rejects OMP advisor mode because --no-tools only disables bundled tools", () => {
     const omp = getHarness("omp");
 

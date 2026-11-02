@@ -169,6 +169,14 @@ describe("harnesses usage paths", () => {
     expect(String((info as { modelHint?: unknown }).modelHint)).toContain(hint);
   });
 
+  it("harnesses info names the only tools a read-only Pi run keeps", () => {
+    const info: unknown = JSON.parse(runCli(["info", "pi", "--json"]).stdout);
+    const text = runCli(["info", "pi"], "", { CONSOLA_LEVEL: "3" }).stdout;
+
+    expect(info).toMatchObject({ readOnlyTools: ["read", "grep", "find", "ls"] });
+    expect(text).toContain("readOnly tools: only read, grep, find, ls, no extension or MCP tools");
+  });
+
   it("harnesses models prints the ids agy --model accepts", () => {
     const binDir = mkdtempSync(join(tmpdir(), "harnesses-agy-"));
     try {

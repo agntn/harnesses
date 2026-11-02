@@ -4,6 +4,9 @@ import type { AvailableModel } from "../types.ts";
 
 const MODEL_HEADERS = ["provider", "model", "context", "max-out", "thinking", "images"];
 
+/** Pi reads `--tools` as an allowlist: no extension tools, no codemode or tool_search for MCP. */
+const READ_ONLY_TOOLS = ["read", "grep", "find", "ls"];
+
 function parseTokenCount(value: string, harness: string): number {
   const match = /^(\d+(?:\.\d+)?)([KM])?$/.exec(value);
   if (!match?.[1]) throw new Error(`Invalid ${harness} token count: ${JSON.stringify(value)}`);
@@ -172,8 +175,9 @@ export default class Pi extends Harness {
     jsonArgs: ["-p", "--mode", "json", "{prompt}"],
     noToolsArgs: ["-p", "--no-tools", "{prompt}"],
     noToolsJsonArgs: ["-p", "--no-tools", "--mode", "json", "{prompt}"],
-    readOnlyArgs: ["-p", "--tools", "read,grep,find,ls", "{prompt}"],
-    readOnlyJsonArgs: ["-p", "--tools", "read,grep,find,ls", "--mode", "json", "{prompt}"],
+    readOnlyArgs: ["-p", "--tools", READ_ONLY_TOOLS.join(","), "{prompt}"],
+    readOnlyJsonArgs: ["-p", "--tools", READ_ONLY_TOOLS.join(","), "--mode", "json", "{prompt}"],
+    readOnlyTools: READ_ONLY_TOOLS,
     modelArgs: ["--model", "{model}"],
     effortArgs: ["--thinking", "{effort}"],
     level: "official",
