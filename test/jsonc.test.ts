@@ -37,6 +37,20 @@ describe("parseJsonc", () => {
     });
   });
 
+  it("keeps a comment between a comma and the next value", () => {
+    expect(parseJsonc("[1, /* ] */ 2, // ]\n 3,\n]")).toEqual([1, 2, 3]);
+  });
+
+  /** A lookahead that rescans the rest of the file at every comma needs about five seconds here. */
+  it("stays linear on a big file", { timeout: 1000 }, () => {
+    const servers = Array.from(
+      { length: 4000 },
+      (_, index) => `"s${index}": { "command": "npx", "args": ["-y", "pkg${index}"] }`,
+    );
+    const parsed = parseJsonc(`{ "mcpServers": { ${servers.join(",\n")}, }, }`);
+    expect(Object.keys((parsed as { mcpServers: object }).mcpServers)).toHaveLength(4000);
+  });
+
   it("still throws on broken JSON", () => {
     expect(() => parseJsonc('{ "a": }')).toThrow(SyntaxError);
   });
