@@ -38,13 +38,6 @@ minimumReleaseAgeExclude:
   - "@oxlint-tsgolint/linux-x64@7.0.2002"
   - "@oxlint-tsgolint/win32-arm64@7.0.2002"
   - "@oxlint-tsgolint/win32-x64@7.0.2002"
-  - "@earendil-works/chord@0.99.1"
-  - "@earendil-works/pi-ai@0.99.1"
-  - "@earendil-works/pi-codemode@0.99.1"
-  - "@earendil-works/pi-coding-agent@0.99.1"
-  - "@earendil-works/pi-mcp@0.99.1"
-  - "@earendil-works/pi-telemetry@0.99.1"
-  - "@earendil-works/pi-tui@0.99.1"
   - "wrangler@4.134.0"
   - miniflare@5.20260917.0-alpha
 catalog:
@@ -66,8 +59,8 @@ catalogs:
     yaml: 2.9.1
   dev:
     "@agntn/ox": 0.1.0
-    "@earendil-works/pi-coding-agent": 0.99.1
-    "@earendil-works/pi-tui": 0.99.1
+    "@earendil-works/pi-coding-agent": 1.4.0
+    "@earendil-works/pi-tui": 1.4.0
     "@iconify-json/lucide": 1.2.147
     "@iconify-json/simple-icons": 1.2.100
     "@iconify-json/vscode-icons": 1.2.92
