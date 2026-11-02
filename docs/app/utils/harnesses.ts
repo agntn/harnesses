@@ -56,6 +56,11 @@ const PRESENTATION: Record<string, { icon: string; short: string; blurb: string 
     short: "Mastra Code",
     blurb: "LibSQL database for threads and memory. No headless mode yet, so no invoke.",
   },
+  openbot: {
+    icon: "i-lucide-users",
+    short: "OpenBot",
+    blurb: "Desktop app that hosts CLI agents. One SQLite database and no headless mode.",
+  },
   omp: {
     icon: "i-lucide-orbit",
     short: "OMP",

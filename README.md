@@ -5,20 +5,20 @@
 [![license](https://npmx.dev/api/registry/badge/license/@agntn/harnesses)](https://npmx.dev/package/@agntn/harnesses)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/agntn/harnesses)
 
-🧭 Thirteen coding CLIs, one map. You ask where Claude keeps skills, you get the path.
+🧭 Fourteen coding CLIs, one map. You ask where Claude keeps skills, you get the path.
 
 > [!WARNING]
 > **@agntn/harnesses is pre-1.0.** Paths follow upstream CLIs that still move. Building on it now means pinning the version.
 
 ## Why?
 
-Claude stores transcripts under a mangled copy of your cwd. Codex keeps TOML with comments you wanted to keep. Ask a model where Codex lives and it invents `.claude/`. So this is one registry: thirteen harnesses, same object, paths for your machine.
+Claude stores transcripts under a mangled copy of your cwd. Codex keeps TOML with comments you wanted to keep. Ask a model where Codex lives and it invents `.claude/`. So this is one registry: fourteen harnesses, same object, paths for your machine.
 
 The rest of it sits on [harnesses.agntn.dev](https://harnesses.agntn.dev).
 
 ## ✨ Features
 
-- 🧩 **Thirteen harnesses, one class.** Same fields on Claude, Codex, Pi and the rest.
+- 🧩 **Fourteen harnesses, one class.** Same fields on Claude, Codex, Pi and the rest.
 - 📂 **Every path has a receipt.** Scope, evidence level, and a platform tag when the OS actually differs.
 - 🔎 **Detects which CLI you're inside.** Environment variables first. Two project markers in one directory is `null`, not a guess.
 - ▶️ **Headless runs with real modes.** Advisor without tools, full agent, or a native read-only sandbox. A mode the CLI cannot enforce is rejected.
@@ -58,6 +58,7 @@ npx @agntn/harnesses detect
     ● opencode        OpenCode CLI            v2.0.22   agent
     ● prime-agent     Prime Agent             v0.9.5    advisor · agent
     ● pi              Pi Coding Agent         v1.0.2    advisor · readOnly · agent
+    ○ openbot         OpenBot
 ```
 
 No key, no config. No network either. `detect` looks at `PATH`. Filled dot is installed, hollow is not. The tail says how `run` can drive it: `advisor` without tools, `readOnly` behind the harness's own read-only lock, `agent` with everything. Codex has no advisor, and now you learn that here, not from a refused run. After `pnpm add`, the same command is `pnpm exec harnesses`, or install it once with `pnpm add -g @agntn/harnesses`.
@@ -185,16 +186,21 @@ const report = syncSkills(getAllHarnesses(), true);
 console.log(report.skills, report.targets);
 ```
 
-Every harness's user skills directory, `~/.claude/skills/`, `~/.agents/skills/`
-for Codex, `~/.pi/agent/skills/` and the rest, becomes one symlink to that
-folder. A skill written through Claude is already there when Pi looks. Old
-setups with a symlink per skill get replaced without ceremony, and a directory
-with real skills in it is backed up to `diverged/skills/` first. Already keep
-skills in a dotfiles repo? Make the XDG folder a symlink to it. The sync leaves
-a harness directory alone if the source points into it, instead of moving your
-only copy away. `skillsSyncTarget` names the directory it links for each
-harness, `null` for Copilot and Freebuff, which have no user skills directory
-in the registry.
+Every harness's user skills directory becomes one symlink to that folder. That
+includes `~/.claude/skills/`, `~/.agents/skills/` for Codex,
+`~/.pi/agent/skills/` and the rest. A skill written through Claude is already
+there when Pi looks.
+
+Old setups with a symlink per skill get replaced without ceremony. A directory
+with real skills gets backed up to `diverged/skills/` first. Already keep skills
+in a dotfiles repo? Make the XDG folder a symlink to it. The sync leaves a
+harness directory alone if the source points into it. Your only copy stays put.
+
+`skillsSyncTarget` names the linked directory for each harness. Each harness
+gets its own target, never a shared one. It's `null` for Copilot and Freebuff.
+Neither has a user skills directory in the registry. It's also `null` for
+OpenBot, but for another reason. OpenBot reads only `~/.agents/skills/`, Codex's
+target. Syncing Codex already links it.
 
 ## 🗺️ Harnesses
 
@@ -210,6 +216,7 @@ in the registry.
 | `grok`           | xAI Grok CLI           | `.grok/skills/`        |
 | `mastracode`     | Mastra Code            | `.mastracode/skills/`  |
 | `omp`            | OMP (oh-my-pi)         | `.omp/skills/`         |
+| `openbot`        | OpenBot                | none                   |
 | `opencode`       | OpenCode CLI           | `.opencode/skills/`    |
 | `prime-agent`    | Prime Agent            | `.prime/agent/skills/` |
 | `pi`             | Pi Coding Agent        | `.pi/skills/`          |

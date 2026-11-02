@@ -6,15 +6,24 @@
  * that a round trip would destroy, so TOML writes are surgical line edits:
  * only the target server's section is removed or appended, the result is
  * re-parsed and checked against the intended state before anything is
- * written, and every write lands atomically via a temp file rename.
+ * written, and every write lands atomically via a temp file rename. OpenBot
+ * keeps its servers as rows of a SQLite table, which `mcp-sqlite.ts` edits
+ * one row per server.
  */
-import { mkdirSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
 import { parse as parseToml } from "smol-toml";
 import { readIfExists } from "./files.ts";
 import type { Harness } from "./harness.ts";
 import { parseJsonc } from "./jsonc.ts";
+import {
+  McpLimitError,
+  openBotServer,
+  readSqliteServers,
+  removeSqliteServer,
+  upsertSqliteServer,
+} from "./mcp-sqlite.ts";
 import { agntnConfigDir } from "./resolve.ts";
 import type { EvidenceLevel, McpConfigFile, McpServerConfig, ResolveOptions } from "./types.ts";
 
@@ -176,6 +185,8 @@ export class McpEnvError extends Error {
 export class McpTransportError extends Error {
   override readonly name = "McpTransportError";
 }
+
+export { McpLimitError };
 
 function envReference(value: string): string | undefined {
   return ENV_REFERENCE.exec(value)?.[1];
@@ -364,9 +375,16 @@ function resolveEnvReferences(
   return { ...server, env };
 }
 
+/** Dialects that take stdio and streamable HTTP only, by the name a refusal gives the harness. */
+const WITHOUT_SSE: Readonly<Partial<Record<McpConfigFile["dialect"], string>>> = {
+  openbot: "OpenBot",
+  pi: "Pi",
+};
+
 /**
  * Env references per {@link resolveEnvReferences}, minus `sse` and `enabled` for Mastra Code.
- * Pi rejects `sse`, and an sse url is rarely the streamable HTTP endpoint, so it's refused.
+ * Pi and OpenBot reject `sse`, and an sse url is rarely the streamable HTTP endpoint, so it's
+ * refused. OpenBot rows go through {@link openBotServer} for their names and their `enabled`.
  *
  * @param server - Normalized server from the master list or a caller.
  * @param dialect - Target harness config dialect.
@@ -377,11 +395,13 @@ function shapeForDialect(
   dialect: McpConfigFile["dialect"],
 ): McpServerConfig {
   const shaped = resolveEnvReferences(server, dialect);
-  if (dialect === "pi" && shaped.transport === "sse") {
+  const withoutSse = WITHOUT_SSE[dialect];
+  if (withoutSse && shaped.transport === "sse") {
     throw new McpTransportError(
-      `${server.name}: Pi takes stdio and streamable HTTP servers, not sse; point url at the server's streamable HTTP endpoint`,
+      `${server.name}: ${withoutSse} takes stdio and streamable HTTP servers, not sse; point url at the server's streamable HTTP endpoint`,
     );
   }
+  if (dialect === "openbot") return openBotServer(shaped);
   if (dialect !== "mastracode") return shaped;
   return compact({
     ...shaped,
@@ -471,6 +491,10 @@ function normalizeServerMap(
 function listMcpConfig(entry: McpConfigFile, path: string): McpConfigListing {
   const base = listingBase(entry, path);
   try {
+    if (entry.format === "sqlite") {
+      if (!existsSync(path)) return base;
+      return { ...base, exists: true, servers: readSqliteServers(path, entry.key) };
+    }
     const raw = readIfExists(path);
     if (raw === null) return base;
     const servers = normalizeServerMap(configServerMap(raw, entry), entry.dialect);
@@ -674,6 +698,10 @@ export function addMcpServer(
   const { entry, path } = writableConfig(harness, scope, options);
   const resolved = shapeForDialect(server, entry.dialect);
 
+  if (entry.format === "sqlite") {
+    return { path, replaced: upsertSqliteServer(path, entry.key, resolved) };
+  }
+
   if (entry.format === "toml") {
     return { path, replaced: addTomlServer(path, entry.key, resolved) };
   }
@@ -704,6 +732,10 @@ export function removeMcpServer(
   options: ResolveOptions = {},
 ): { path: string; removed: boolean } {
   const { entry, path } = writableConfig(harness, scope, options);
+
+  if (entry.format === "sqlite") {
+    return { path, removed: removeSqliteServer(path, entry.key, name) };
+  }
 
   if (entry.format === "toml") {
     return { path, removed: removeTomlServer(path, entry.key, name) };
@@ -944,8 +976,12 @@ function withdrawMasterServers(
  * @param error - Error thrown while shaping or writing one server.
  * @returns {boolean} Whether the error is one of the refusals a sync reports.
  */
-function cannotHold(error: unknown): error is McpEnvError | McpTransportError {
-  return error instanceof McpEnvError || error instanceof McpTransportError;
+function cannotHold(error: unknown): error is McpEnvError | McpLimitError | McpTransportError {
+  return (
+    error instanceof McpEnvError ||
+    error instanceof McpLimitError ||
+    error instanceof McpTransportError
+  );
 }
 
 function removeExtraServers(
@@ -1005,12 +1041,15 @@ function writeMasterServers(
 /**
  * Writes the servers this harness may have and withdraws the other master names.
  *
+ * Removals run first, so a harness with a capped list (OpenBot holds 32) has room for the master
+ * servers before they arrive. The report still lists the writes first.
+ *
  * @param harness - Target harness with a readable user-scope config.
  * @param master - Master list to sync from.
  * @param existing - Servers the harness config holds now, by name.
  * @param masterNames - Every server name on the master list.
  * @param options - Path-resolution overrides.
- * @returns {SyncStep[]} The outcome of each step, in order.
+ * @returns {SyncStep[]} The outcome of each step, in report order.
  */
 function syncMasterServers(
   harness: Harness,
@@ -1022,14 +1061,28 @@ function syncMasterServers(
   const allowed = master.servers.filter((server) => !excludedFrom(master, server.name, harness.id));
   const allowedNames = new Set(allowed.map((server) => server.name));
   const withdrawn = new Set([...masterNames].filter((name) => !allowedNames.has(name)));
-  const steps = [
-    writeMasterServers(harness, allowed, existing, options),
-    withdrawMasterServers(harness, existing, withdrawn, options),
-  ];
+  const removals = [withdrawMasterServers(harness, existing, withdrawn, options)];
   if (!master.excludes.includes(harness.id)) {
-    steps.push(removeExtraServers(harness, existing, masterNames, master.keep, options));
+    removals.push(removeExtraServers(harness, existing, masterNames, master.keep, options));
   }
-  return steps;
+  return [writeMasterServers(harness, allowed, existing, options), ...removals];
+}
+
+/**
+ * Why a sync can't write to this config, if it can't. A SQLite config that isn't there yet stays
+ * that way: only the app may create its database, schema and all.
+ *
+ * @param listing - The user-scope config as it reads now.
+ * @returns {string | undefined} The reason to skip the harness, or undefined.
+ */
+function unwritableReason(
+  listing: Readonly<Pick<McpConfigListing, "error" | "exists" | "format">>,
+): string | undefined {
+  if (listing.error) return `existing config is unreadable: ${listing.error}`;
+  if (listing.format === "sqlite" && !listing.exists) {
+    return "no database yet: the app creates it on its first start";
+  }
+  return undefined;
 }
 
 function syncMcpTarget(
@@ -1044,13 +1097,9 @@ function syncMcpTarget(
   }
 
   const listing = listMcpServers(harness, options).find((item) => item.scope === "user");
-  if (listing?.error) {
-    return {
-      id: harness.id,
-      path: listing.path,
-      skipped: `existing config is unreadable: ${listing.error}`,
-      results: [],
-    };
+  const skipped = listing && unwritableReason(listing);
+  if (listing && skipped) {
+    return { id: harness.id, path: listing.path, skipped, results: [] };
   }
 
   const steps = syncMasterServers(harness, master, existingServers(listing), masterNames, options);

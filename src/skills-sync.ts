@@ -56,7 +56,11 @@ function syncTarget(
 ): SkillsSyncTargetResult {
   const target = harness.skillsSyncTarget;
   if (target === null) {
-    return { id: harness.id, action: "skipped", detail: "no stable user-scope skills directory" };
+    return {
+      id: harness.id,
+      action: "skipped",
+      detail: "no user-scope skills directory of its own",
+    };
   }
 
   const resolved = harness.resolveCandidates([target], options)[0];
