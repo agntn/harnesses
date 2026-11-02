@@ -28,7 +28,7 @@ import type { PromptSyncReport } from "./prompt-sync.ts";
 export type { SkillsSyncReport } from "./skills-sync.ts";
 import { syncSkills } from "./skills-sync.ts";
 import type { SkillsSyncReport } from "./skills-sync.ts";
-import { readOnlyVersionError, selectionError } from "./harness.ts";
+import { modelListingError, readOnlyVersionError, selectionError } from "./harness.ts";
 import type { Harness } from "./harness.ts";
 import type {
   AvailableModel,
@@ -84,6 +84,8 @@ export interface HarnessMetadata {
   /** Network for what a read-only run starts here, MCP servers included; null when unknown. */
   readOnlyNetwork: boolean | null;
   modelListing: boolean;
+  /** What `model` takes when the harness can't list its models; null when no hint is recorded. */
+  modelHint: string | null;
   modelSelection: boolean;
   effortSelection: boolean;
   config: PathCandidate[];
@@ -341,6 +343,7 @@ function harnessInfoResult(id: string): HarnessInfoResult {
     invocationModes: harness.invocationModes,
     readOnlyNetwork: harness.readOnlyNetwork(),
     modelListing: harness.modelListing !== null,
+    modelHint: harness.invocation?.modelHint ?? null,
     modelSelection: harness.invocation?.modelArgs !== undefined,
     effortSelection: harness.invocation?.effortArgs !== undefined,
     config: harness.config,
@@ -399,6 +402,7 @@ function harnessInfoText(result: HarnessInfoResult): HarnessInfoText {
     invocationModes,
     readOnlyNetwork,
     modelListing,
+    modelHint,
     modelSelection,
     effortSelection,
     envOverrides,
@@ -414,6 +418,7 @@ function harnessInfoText(result: HarnessInfoResult): HarnessInfoText {
     invocationModes,
     readOnlyNetwork,
     modelListing,
+    modelHint,
     modelSelection,
     effortSelection,
     envOverrides: getHarness(id).resolveCandidates(envOverrides),
@@ -496,7 +501,7 @@ export async function listHarnessModels(
   const harness = getHarness(id);
   const built = harness.buildModelListInvocation(options.search);
   if (!built) {
-    const details: RunFailure = { error: `Harness ${id} does not support model listing` };
+    const details: RunFailure = { error: modelListingError(id, harness.invocation) };
     return { content: text(details), details, isError: true };
   }
 

@@ -98,6 +98,8 @@ export interface HarnessInvocation {
   readOnlyNetwork?: Partial<Record<Platform, boolean>>;
   /** Arguments appended when a model is selected; every "{model}" is replaced. */
   modelArgs?: string[];
+  /** What `{model}` takes, said in one sentence, for a harness that can't list its models. */
+  modelHint?: string;
   /** Arguments appended when a reasoning effort is selected; every "{effort}" is replaced. */
   effortArgs?: string[];
   /**

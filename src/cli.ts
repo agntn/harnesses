@@ -14,6 +14,7 @@ import {
   type RunFailure,
 } from "./tool-operations.ts";
 import { exitOnClosedPipe, sanitize } from "./commands/output.ts";
+import type { Harness } from "./harness.ts";
 
 const s = {
   cyan: (t: string) => `\x1B[36m${t}\x1B[0m`,
@@ -48,6 +49,29 @@ function readOnlyNetworkLine(network: boolean | null): string {
   return network
     ? s.green("readOnly network: kept")
     : s.red("readOnly network: cut, MCP servers included");
+}
+
+/** The model part of `harnesses info`: three switches and the hint, when the recipe has one. */
+interface ModelSummary {
+  features: Record<"listing" | "selection" | "effort", boolean>;
+  hint: string | null;
+}
+
+/**
+ * Reads what info says about models in one place, so the command body stays flat.
+ *
+ * @param harness - The harness to describe.
+ * @returns {ModelSummary} Its model switches and hint.
+ */
+function modelSummary(harness: Harness): ModelSummary {
+  return {
+    features: {
+      listing: harness.modelListing !== null,
+      selection: harness.invocation?.modelArgs !== undefined,
+      effort: harness.invocation?.effortArgs !== undefined,
+    },
+    hint: harness.invocation?.modelHint ?? null,
+  };
 }
 
 function renderPathSection(
@@ -116,7 +140,7 @@ function parsePositiveTimeout(raw: string | undefined): number | null | undefine
 }
 
 function modelFailureMessage(details: ModelsOutcome | RunFailure): string {
-  return "error" in details ? details.error : "Failed to list models";
+  return "error" in details ? sanitize(details.error) : "Failed to list models";
 }
 
 function modelDescription(model: Readonly<AvailableModel>): string {
@@ -221,11 +245,7 @@ const info = defineCommand({
   args: { id: harnessArg, ...formatArgs },
   run({ args }) {
     const harness = resolveHarness(args.id as string);
-    const modelFeatures = {
-      listing: harness.modelListing !== null,
-      selection: harness.invocation?.modelArgs !== undefined,
-      effort: harness.invocation?.effortArgs !== undefined,
-    };
+    const models = modelSummary(harness);
 
     if (
       emit(
@@ -236,9 +256,10 @@ const info = defineCommand({
           capabilities: harness.capabilities,
           invocationModes: harness.invocationModes,
           readOnlyNetwork: harness.readOnlyNetwork(),
-          modelListing: modelFeatures.listing,
-          modelSelection: modelFeatures.selection,
-          effortSelection: modelFeatures.effort,
+          modelListing: models.features.listing,
+          modelHint: models.hint,
+          modelSelection: models.features.selection,
+          effortSelection: models.features.effort,
           config: harness.config,
           sessions: harness.sessions,
           instructions: harness.instructions,
@@ -277,11 +298,12 @@ const info = defineCommand({
     consola.log(section("Models"));
     consola.log(
       entry(
-        Object.entries(modelFeatures)
+        Object.entries(models.features)
           .map(([k, v]) => (v ? s.green(k) : s.dim(k)))
           .join(s.dim("  ·  ")),
       ),
     );
+    if (models.hint !== null) consola.log(entry(s.dim(sanitize(models.hint))));
 
     renderPathSection("Config", harness.config);
     renderPathSection("Sessions", harness.sessions);

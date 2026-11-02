@@ -126,6 +126,8 @@ export default class OpenCode extends Harness {
     args: ["run", "{prompt}"],
     jsonArgs: ["run", "--format", "json", "{prompt}"],
     modelArgs: ["--model", "{model}"],
+    modelHint:
+      "Pass model as provider/model with an optional #variant, the ids `opencode models` prints.",
     level: "official",
   };
   override readonly mcpConfigs: Harness["mcpConfigs"] = [

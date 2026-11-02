@@ -158,6 +158,17 @@ describe("harnesses usage paths", () => {
     expect(result.stderr).toContain("Harness claude cannot run readOnly with tools: false");
   });
 
+  it("harnesses models and info tell what claude --model takes", () => {
+    const hint = "Pass model as an alias for the latest model (fable, opus or sonnet)";
+    const models = runCli(["models", "claude"]);
+    const info: unknown = JSON.parse(runCli(["info", "claude", "--json"]).stdout);
+
+    expect(models.status).toBe(1);
+    expect(stripVTControlCharacters(models.stderr)).toContain(hint);
+    expect(info).toMatchObject({ modelListing: false });
+    expect(String((info as { modelHint?: unknown }).modelHint)).toContain(hint);
+  });
+
   it("harnesses models prints the ids agy --model accepts", () => {
     const binDir = mkdtempSync(join(tmpdir(), "harnesses-agy-"));
     try {
