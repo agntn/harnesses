@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { decode as fromToon } from "@toon-format/toon";
 import { getEventListeners } from "node:events";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
@@ -15,6 +15,7 @@ import {
   runHarness,
   RUN_MAX_OUTPUT_CHARS,
   TOOL_CALL_TEXT_WARNING,
+  type HarnessListing,
 } from "../src/tool-operations.ts";
 
 /**
@@ -57,6 +58,16 @@ class FakeCursor extends Harness {
     ],
     level: "inferred",
   };
+}
+
+/* Reads the fake cursor's row with an empty PATH, so the scan skips every real CLI on this machine. */
+function fakeCursorRow(): HarnessListing["harnesses"][number] | undefined {
+  vi.stubEnv("PATH", "");
+  try {
+    return detectHarnesses().details.harnesses.find(({ id }) => id === "cursor");
+  } finally {
+    vi.unstubAllEnvs();
+  }
 }
 
 describe("normalized invocation", () => {
@@ -1332,6 +1343,9 @@ describe("runHarness tool operation", () => {
           override get version(): string | null {
             return installed;
           }
+          override isInstalled(): boolean {
+            return true;
+          }
         },
       );
 
@@ -1346,9 +1360,7 @@ describe("runHarness tool operation", () => {
 
         const agent = await runHarness("cursor", "review", { tools: true });
         expect(agent.isError).toBeUndefined();
-        expect(detectHarnesses().details.harnesses.find(({ id }) => id === "cursor")).toMatchObject(
-          { installed: true, readOnly: false, agent: true },
-        );
+        expect(fakeCursorRow()).toMatchObject({ installed: true, readOnly: false, agent: true });
       } finally {
         registerHarness(Cursor);
       }
@@ -1367,6 +1379,9 @@ describe("runHarness tool operation", () => {
         override get version(): string | null {
           return "1.0.25";
         }
+        override isInstalled(): boolean {
+          return true;
+        }
       },
     );
 
@@ -1375,10 +1390,7 @@ describe("runHarness tool operation", () => {
 
       expect(result.isError).toBeUndefined();
       expect(result.details).toMatchObject({ stdout: "read:review\n", readOnly: true });
-      expect(detectHarnesses().details.harnesses.find(({ id }) => id === "cursor")).toMatchObject({
-        installed: true,
-        readOnly: true,
-      });
+      expect(fakeCursorRow()).toMatchObject({ installed: true, readOnly: true });
     } finally {
       registerHarness(Cursor);
     }

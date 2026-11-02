@@ -1,6 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { afterEach, describe, expect, it } from "vite-plus/test";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { createMcpServer } from "../src/mcp.ts";
 import { decode as fromToon } from "@toon-format/toon";
 import { getHarness, listHarnesses, registerHarness } from "../src/index.ts";
@@ -140,7 +140,10 @@ describe("harnesses MCP server", () => {
   it("lists the run modes harnesses_run takes for each harness", async () => {
     const client = await connectTestClient();
 
-    const response = await client.callTool({ name: "harnesses_detect", arguments: {} });
+    vi.stubEnv("PATH", "");
+    const response = await client
+      .callTool({ name: "harnesses_detect", arguments: {} })
+      .finally(() => vi.unstubAllEnvs());
 
     expect(response.isError).not.toBe(true);
     const harnesses = listHarnesses().map((id) => {
