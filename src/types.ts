@@ -92,6 +92,8 @@ export interface HarnessInvocation {
   readOnlyArgs?: string[];
   /** Structured agent argument template with read-only tool access. */
   readOnlyJsonArgs?: string[];
+  /** Every tool a read-only run keeps, no extension or MCP ones. Absent when a sandbox decides. */
+  readOnlyTools?: string[];
   /** Lowest CLI version whose read-only enforcement was verified; older or unknown versions reject read-only runs. */
   readOnlyMinVersion?: string;
   /** Per platform, whether read-only child processes reach the network; unlisted is unchecked. */

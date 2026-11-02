@@ -92,6 +92,9 @@ export function foldClaudeStream(stdout: string, complete: boolean): string {
 }
 
 /** A toolless Claude without this writes `<invoke>` blocks as text and makes up their output. */
+/** Claude's inspection tools. Beside `--strict-mcp-config`, no MCP server is left to call. */
+const READ_ONLY_TOOLS = ["Read", "Glob", "Grep"];
+
 const ADVISOR_SYSTEM_PROMPT =
   "This run has no tools: nothing can be called, run or read, and no tool output will come back. " +
   "Never write a tool call as text, such as an <invoke> or <function_calls> block. " +
@@ -253,7 +256,7 @@ export default class Claude extends Harness {
       "--tools",
       "",
     ],
-    readOnlyArgs: ["-p", "{prompt}", "--strict-mcp-config", "--tools", "Read,Glob,Grep"],
+    readOnlyArgs: ["-p", "{prompt}", "--strict-mcp-config", "--tools", READ_ONLY_TOOLS.join(",")],
     readOnlyJsonArgs: [
       "-p",
       "--output-format",
@@ -261,8 +264,9 @@ export default class Claude extends Harness {
       "{prompt}",
       "--strict-mcp-config",
       "--tools",
-      "Read,Glob,Grep",
+      READ_ONLY_TOOLS.join(","),
     ],
+    readOnlyTools: READ_ONLY_TOOLS,
     readOnlyMinVersion: "2.1.175",
     modelArgs: ["--model", "{model}"],
     modelHint:

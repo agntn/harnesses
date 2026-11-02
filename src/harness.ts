@@ -551,6 +551,17 @@ export abstract class Harness {
   }
 
   /**
+   * Every tool a read-only run keeps, named as the CLI names them. No extension or MCP tool.
+   *
+   * @returns {string[] | null} The list, or null under a sandbox or without a read-only mode.
+   */
+  readOnlyTools(): string[] | null {
+    const { readOnly, readOnlyStructured } = this.invocationModes;
+    const tools = readOnly || readOnlyStructured ? this.invocation?.readOnlyTools : undefined;
+    return tools === undefined ? null : [...tools];
+  }
+
+  /**
    * Expands the invocation template for one prompt, without spawning anything.
    * Returns null when the harness has no headless mode, or no structured mode
    * when `structured` is requested.

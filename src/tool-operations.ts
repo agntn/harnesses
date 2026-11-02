@@ -83,6 +83,8 @@ export interface HarnessMetadata {
   invocationModes: HarnessInvocationModes;
   /** Network for what a read-only run starts here, MCP servers included; null when unknown. */
   readOnlyNetwork: boolean | null;
+  /** Every tool a read-only run keeps, no extension or MCP ones. Null when a sandbox decides. */
+  readOnlyTools: string[] | null;
   modelListing: boolean;
   /** What `model` takes when the harness can't list its models; null when no hint is recorded. */
   modelHint: string | null;
@@ -342,6 +344,7 @@ function harnessInfoResult(id: string): HarnessInfoResult {
     capabilities: harness.capabilities,
     invocationModes: harness.invocationModes,
     readOnlyNetwork: harness.readOnlyNetwork(),
+    readOnlyTools: harness.readOnlyTools(),
     modelListing: harness.modelListing !== null,
     modelHint: harness.invocation?.modelHint ?? null,
     modelSelection: harness.invocation?.modelArgs !== undefined,
@@ -401,6 +404,7 @@ function harnessInfoText(result: HarnessInfoResult): HarnessInfoText {
     capabilities,
     invocationModes,
     readOnlyNetwork,
+    readOnlyTools,
     modelListing,
     modelHint,
     modelSelection,
@@ -417,6 +421,7 @@ function harnessInfoText(result: HarnessInfoResult): HarnessInfoText {
     capabilities,
     invocationModes,
     readOnlyNetwork,
+    readOnlyTools,
     modelListing,
     modelHint,
     modelSelection,

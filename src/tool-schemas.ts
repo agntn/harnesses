@@ -145,7 +145,7 @@ export function harnessToolSchemas<I, S>(Type: McpSchemaBuilder<I, S>) {
       readOnly: Type.Optional(
         Type.Boolean({
           description:
-            "Set with tools=true to require native read-only tool enforcement. Unsupported harnesses reject the run instead of widening access. The sandbox can also cut the network of what the harness starts, MCP servers included: when readOnlyNetwork in harnesses_info is false, MCP tools that need the web fail in that run.",
+            "Set with tools=true to require native read-only tool enforcement. Unsupported harnesses reject the run instead of widening access. The sandbox can also cut the network of what the harness starts, MCP servers included: when readOnlyNetwork in harnesses_info is false, MCP tools that need the web fail in that run. When readOnlyTools there is a list, the run keeps only those tools, without any extension or MCP tool.",
         }),
       ),
     }),

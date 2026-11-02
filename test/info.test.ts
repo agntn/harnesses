@@ -44,6 +44,16 @@ describe("harness info", () => {
     expect(text).toMatch(new RegExp(`^readOnlyNetwork: ${String(network)}$`, "m"));
   });
 
+  it("names the tools a read-only run keeps, or null when a sandbox decides", () => {
+    const pi = harnessInfo("pi");
+    const codex = harnessInfo("codex");
+
+    expect(pi.details).toMatchObject({ readOnlyTools: ["read", "grep", "find", "ls"] });
+    expect(pi.content[0]?.text).toMatch(/^readOnlyTools\[4\]: read,grep,find,ls$/m);
+    expect(codex.details).toMatchObject({ readOnlyTools: null });
+    expect(codex.content[0]?.text).toMatch(/^readOnlyTools: null$/m);
+  });
+
   it("drops the templates from every batch entry", () => {
     const result = harnessInfo(["claude", "missing"]);
     const text = result.content[0]?.text ?? "";
