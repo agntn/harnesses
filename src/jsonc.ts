@@ -16,10 +16,14 @@ type JsoncStep = Readonly<{
 
 type JsoncScanner = (context: JsoncContext) => JsoncStep;
 
+/** Sticky, so a comma's lookahead stops at the first real token instead of sweeping the rest of the file. */
+const JSONC_GAP = /(?:\s|\/\/[^\n]*|\/\*[\s\S]*?\*\/)*/y;
+
 function trailingJsoncComma(text: string, index: number): boolean {
-  const rest = text.slice(index + 1);
-  const significant = rest.replaceAll(/\/\/[^\n]*|\/\*[\s\S]*?\*\/|\s+/g, "");
-  return significant.startsWith("}") || significant.startsWith("]");
+  JSONC_GAP.lastIndex = index + 1;
+  JSONC_GAP.exec(text);
+  const significant = text[JSONC_GAP.lastIndex];
+  return significant === "}" || significant === "]";
 }
 
 function scanJsoncCode(context: JsoncContext): JsoncStep {
