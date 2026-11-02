@@ -112,6 +112,7 @@ if (active) console.log(active.id);
 
 await getHarness("codex").invoke("Review this patch", { readOnly: true, effort: "low" });
 getHarness("grok").readOnlyNetwork(); // false on Linux, so no web for its MCP servers under readOnly
+getHarness("claude").invocation?.modelHint; // what model takes, since Claude can't list them
 
 const agy = getHarness("antigravity");
 const [model] = (await agy.listModels({ search: "gemini" })).models;

@@ -265,6 +265,8 @@ export default class Claude extends Harness {
     ],
     readOnlyMinVersion: "2.1.175",
     modelArgs: ["--model", "{model}"],
+    modelHint:
+      "Pass model as an alias for the latest model (fable, opus or sonnet) or as a full model name.",
     effortArgs: ["--effort", "{effort}"],
     streamArgs: ["--output-format", "stream-json", "--verbose", "--include-partial-messages"],
     level: "official",

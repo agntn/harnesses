@@ -222,6 +222,19 @@ function compareVersions(a: string, b: string): number {
 }
 
 /**
+ * Refuses model listing and says what `model` takes, so the next call can be a run instead.
+ *
+ * @param id - Harness id for the message.
+ * @param invocation - Recipe that may carry `modelHint`.
+ * @returns {string} The refusal, with the hint appended when there is one.
+ */
+export function modelListingError(id: string, invocation: HarnessInvocation | null): string {
+  const error = `Harness ${id} does not support model listing`;
+  const hint = invocation?.modelHint;
+  return hint === undefined ? error : `${error}. ${hint}`;
+}
+
+/**
  * Refuses read-only runs on a CLI older than the recipe's version floor. An unknown version fails closed.
  *
  * @param id - Harness id for the message.
@@ -687,7 +700,7 @@ export abstract class Harness {
    */
   async listModels(options: ListModelsOptions = {}): Promise<ListModelsResult> {
     const built = this.buildModelListInvocation(options.search);
-    if (!built) throw new Error(`Harness ${this.id} does not support model listing`);
+    if (!built) throw new Error(modelListingError(this.id, this.invocation));
 
     const result = await executeCommand(built.command, built.args, options);
     if (result.timedOut || result.aborted || result.exitCode !== 0)

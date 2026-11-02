@@ -1,12 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
-import { getHarness, registerHarness } from "../src/index.ts";
+import { getAllHarnesses, getHarness, registerHarness } from "../src/index.ts";
 import Antigravity, { parseAntigravityModels } from "../src/harnesses/antigravity.ts";
 import Codex, { parseCodexModels } from "../src/harnesses/codex.ts";
 import Grok, { parseGrokModels } from "../src/harnesses/grok.ts";
 import Omp, { parseOmpModels } from "../src/harnesses/omp.ts";
 import Pi, { parsePiModelTable } from "../src/harnesses/pi.ts";
 import PrimeAgent from "../src/harnesses/prime-agent.ts";
-import { listHarnessModels, runHarness } from "../src/tool-operations.ts";
+import { harnessInfo, listHarnessModels, runHarness } from "../src/tool-operations.ts";
 
 const MODELS_OUTPUT = `provider      model                context  max-out  thinking  images
 openai-codex  gpt-5.4              272K     128K     yes       yes
@@ -283,6 +283,43 @@ describe("model listing", () => {
     await expect(getHarness("mastracode").listModels()).rejects.toThrow(
       "does not support model listing",
     );
+  });
+
+  it("says what model takes when a harness cannot list", async () => {
+    const hint = "Pass model as an alias for the latest model (fable, opus or sonnet)";
+    await expect(getHarness("claude").listModels()).rejects.toThrow(hint);
+
+    const result = await listHarnessModels("claude");
+    expect(result.isError).toBe(true);
+    expect(result.details).toEqual({
+      error: `Harness claude does not support model listing. ${hint} or as a full model name.`,
+    });
+    expect(result.content[0]?.text).toContain(hint);
+  });
+
+  it("keeps the bare refusal for a harness that cannot take a model", async () => {
+    const result = await listHarnessModels("mastracode");
+    expect(result.details).toEqual({ error: "Harness mastracode does not support model listing" });
+  });
+
+  it("puts the model hint next to modelListing in harnessInfo", () => {
+    const claude = harnessInfo("claude").details;
+    const pi = harnessInfo("pi").details;
+    expect(claude).toMatchObject({ modelListing: false, modelSelection: true });
+    expect("modelHint" in claude ? claude.modelHint : undefined).toBe(
+      getHarness("claude").invocation?.modelHint,
+    );
+    expect(harnessInfo("claude").content[0]?.text).toContain("fable, opus or sonnet");
+    expect("modelHint" in pi ? pi.modelHint : undefined).toBeNull();
+  });
+
+  it("gives every harness that selects a model but cannot list one a hint", () => {
+    const silent = getAllHarnesses()
+      .filter((harness) => harness.invocation?.modelArgs !== undefined)
+      .filter((harness) => harness.modelListing === null)
+      .filter((harness) => harness.invocation?.modelHint === undefined)
+      .map((harness) => harness.id);
+    expect(silent).toEqual([]);
   });
 
   it("returns models through the shared tool operation", async () => {

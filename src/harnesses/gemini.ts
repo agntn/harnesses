@@ -110,6 +110,8 @@ export default class Gemini extends Harness {
     args: ["-p", "{prompt}"],
     jsonArgs: ["-p", "{prompt}", "--output-format", "json"],
     modelArgs: ["--model", "{model}"],
+    modelHint:
+      "Pass model as an alias (auto, pro, flash or flash-lite) or as a concrete model name.",
     level: "official",
     note: "Non-interactive (headless) mode.",
   };
