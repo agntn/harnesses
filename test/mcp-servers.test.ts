@@ -1301,3 +1301,104 @@ describe("syncMcpServers", () => {
     }
   });
 });
+
+describe("codex HTTP headers", () => {
+  it("writes headers as http_headers and reads them back", () => {
+    const dirs = fixtureDirs();
+    const codex = getHarness("codex");
+
+    addMcpServer(
+      codex,
+      {
+        name: "hub",
+        transport: "http",
+        url: "http://127.0.0.1:7340/mcp/hub",
+        headers: { Authorization: "Bearer t" },
+      },
+      "user",
+      dirs,
+    );
+
+    const written = readFileSync(join(dirs.homeDir, ".codex/config.toml"), "utf8");
+    expect(written).toContain("[mcp_servers.hub.http_headers]");
+    expect(written).not.toContain("[mcp_servers.hub.headers]");
+    const servers = listMcpServers(codex, dirs).find((l) => l.scope === "user")?.servers;
+    expect(servers).toEqual([
+      {
+        name: "hub",
+        transport: "http",
+        url: "http://127.0.0.1:7340/mcp/hub",
+        headers: { Authorization: "Bearer t" },
+      },
+    ]);
+  });
+});
+
+describe("header references", () => {
+  it("fills ${NAME} inside a header value from the environment", () => {
+    const dirs = fixtureDirs();
+    vi.stubEnv("HARNESSES_TEST_HUB_TOKEN", "s3cret");
+    onTestFinished(() => vi.unstubAllEnvs());
+
+    addMcpServer(
+      getHarness("claude"),
+      {
+        name: "hub",
+        transport: "http",
+        url: "http://h/mcp",
+        headers: { Authorization: "Bearer ${HARNESSES_TEST_HUB_TOKEN}", "X-Plain": "keep" },
+      },
+      "user",
+      dirs,
+    );
+
+    const servers = listMcpServers(getHarness("claude"), dirs).find(
+      (l) => l.scope === "user",
+    )?.servers;
+    expect(servers?.[0]?.headers).toEqual({ Authorization: "Bearer s3cret", "X-Plain": "keep" });
+  });
+
+  it("refuses a header that references an unset variable", () => {
+    const dirs = fixtureDirs();
+    vi.stubEnv("HARNESSES_TEST_UNSET_TOKEN", undefined);
+    onTestFinished(() => vi.unstubAllEnvs());
+
+    expect(() =>
+      addMcpServer(
+        getHarness("claude"),
+        {
+          name: "hub",
+          transport: "http",
+          url: "http://h/mcp",
+          headers: { Authorization: "Bearer ${HARNESSES_TEST_UNSET_TOKEN}" },
+        },
+        "user",
+        dirs,
+      ),
+    ).toThrow(/hub: header Authorization references HARNESSES_TEST_UNSET_TOKEN, which is not set/);
+  });
+});
+
+describe("header references for Prime Agent", () => {
+  it("fills header references while env keeps its references", () => {
+    const dirs = fixtureDirs();
+    vi.stubEnv("HARNESSES_TEST_HUB_TOKEN", "s3cret");
+    onTestFinished(() => vi.unstubAllEnvs());
+    const prime = getHarness("prime-agent");
+
+    addMcpServer(
+      prime,
+      {
+        name: "hub",
+        transport: "http",
+        url: "http://h/mcp",
+        headers: { Authorization: "Bearer ${HARNESSES_TEST_HUB_TOKEN}" },
+      },
+      "user",
+      dirs,
+    );
+
+    const servers = listMcpServers(prime, dirs).find((l) => l.scope === "user")?.servers;
+    expect(servers?.[0]?.headers).toEqual({ Authorization: "Bearer s3cret" });
+  });
+});

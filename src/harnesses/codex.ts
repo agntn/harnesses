@@ -190,7 +190,7 @@ export default class Codex extends Harness {
       level: "official",
       format: "toml",
       key: ["mcp_servers"],
-      dialect: "standard",
+      dialect: "codex",
     },
     {
       path: ".codex/config.toml",
@@ -198,7 +198,7 @@ export default class Codex extends Harness {
       level: "official",
       format: "toml",
       key: ["mcp_servers"],
-      dialect: "standard",
+      dialect: "codex",
     },
   ];
   override readonly envOverrides: Harness["envOverrides"] = [
