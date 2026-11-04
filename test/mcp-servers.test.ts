@@ -688,6 +688,28 @@ describe("syncMcpServers", () => {
   },
 }`;
 
+  it("fills a header reference once, even when the value holds a reference of its own", () => {
+    const dirs = fixtureDirs();
+    vi.stubEnv("HARNESSES_TEST_TOKEN", "literal${HARNESSES_TEST_INNER}");
+    vi.stubEnv("HARNESSES_TEST_INNER", undefined);
+    vi.stubEnv("XDG_CONFIG_HOME", undefined);
+    onTestFinished(() => vi.unstubAllEnvs());
+    writeMaster(
+      dirs.homeDir,
+      `{ "mcpServers": { "hub": { "url": "http://h/mcp", "headers": { "Authorization": "Bearer \${HARNESSES_TEST_TOKEN}" } } } }`,
+    );
+
+    const report = syncMcpServers([getHarness("claude")], dirs);
+
+    expect(targetResults(report.targets, "claude")).toEqual([{ name: "hub", action: "added" }]);
+    const servers = listMcpServers(getHarness("claude"), dirs).find(
+      (l) => l.scope === "user",
+    )?.servers;
+    expect(servers?.[0]?.headers).toEqual({
+      Authorization: "Bearer literal${HARNESSES_TEST_INNER}",
+    });
+  });
+
   it("resets JSON and TOML configs to the master list and is idempotent", () => {
     const dirs = fixtureDirs();
     const previousXdg = process.env.XDG_CONFIG_HOME;

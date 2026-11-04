@@ -771,8 +771,27 @@ export function addMcpServer(
   scope: "user" | "project" = "user",
   options: ResolveOptions = {},
 ): { path: string; replaced: boolean } {
+  const { entry } = writableConfig(harness, scope, options);
+  return writeShapedServer(harness, shapeForDialect(server, entry.dialect), scope, options);
+}
+
+/**
+ * Writes a server already shaped for the harness dialect. Shaping it again would read a
+ * value the first pass took from the environment as a reference of its own.
+ *
+ * @param harness - Target harness.
+ * @param resolved - Server as {@link shapeForDialect} returned it for this harness.
+ * @param scope - User or project config scope.
+ * @param options - Platform and path-resolution overrides.
+ * @returns {{ path: string, replaced: boolean }} The written path and replacement status.
+ */
+function writeShapedServer(
+  harness: Harness,
+  resolved: McpServerConfig,
+  scope: "user" | "project",
+  options: ResolveOptions,
+): { path: string; replaced: boolean } {
   const { entry, path } = writableConfig(harness, scope, options);
-  const resolved = shapeForDialect(server, entry.dialect);
 
   if (entry.format === "sqlite") {
     return { path, replaced: upsertSqliteServer(path, entry.key, resolved) };
@@ -786,8 +805,8 @@ export function addMcpServer(
   const map = drill(root, entry.key, "create");
   if (!map) throw new Error(`Config at ${path} has a non-object at ${entry.key.join(".")}`);
 
-  const replaced = Object.hasOwn(map, server.name);
-  map[server.name] = replacementEntry(map[server.name], resolved, entry.dialect);
+  const replaced = Object.hasOwn(map, resolved.name);
+  map[resolved.name] = replacementEntry(map[resolved.name], resolved, entry.dialect);
   writeAtomically(path, `${JSON.stringify(root, null, 2)}\n`);
   return { path, replaced };
 }
@@ -1102,7 +1121,7 @@ function writeMasterServers(
         results.push({ name: server.name, action: "unchanged" });
         continue;
       }
-      const written = addMcpServer(harness, resolved, "user", options);
+      const written = writeShapedServer(harness, resolved, "user", options);
       path = written.path;
       results.push({ name: server.name, action: written.replaced ? "replaced" : "added" });
     } catch (error) {
