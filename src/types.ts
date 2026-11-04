@@ -218,6 +218,10 @@ export interface McpServerConfig {
    */
   env?: Record<string, string>;
   url?: string;
+  /**
+   * HTTP headers. A `${NAME}` anywhere in a value, as in "Bearer ${TOKEN}", is resolved
+   * from the environment when the entry is written, for every harness.
+   */
   headers?: Record<string, string>;
   /** Present only when the harness tracks an on/off state per server. */
   enabled?: boolean;
@@ -236,10 +240,12 @@ export interface McpConfigFile extends PathCandidate {
    * family, "prime" is that family with env values as {"env": "NAME"} references,
    * "mastracode" is that family read by its keys alone, type ignored, "pi"
    * is that family without sse that keeps the entry fields it doesn't manage,
-   * and "openbot" is one table row per server, stdio or streamable HTTP.
+   * "openbot" is one table row per server, stdio or streamable HTTP, and "codex"
+   * is the standard family with HTTP headers under `http_headers`.
    */
   dialect:
     | "standard"
+    | "codex"
     | "antigravity"
     | "mastracode"
     | "opencode"

@@ -210,6 +210,17 @@ function primeEnv(value: unknown): Record<string, string> | undefined {
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
+/**
+ * Codex reads HTTP headers from `http_headers` only, so that is where they go.
+ *
+ * @param name - Server name from the containing map.
+ * @param raw - Raw Codex server entry.
+ * @returns {McpServerConfig} The normalized server entry.
+ */
+function normalizeCodex(name: string, raw: Readonly<Record<string, unknown>>): McpServerConfig {
+  return compact({ ...normalizeStandard(name, raw), headers: asStringRecord(raw.http_headers) });
+}
+
 function normalizePrime(name: string, raw: Readonly<Record<string, unknown>>): McpServerConfig {
   return compact({ ...normalizeStandard(name, raw), env: primeEnv(raw.env) });
 }
@@ -254,6 +265,7 @@ function normalizeEntry(
   if (dialect === "mastracode") return normalizeMastracode(name, raw);
   if (dialect === "opencode") return normalizeOpenCode(name, raw);
   if (dialect === "prime") return normalizePrime(name, raw);
+  if (dialect === "codex") return normalizeCodex(name, raw);
   return normalizeStandard(name, raw);
 }
 
@@ -336,10 +348,11 @@ function requirePrimeReference(server: McpServerConfig, key: string, value: stri
 }
 
 /**
- * Shapes a server's env for one dialect before it is compared or written:
- * Prime Agent keeps `${NAME}` references and refuses literals, every other
+ * Shapes a server's env and headers for one dialect before it is compared or written:
+ * Prime Agent keeps `${NAME}` references in env and refuses literals there, every other
  * dialect gets the references resolved from the environment of this
- * process, the same way `~` and `${HOME}` are expanded before a sync.
+ * process, the same way `~` and `${HOME}` are expanded before a sync. A header
+ * value may hold its reference inside a longer string, such as `Bearer ${TOKEN}`.
  *
  * @param server - Normalized server, possibly carrying references.
  * @param dialect - Target harness config dialect.
@@ -349,30 +362,70 @@ function resolveEnvReferences(
   server: McpServerConfig,
   dialect: McpConfigFile["dialect"],
 ): McpServerConfig {
-  if (!server.env) return server;
   if (dialect === "prime") {
-    for (const [key, value] of Object.entries(server.env))
+    for (const [key, value] of Object.entries(server.env ?? {}))
       requirePrimeReference(server, key, value);
-    return server;
   }
-  const env: Record<string, string> = {};
-  for (const [key, value] of Object.entries(server.env)) {
+  const env = server.env && dialect !== "prime" ? resolvedEnv(server, server.env) : server.env;
+  const headers = server.headers && resolvedHeaders(server, server.headers);
+  return compact({ ...server, env, headers });
+}
+
+function resolvedEnv(
+  server: McpServerConfig,
+  env: Readonly<Record<string, string>>,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(env)) {
     const reference = envReference(value);
-    if (reference === undefined) {
-      env[key] = value;
-      continue;
-    }
-    // process.env inherits Object.prototype, so a bare lookup would turn
-    // ${constructor} into a function; only own string values count.
-    const resolved = Object.hasOwn(process.env, reference) ? process.env[reference] : undefined;
-    if (typeof resolved !== "string") {
-      throw new McpEnvError(
-        `${server.name}: env ${key} references ${reference}, which is not set in this environment`,
-      );
-    }
-    env[key] = resolved;
+    out[key] = reference === undefined ? value : envValue(server, `env ${key}`, reference);
   }
-  return { ...server, env };
+  return out;
+}
+
+/**
+ * Fills every reference inside header values; a header carries it inside a longer value, as in "Bearer ${TOKEN}".
+ *
+ * @param server - Server the headers belong to, for the error.
+ * @param headers - Header values, possibly holding references.
+ * @returns {Record<string, string>} The headers with values filled in.
+ * @throws {McpEnvError} When a referenced variable is not set.
+ */
+function resolvedHeaders(
+  server: McpServerConfig,
+  headers: Readonly<Record<string, string>>,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(headers)) {
+    out[key] = value.replaceAll(ENV_REFERENCE_INSIDE, (_, reference: string) =>
+      envValue(server, `header ${key}`, reference),
+    );
+  }
+  return out;
+}
+
+/** Every `${NAME}` inside a header value. */
+const ENV_REFERENCE_INSIDE = /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
+
+/**
+ * Reads one referenced variable from the environment of this process.
+ *
+ * @param server - Server the reference belongs to, for the error.
+ * @param field - Where the reference sits, e.g. "env TOKEN" or "header Authorization".
+ * @param reference - Variable name.
+ * @returns {string} The value.
+ * @throws {McpEnvError} When the variable is not set.
+ */
+function envValue(server: McpServerConfig, field: string, reference: string): string {
+  // process.env inherits Object.prototype, so a bare lookup would turn
+  // ${constructor} into a function; only own string values count.
+  const resolved = Object.hasOwn(process.env, reference) ? process.env[reference] : undefined;
+  if (typeof resolved !== "string") {
+    throw new McpEnvError(
+      `${server.name}: ${field} references ${reference}, which is not set in this environment`,
+    );
+  }
+  return resolved;
 }
 
 /** Dialects that take stdio and streamable HTTP only, by the name a refusal gives the harness. */
@@ -552,26 +605,41 @@ function tomlKeyPart(name: string): string {
  *
  * @param key - TOML path containing the server map.
  * @param server - Server to serialize.
+ * @param headersKey - Sub-table that holds HTTP headers, `http_headers` for Codex.
  * @returns {string} The rendered TOML section block.
  */
-function tomlSections(key: readonly string[], server: McpServerConfig): string {
+function tomlSections(
+  key: readonly string[],
+  server: McpServerConfig,
+  headersKey: "headers" | "http_headers" = "headers",
+): string {
   const head = [...key, server.name].map(tomlKeyPart).join(".");
   const lines = [`[${head}]`];
   if (server.command) lines.push(`command = ${tomlValue(server.command)}`);
   if (server.args?.length) lines.push(`args = [${server.args.map(tomlValue).join(", ")}]`);
   if (server.url) lines.push(`url = ${tomlValue(server.url)}`);
   if (server.enabled !== undefined) lines.push(`enabled = ${server.enabled}`);
-  for (const [subKey, record] of [
-    ["env", server.env],
-    ["headers", server.headers],
-  ] as const) {
-    if (!record) continue;
-    lines.push("", `[${head}.${subKey}]`);
-    for (const [k, v] of Object.entries(record)) {
-      lines.push(`${tomlKeyPart(k)} = ${tomlValue(v)}`);
-    }
-  }
+  lines.push(
+    ...tomlTable(`${head}.env`, server.env),
+    ...tomlTable(`${head}.${headersKey}`, server.headers),
+  );
   return `${lines.join("\n")}\n`;
+}
+
+/**
+ * Renders one string map as a TOML sub-table, after a blank line.
+ *
+ * @param head - Full table name.
+ * @param record - Values to write, if any.
+ * @returns {string[]} The lines, none for an absent map.
+ */
+function tomlTable(head: string, record: Readonly<Record<string, string>> | undefined): string[] {
+  if (!record) return [];
+  return [
+    "",
+    `[${head}]`,
+    ...Object.entries(record).map(([k, v]) => `${tomlKeyPart(k)} = ${tomlValue(v)}`),
+  ];
 }
 
 /**
@@ -655,13 +723,21 @@ function assertTomlEdit(
   }
 }
 
-function addTomlServer(path: string, key: readonly string[], server: McpServerConfig): boolean {
+function addTomlServer(
+  path: string,
+  key: readonly string[],
+  server: McpServerConfig,
+  dialect: McpConfigFile["dialect"],
+): boolean {
+  const headersKey = dialect === "codex" ? "http_headers" : "headers";
   const before = readIfExists(path) ?? "";
   const beforeMap = serverMapFromToml(before, key);
   const replaced = Object.hasOwn(beforeMap, server.name);
   const stripped = replaced ? stripTomlServer(before, key, server.name) : before;
   const body = stripped.replace(/\s+$/, "");
-  const after = body ? `${body}\n\n${tomlSections(key, server)}` : tomlSections(key, server);
+  const after = body
+    ? `${body}\n\n${tomlSections(key, server, headersKey)}`
+    : tomlSections(key, server, headersKey);
   assertTomlEdit(beforeMap, after, key, server.name, true);
   writeAtomically(path, after);
   return replaced;
@@ -695,23 +771,42 @@ export function addMcpServer(
   scope: "user" | "project" = "user",
   options: ResolveOptions = {},
 ): { path: string; replaced: boolean } {
+  const { entry } = writableConfig(harness, scope, options);
+  return writeShapedServer(harness, shapeForDialect(server, entry.dialect), scope, options);
+}
+
+/**
+ * Writes a server already shaped for the harness dialect. Shaping it again would read a
+ * value the first pass took from the environment as a reference of its own.
+ *
+ * @param harness - Target harness.
+ * @param resolved - Server as {@link shapeForDialect} returned it for this harness.
+ * @param scope - User or project config scope.
+ * @param options - Platform and path-resolution overrides.
+ * @returns {{ path: string, replaced: boolean }} The written path and replacement status.
+ */
+function writeShapedServer(
+  harness: Harness,
+  resolved: McpServerConfig,
+  scope: "user" | "project",
+  options: ResolveOptions,
+): { path: string; replaced: boolean } {
   const { entry, path } = writableConfig(harness, scope, options);
-  const resolved = shapeForDialect(server, entry.dialect);
 
   if (entry.format === "sqlite") {
     return { path, replaced: upsertSqliteServer(path, entry.key, resolved) };
   }
 
   if (entry.format === "toml") {
-    return { path, replaced: addTomlServer(path, entry.key, resolved) };
+    return { path, replaced: addTomlServer(path, entry.key, resolved, entry.dialect) };
   }
 
   const root = JSON.parse(readIfExists(path) ?? "{}") as Record<string, unknown>;
   const map = drill(root, entry.key, "create");
   if (!map) throw new Error(`Config at ${path} has a non-object at ${entry.key.join(".")}`);
 
-  const replaced = Object.hasOwn(map, server.name);
-  map[server.name] = replacementEntry(map[server.name], resolved, entry.dialect);
+  const replaced = Object.hasOwn(map, resolved.name);
+  map[resolved.name] = replacementEntry(map[resolved.name], resolved, entry.dialect);
   writeAtomically(path, `${JSON.stringify(root, null, 2)}\n`);
   return { path, replaced };
 }
@@ -1026,7 +1121,7 @@ function writeMasterServers(
         results.push({ name: server.name, action: "unchanged" });
         continue;
       }
-      const written = addMcpServer(harness, resolved, "user", options);
+      const written = writeShapedServer(harness, resolved, "user", options);
       path = written.path;
       results.push({ name: server.name, action: written.replaced ? "replaced" : "added" });
     } catch (error) {
