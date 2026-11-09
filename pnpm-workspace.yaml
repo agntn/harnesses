@@ -61,9 +61,9 @@ catalogs:
     "@agntn/ox": 0.1.0
     "@earendil-works/pi-coding-agent": 1.4.0
     "@earendil-works/pi-tui": 1.4.0
-    "@iconify-json/lucide": 1.2.147
-    "@iconify-json/simple-icons": 1.2.100
-    "@iconify-json/vscode-icons": 1.2.92
+    "@iconify-json/lucide": 1.2.151
+    "@iconify-json/simple-icons": 1.2.101
+    "@iconify-json/vscode-icons": 1.2.96
     "@nuxt/content": 3.16.0
     "@nuxt/ui": 4.11.0
     "@oh-my-pi/omptype": 18.14.2
