@@ -455,6 +455,81 @@ export function executeCommand(
   });
 }
 
+/** What {@link Harness.probe} found. */
+export interface HarnessProbe {
+  installed: boolean;
+  version: string | null;
+}
+
+/** Cap on one `--version` probe. */
+const VERSION_TIMEOUT_MS = 5000;
+
+/**
+ * @param binaries - Executable names to look up.
+ * @returns {Promise<boolean>} Whether the locator finds any of them.
+ */
+export async function anyOnPath(binaries: readonly string[]): Promise<boolean> {
+  const locator = process.platform === "win32" ? "where" : "which";
+  for (const binary of binaries) {
+    try {
+      if ((await executeCommand(locator, [binary], {})).exitCode === 0) return true;
+    } catch {
+      continue;
+    }
+  }
+  return false;
+}
+
+/**
+ * @param binary - Executable to ask.
+ * @returns {Promise<string | null>} Its `--version` stdout, or null.
+ */
+export async function versionOutput(binary: string): Promise<string | null> {
+  try {
+    const result = await executeCommand(binary, ["--version"], { timeoutMs: VERSION_TIMEOUT_MS });
+    return result.exitCode === 0 ? result.stdout : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether a subclass brought its own sync probe.
+ *
+ * @param harness - Harness to check.
+ * @param key - The sync probe.
+ * @returns {boolean} Whether anything below `Harness` defines it.
+ */
+function replaces(harness: Harness, key: "isInstalled" | "version"): boolean {
+  let owner: object | null = harness;
+  while (owner !== null && owner !== Harness.prototype) {
+    if (Object.hasOwn(owner, key)) return true;
+    owner = Object.getPrototypeOf(owner) as object | null;
+  }
+  return false;
+}
+
+/**
+ * @param output - Output of `<binary> --version`.
+ * @returns {string | null} The first semver in it.
+ */
+function semver(output: string): string | null {
+  return /(\d+\.\d+\.\d+(?:-[\w.]+)?)/.exec(output)?.[1] ?? null;
+}
+
+/**
+ * @param binaries - Executables to ask, in order.
+ * @returns {Promise<string | null>} First semver from `--version`.
+ */
+async function askVersion(binaries: readonly string[]): Promise<string | null> {
+  for (const binary of binaries) {
+    const output = await versionOutput(binary);
+    const version = output === null ? null : semver(output);
+    if (version !== null) return version;
+  }
+  return null;
+}
+
 export abstract class Harness {
   abstract readonly id: HarnessId;
   abstract readonly name: string;
@@ -518,15 +593,29 @@ export abstract class Harness {
         const output = execFileSync(binary, ["--version"], {
           encoding: "utf8",
           stdio: ["pipe", "pipe", "pipe"],
-          timeout: 5000,
+          timeout: VERSION_TIMEOUT_MS,
         });
-        const match = output.match(/(\d+\.\d+\.\d+(?:-[\w.]+)?)/);
-        if (match?.[1]) return match[1];
+        const version = semver(output);
+        if (version !== null) return version;
       } catch {
         continue;
       }
     }
     return null;
+  }
+
+  /**
+   * `isInstalled()` and `version` off the event loop, unless a subclass overrides them sync.
+   *
+   * @returns {Promise<HarnessProbe>} Install state and version.
+   */
+  async probe(): Promise<HarnessProbe> {
+    const installed = replaces(this, "isInstalled")
+      ? this.isInstalled()
+      : await anyOnPath(this.binaries);
+    if (!installed) return { installed, version: null };
+    const version = replaces(this, "version") ? this.version : await askVersion(this.binaries);
+    return { installed, version };
   }
 
   /**

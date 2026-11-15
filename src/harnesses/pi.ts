@@ -1,6 +1,13 @@
 import { execFileSync } from "node:child_process";
 import { stripVTControlCharacters } from "node:util";
-import { executeCommand, Harness, type CommandOptions } from "../harness.ts";
+import {
+  anyOnPath,
+  executeCommand,
+  Harness,
+  type CommandOptions,
+  type HarnessProbe,
+  versionOutput,
+} from "../harness.ts";
 import type {
   AvailableModel,
   InvokeOptions,
@@ -202,6 +209,19 @@ export default class Pi extends Harness {
     const version = readVersion(this.binaries[0] ?? "pi");
     this.#probe = { path, at: now, version };
     return version;
+  }
+
+  /**
+   * One `--version` serves both answers.
+   *
+   * @returns {Promise<HarnessProbe>} Install state and the Pi version.
+   */
+  override async probe(): Promise<HarnessProbe> {
+    if (!(await anyOnPath(this.binaries))) return { installed: false, version: null };
+    if (process.platform === "win32") return { installed: true, version: this.version };
+    const output = await versionOutput(this.binaries[0] ?? "pi");
+    const version = output === null ? null : (PI_VERSION.exec(output)?.[1] ?? null);
+    return { installed: version !== null, version };
   }
 
   override async invoke(prompt: string, options: InvokeOptions = {}): Promise<InvokeResult> {

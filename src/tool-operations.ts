@@ -305,14 +305,16 @@ function unsupportedInvocation(
 
 /**
  * Scans every registered harness for its binaries and version, next to the modes it runs in.
+ * Probes run side by side, so the slowest CLI sets the pace.
  *
- * @returns {ToolResult<HarnessListing>} The complete installation listing.
+ * @returns {Promise<ToolResult<HarnessListing>>} The complete installation listing.
  */
-export function detectHarnesses(): ToolResult<HarnessListing> {
+export async function detectHarnesses(): Promise<ToolResult<HarnessListing>> {
+  const scans = await Promise.all(
+    getAllHarnesses().map(async (harness) => ({ harness, ...(await harness.probe()) })),
+  );
   const details: HarnessListing = {
-    harnesses: getAllHarnesses().map((harness) => {
-      const installed = harness.isInstalled();
-      const version = installed ? harness.version : null;
+    harnesses: scans.map(({ harness, installed, version }) => {
       const { advisor, readOnly, agent } = harness.invocationModes;
       const belowFloor =
         installed && readOnlyVersionError(harness.id, harness.invocation, version) !== null;

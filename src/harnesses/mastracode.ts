@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, realpathSync } from "node:fs";
 import { createRequire } from "node:module";
-import { Harness } from "../harness.ts";
+import { executeCommand, Harness, type HarnessProbe } from "../harness.ts";
 
 function packageVersion(commandPath: string): string | null {
   try {
@@ -49,6 +49,26 @@ export default class MastraCode extends Harness {
     }
     return null;
   }
+  /**
+   * Same lookup as `version`, without `execFileSync` stalling the other probes.
+   *
+   * @returns {Promise<HarnessProbe>} Install state and the package version.
+   */
+  override async probe(): Promise<HarnessProbe> {
+    const locator = process.platform === "win32" ? "where" : "which";
+    let output: string;
+    try {
+      const lookup = await executeCommand(locator, [this.binaries[0] ?? "mastracode"], {});
+      if (lookup.exitCode !== 0) return { installed: false, version: null };
+      output = lookup.stdout;
+    } catch {
+      return { installed: false, version: null };
+    }
+    const paths = output.split(/\r?\n/u).filter((path) => path !== "");
+    const version = paths.map(packageVersion).find((found) => found !== null) ?? null;
+    return { installed: true, version };
+  }
+
   readonly capabilities = {
     mcp: true,
     vision: true,

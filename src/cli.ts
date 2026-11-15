@@ -236,8 +236,8 @@ const list = defineCommand({
 const detect = defineCommand({
   meta: { description: "Detect installed harnesses, versions and run modes" },
   args: { ...formatArgs },
-  run({ args }) {
-    const results = detectHarnesses().details.harnesses;
+  async run({ args }) {
+    const results = (await detectHarnesses()).details.harnesses;
 
     if (emit(results, args)) return;
 
