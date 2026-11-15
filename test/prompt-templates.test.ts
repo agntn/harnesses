@@ -64,7 +64,7 @@ describe("prompt template locations", () => {
       ".pi/prompts/",
       "~/.pi/agent/prompts/",
     ]);
-    expect(result.content[0]?.text).toContain("promptTemplates[");
+    expect(result.content[0]?.text).toContain('"promptTemplates":[');
     expect(result.content[0]?.text).toContain("/.pi/agent/prompts/");
     expect(result.content[0]?.text).not.toContain("~/.pi/agent/prompts/");
     expect(getHarness("github-copilot").resolve().promptTemplates).toEqual([]);

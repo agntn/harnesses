@@ -2,7 +2,6 @@
 
 import { styleText } from "node:util";
 import { consola } from "consola";
-import { encode as toToon } from "@toon-format/toon";
 import { version, type AvailableModel, type InvokeResult } from "./types.ts";
 import { getAllHarnesses, getHarness, isHarnessId, listHarnesses } from "./registry.ts";
 import {
@@ -127,7 +126,6 @@ function renderPathSection(
 
 const formatArgs = {
   json: { type: "boolean" as const, description: "Output as JSON" },
-  toon: { type: "boolean" as const, description: "Output as TOON" },
 };
 
 const harnessArg = {
@@ -136,16 +134,10 @@ const harnessArg = {
   required: true,
 };
 
-function emit(data: unknown, args: Readonly<{ json?: boolean; toon?: boolean }>) {
-  if (args.json) {
-    console.log(JSON.stringify(data, null, 2));
-    return true;
-  }
-  if (args.toon) {
-    console.log(toToon(data));
-    return true;
-  }
-  return false;
+function emit(data: unknown, args: Readonly<{ json?: boolean }>) {
+  if (!args.json) return false;
+  console.log(JSON.stringify(data, null, 2));
+  return true;
 }
 
 function resolveHarness(id: string): ReturnType<typeof getHarness> {

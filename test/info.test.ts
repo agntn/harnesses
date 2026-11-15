@@ -14,8 +14,8 @@ describe("harness info", () => {
     const result = harnessInfo("claude");
     const text = result.content[0]?.text ?? "";
 
-    expect(text).toMatch(/^resolved:/m);
-    expect(text).not.toMatch(/^config\[/m);
+    expect(JSON.parse(text)).toHaveProperty("resolved");
+    expect(JSON.parse(text)).not.toHaveProperty("config");
     expect(text).not.toContain("~/.claude/settings.json");
     expect(text).toContain("/.claude/settings.json");
     const templates = "config" in result.details ? result.details.config : [];
@@ -26,11 +26,11 @@ describe("harness info", () => {
     const result = harnessInfo("claude");
     const text = result.content[0]?.text ?? "";
 
-    expect(text).toMatch(/^envOverrides\[/m);
+    expect(JSON.parse(text)).toHaveProperty("envOverrides");
     expect(text).toContain("CLAUDE_CONFIG_DIR");
     expect(text).toContain("CLAUDE_CODE_TMPDIR");
     expect(text).not.toContain("${TMPDIR}");
-    expect(text).toMatch(/^  temp\[/m);
+    expect(JSON.parse(text)).toHaveProperty("resolved.temp");
     const overrides = "envOverrides" in result.details ? result.details.envOverrides : [];
     expect(overrides.map((entry) => entry.path)).toContain("${TMPDIR}");
   });
@@ -41,7 +41,7 @@ describe("harness info", () => {
     const network = getHarness("grok").readOnlyNetwork();
 
     expect(result.details).toMatchObject({ id: "grok", readOnlyNetwork: network });
-    expect(text).toMatch(new RegExp(`^readOnlyNetwork: ${String(network)}$`, "m"));
+    expect(JSON.parse(text)).toMatchObject({ readOnlyNetwork: network });
   });
 
   it("names the tools a read-only run keeps, or null when a sandbox decides", () => {
@@ -49,9 +49,11 @@ describe("harness info", () => {
     const codex = harnessInfo("codex");
 
     expect(pi.details).toMatchObject({ readOnlyTools: ["read", "grep", "find", "ls"] });
-    expect(pi.content[0]?.text).toMatch(/^readOnlyTools\[4\]: read,grep,find,ls$/m);
+    expect(JSON.parse(pi.content[0]?.text ?? "")).toMatchObject({
+      readOnlyTools: ["read", "grep", "find", "ls"],
+    });
     expect(codex.details).toMatchObject({ readOnlyTools: null });
-    expect(codex.content[0]?.text).toMatch(/^readOnlyTools: null$/m);
+    expect(JSON.parse(codex.content[0]?.text ?? "")).toMatchObject({ readOnlyTools: null });
   });
 
   it("drops the templates from every batch entry", () => {
