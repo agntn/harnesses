@@ -12,7 +12,7 @@
  */
 import { existsSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, join } from "node:path";
+import { dirname, isAbsolute, join, normalize } from "node:path";
 import { parse as parseToml } from "smol-toml";
 import { readIfExists } from "./files.ts";
 import type { Harness } from "./harness.ts";
@@ -48,7 +48,7 @@ export interface McpConfigListing {
  * @param options - Platform and path-resolution overrides.
  * @returns {Array<{ entry: McpConfigFile, path: string }>} Resolved config descriptors.
  */
-function resolveConfigs(
+function anchoredConfigs(
   harness: Harness,
   options: ResolveOptions,
 ): Array<{ entry: McpConfigFile; path: string }> {
@@ -58,6 +58,38 @@ function resolveConfigs(
       ? entry.path
       : join(options.projectRoot ?? process.cwd(), entry.path),
   }));
+}
+
+/**
+ * Resolves the declared configs, dropping a project file that is the user file in disguise:
+ * from the home directory `.codex/config.toml` lands on `~/.codex/config.toml`.
+ *
+ * @param harness - Harness whose MCP config paths should be resolved.
+ * @param options - Platform and path-resolution overrides.
+ * @returns {Array<{ entry: McpConfigFile, path: string }>} Each real file once.
+ */
+function resolveConfigs(
+  harness: Harness,
+  options: ResolveOptions,
+): Array<{ entry: McpConfigFile; path: string }> {
+  const configs = anchoredConfigs(harness, options);
+  return configs.filter(({ entry, path }) => entry.scope === "user" || !isUserPath(configs, path));
+}
+
+/**
+ * Tells whether a path is one of the user-scope config files.
+ *
+ * @param configs - Resolved configs of one harness.
+ * @param path - Path to look up.
+ * @returns {boolean} True when a user-scope config sits at that path.
+ */
+function isUserPath(
+  configs: ReadonlyArray<{ readonly entry: McpConfigFile; readonly path: string }>,
+  path: string,
+): boolean {
+  return configs.some(
+    (config) => config.entry.scope === "user" && normalize(config.path) === normalize(path),
+  );
 }
 
 function drill(
@@ -581,10 +613,11 @@ function listMcpConfig(entry: McpConfigFile, path: string): McpConfigListing {
 /**
  * Lists the MCP servers a harness has configured, per declared config file.
  * Missing files come back with `exists: false`; unparsable ones carry `error`.
+ * A project file that resolves onto the user file is listed once, as `user`.
  *
  * @param harness - Harness whose configs should be read.
  * @param options - Platform and path-resolution overrides.
- * @returns {McpConfigListing[]} One listing per declared config file.
+ * @returns {McpConfigListing[]} One listing per real config file.
  */
 export function listMcpServers(harness: Harness, options: ResolveOptions = {}): McpConfigListing[] {
   return resolveConfigs(harness, options).map(({ entry, path }) => listMcpConfig(entry, path));
@@ -595,9 +628,15 @@ function writableConfig(
   scope: "user" | "project",
   options: ResolveOptions,
 ): { entry: McpConfigFile; path: string } {
-  const config = resolveConfigs(harness, options).find(({ entry }) => entry.scope === scope);
+  const configs = anchoredConfigs(harness, options);
+  const config = configs.find(({ entry }) => entry.scope === scope);
   if (!config) {
     throw new Error(`Harness ${harness.id} has no ${scope}-scope MCP config`);
+  }
+  if (scope === "project" && isUserPath(configs, config.path)) {
+    throw new Error(
+      `Harness ${harness.id} project-scope MCP config is the user config ${config.path} from this project root; pass scope "user" to change it`,
+    );
   }
   return config;
 }
