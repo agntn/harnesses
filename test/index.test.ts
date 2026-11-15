@@ -453,7 +453,7 @@ describe("@agntn/harnesses", () => {
     }
   });
 
-  it("should read the Mastra Code package version without starting its TUI", () => {
+  it("should read the Mastra Code package version without starting its TUI", async () => {
     const root = mkdtempSync(join(tmpdir(), "harnesses-mastracode-"));
     const binDir = join(root, "bin");
     const packageDir = join(root, "lib", "node_modules", "mastracode");
@@ -476,6 +476,10 @@ describe("@agntn/harnesses", () => {
       vi.stubEnv("PATH", `${binDir}:${process.env.PATH ?? ""}`);
 
       expect(getHarness("mastracode").version).toBe("0.40.0");
+      expect(await getHarness("mastracode").probe()).toEqual({
+        installed: true,
+        version: "0.40.0",
+      });
       expect(existsSync(tuiMarker)).toBe(false);
     } finally {
       rmSync(root, { recursive: true, force: true });
