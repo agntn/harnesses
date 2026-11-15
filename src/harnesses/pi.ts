@@ -1,6 +1,6 @@
-import { execFile, execFileSync } from "node:child_process";
-import { promisify, stripVTControlCharacters } from "node:util";
-import { Harness } from "../harness.ts";
+import { execFileSync } from "node:child_process";
+import { stripVTControlCharacters } from "node:util";
+import { executeCommand, Harness, type CommandOptions } from "../harness.ts";
 import type {
   AvailableModel,
   InvokeOptions,
@@ -23,8 +23,6 @@ const VERSION_TIMEOUT_MS = 5000;
 const IMPOSTOR_ERROR =
   "The pi on PATH isn't the Pi coding agent: its --version names no Pi release. " +
   "Put the coding agent's directory first on PATH";
-
-const execFileAsync = promisify(execFile);
 
 function parseTokenCount(value: string, harness: string): number {
   const match = /^(\d+(?:\.\d+)?)([KM])?$/.exec(value);
@@ -91,31 +89,6 @@ export function parsePiModelTable(stdout: string, harness: string): AvailableMod
   });
 }
 
-/** A spawn as `invoke` makes it: the caller's env merged over this process's. */
-interface Spawn {
-  readonly command: string;
-  readonly cwd?: string;
-  readonly env?: Readonly<Record<string, string>>;
-  readonly signal?: AbortSignal;
-  readonly timeoutMs?: number;
-}
-
-/**
- * @param spawn - Command, working directory and env overrides.
- * @returns {Record<string, string | undefined>} The env the spawn sees.
- */
-function spawnEnv(spawn: Spawn): Record<string, string | undefined> {
-  return spawn.env ? { ...process.env, ...spawn.env } : process.env;
-}
-
-/**
- * @param output - What `--version` printed.
- * @returns {string | null} The Pi version, or null for anything else.
- */
-function piVersion(output: string): string | null {
-  return PI_VERSION.exec(output)?.[1] ?? null;
-}
-
 /**
  * Asks a binary on this process's PATH for its Pi version.
  *
@@ -129,29 +102,29 @@ function readVersion(command: string): string | null {
       stdio: ["ignore", "pipe", "ignore"],
       timeout: VERSION_TIMEOUT_MS,
     });
-    return piVersion(output);
+    return PI_VERSION.exec(output)?.[1] ?? null;
   } catch {
     return null;
   }
 }
 
 /**
- * Asks the binary a run would start whether it's Pi, inside the run's signal and deadline.
+ * Asks the binary a run would start whether it's Pi, with the run's own cleanup.
  *
- * @param spawn - Command, working directory, env, signal and deadline of the run.
+ * @param command - Binary the run spawns.
+ * @param options - The run's working directory, env, deadline and signal.
  * @returns {Promise<string | null>} Why it can't run, or null when it's Pi or the probe can't tell.
  */
-async function impostorError(spawn: Spawn): Promise<string | null> {
-  if (process.platform === "win32" || spawn.signal?.aborted) return null;
+async function impostorError(command: string, options: CommandOptions): Promise<string | null> {
+  if (process.platform === "win32" || options.signal?.aborted) return null;
+  const deadline = options.timeoutMs ? Math.min(options.timeoutMs, VERSION_TIMEOUT_MS) : undefined;
   try {
-    const { stdout } = await execFileAsync(spawn.command, ["--version"], {
-      cwd: spawn.cwd,
-      env: spawnEnv(spawn),
-      encoding: "utf8",
-      signal: spawn.signal,
-      timeout: spawn.timeoutMs ? Math.min(spawn.timeoutMs, VERSION_TIMEOUT_MS) : VERSION_TIMEOUT_MS,
+    const probe = await executeCommand(command, ["--version"], {
+      ...options,
+      timeoutMs: deadline ?? VERSION_TIMEOUT_MS,
     });
-    return piVersion(stdout) === null ? IMPOSTOR_ERROR : null;
+    if (probe.exitCode !== 0) return null;
+    return PI_VERSION.test(probe.stdout) ? null : IMPOSTOR_ERROR;
   } catch {
     return null;
   }
@@ -202,7 +175,7 @@ export default class Pi extends Harness {
   override async invoke(prompt: string, options: InvokeOptions = {}): Promise<InvokeResult> {
     const command = this.invocation?.binary ?? this.binaries[0] ?? "pi";
     const started = performance.now();
-    const error = await impostorError({ ...options, command });
+    const error = await impostorError(command, options);
     if (error !== null) throw new Error(error);
     return super.invoke(prompt, { ...options, timeoutMs: remaining(options.timeoutMs, started) });
   }
@@ -210,7 +183,7 @@ export default class Pi extends Harness {
   override async listModels(options: ListModelsOptions = {}): Promise<ListModelsResult> {
     const command = this.binaries[0] ?? "pi";
     const started = performance.now();
-    const error = await impostorError({ ...options, command });
+    const error = await impostorError(command, options);
     if (error !== null) throw new Error(error);
     return super.listModels({ ...options, timeoutMs: remaining(options.timeoutMs, started) });
   }

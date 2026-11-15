@@ -52,7 +52,7 @@ const SUPPORTED_PLATFORMS: Record<Platform, true> = {
   win32: true,
 };
 
-type CommandOptions = Readonly<{
+export type CommandOptions = Readonly<{
   cwd?: string;
   env?: Readonly<Record<string, string>>;
   timeoutMs?: number;
@@ -342,7 +342,15 @@ function isDirectory(path: string): boolean {
 /** An `<invoke>` or `<function_calls>` tag, with or without a namespace prefix. */
 const TOOL_CALL_TEXT = /<(?:[\w-]+:)?(?:invoke|function_calls)\b/u;
 
-function executeCommand(
+/**
+ * Spawns one command with the deadline, cancellation and tree cleanup every run gets.
+ *
+ * @param command - Binary to spawn.
+ * @param args - Its arguments.
+ * @param options - Working directory, env overrides, deadline and signal.
+ * @returns {Promise<InvokeResult>} The collected output and how the process ended.
+ */
+export function executeCommand(
   command: string,
   args: readonly string[],
   options: CommandOptions,
