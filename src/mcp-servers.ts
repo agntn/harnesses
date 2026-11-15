@@ -116,18 +116,26 @@ function booleanField(record: Readonly<Record<string, unknown>>, key: string): b
   return typeof value === "boolean" ? value : undefined;
 }
 
+/**
+ * Stdio from `command`, Streamable HTTP from `serverUrl` or `url`. No SSE, ever.
+ *
+ * @param name - Server name from the containing map.
+ * @param raw - Raw Antigravity server entry.
+ * @returns {McpServerConfig} The normalized server entry.
+ */
 function normalizeAntigravity(
   name: string,
   raw: Readonly<Record<string, unknown>>,
 ): McpServerConfig {
-  const url = stringField(raw, "serverUrl");
+  const url = stringField(raw, "serverUrl") ?? stringField(raw, "url");
   return compact({
     name,
-    transport: url ? ("sse" as const) : ("stdio" as const),
+    transport: url ? ("http" as const) : ("stdio" as const),
     command: stringField(raw, "command"),
     args: asStringArray(raw.args),
     env: asStringRecord(raw.env),
     url,
+    headers: asStringRecord(raw.headers),
   });
 }
 
@@ -270,7 +278,7 @@ function normalizeEntry(
 }
 
 function denormalizeAntigravity(server: McpServerConfig): Record<string, unknown> {
-  if (server.url) return { serverUrl: server.url };
+  if (server.url) return compact({ serverUrl: server.url, headers: server.headers });
   return compact({
     command: server.command,
     args: server.args?.length ? server.args : undefined,
@@ -430,14 +438,15 @@ function envValue(server: McpServerConfig, field: string, reference: string): st
 
 /** Dialects that take stdio and streamable HTTP only, by the name a refusal gives the harness. */
 const WITHOUT_SSE: Readonly<Partial<Record<McpConfigFile["dialect"], string>>> = {
+  antigravity: "Antigravity",
   openbot: "OpenBot",
   pi: "Pi",
 };
 
 /**
  * Env references per {@link resolveEnvReferences}, minus `sse` and `enabled` for Mastra Code.
- * Pi and OpenBot reject `sse`, and an sse url is rarely the streamable HTTP endpoint, so it's
- * refused. OpenBot rows go through {@link openBotServer} for their names and their `enabled`.
+ * Pi, OpenBot and Antigravity reject `sse`, and an sse url is rarely the streamable HTTP
+ * endpoint, so it's refused. OpenBot rows go through {@link openBotServer} for names and `enabled`.
  *
  * @param server - Normalized server from the master list or a caller.
  * @param dialect - Target harness config dialect.
