@@ -1061,6 +1061,31 @@ describe("runHarness tool operation", () => {
     },
   );
 
+  it.skipIf(process.platform === "win32")("checks the pi a run's own PATH reaches", async () => {
+    const root = await mkdtemp(join(tmpdir(), "harnesses-pi-env-"));
+    onTestFinished(() => rm(root, { recursive: true, force: true }));
+    onTestFinished(() => vi.unstubAllEnvs());
+    const dirWith = async (name: string, version: string) => {
+      const dir = join(root, name);
+      await mkdir(dir);
+      const script = `#!/bin/sh\n[ "$1" = --version ] && echo '${version}' && exit\necho "ran $*"\n`;
+      await writeFile(join(dir, "pi"), script, { mode: 0o755 });
+      return `${dir}${delimiter}${process.env.PATH ?? ""}`;
+    };
+    const agent = await dirWith("agent", "1.5.2");
+    const cln = await dirWith("cln", "pi (CLN 1.3.7)");
+    const pi = getHarness("pi");
+
+    vi.stubEnv("PATH", cln);
+    await expect(pi.invoke("hi", { tools: true, env: { PATH: agent } })).resolves.toMatchObject({
+      stdout: "ran -p hi\n",
+    });
+    vi.stubEnv("PATH", agent);
+    await expect(pi.listModels({ env: { PATH: cln } })).rejects.toThrow(
+      "isn't the Pi coding agent",
+    );
+  });
+
   it("reports cancellation through both shared tool operations", async () => {
     registerHarness(
       class extends FakeCursor {

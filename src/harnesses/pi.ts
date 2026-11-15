@@ -82,6 +82,49 @@ export function parsePiModelTable(stdout: string, harness: string): AvailableMod
   });
 }
 
+/** A spawn as `invoke` makes it: the caller's env merged over this process's. */
+interface Spawn {
+  readonly command: string;
+  readonly cwd?: string;
+  readonly env?: Readonly<Record<string, string>>;
+}
+
+/**
+ * Asks the binary a spawn would start for its version.
+ *
+ * @param spawn - Command, working directory and env overrides.
+ * @returns {{ found: boolean, version: string | null }} Whether it ran, and its Pi version.
+ */
+function askVersion(spawn: Spawn): { found: boolean; version: string | null } {
+  try {
+    const output = execFileSync(spawn.command, ["--version"], {
+      cwd: spawn.cwd,
+      env: spawn.env ? { ...process.env, ...spawn.env } : process.env,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 5000,
+    });
+    return { found: true, version: PI_VERSION.exec(output)?.[1] ?? null };
+  } catch (error) {
+    const missing = error instanceof Error && "code" in error && error.code === "ENOENT";
+    return { found: !missing, version: null };
+  }
+}
+
+/**
+ * @param spawn - Command, working directory and env overrides.
+ * @returns {string | null} Why that binary can't run, or null when it's Pi or missing.
+ */
+function impostorError(spawn: Spawn): string | null {
+  if (process.platform === "win32") return null;
+  const { found, version } = askVersion(spawn);
+  if (!found || version !== null) return null;
+  return (
+    "The pi on PATH isn't the Pi coding agent: its --version names no Pi release. " +
+    "Put the coding agent's directory first on PATH"
+  );
+}
+
 export default class Pi extends Harness {
   readonly id = "pi";
   readonly name = "Pi Coding Agent";
@@ -109,50 +152,21 @@ export default class Pi extends Harness {
     const now = performance.now();
     const probe = this.#probe;
     if (probe !== undefined && probe.path === path && now - probe.at < 1000) return probe.version;
-    const version = this.#readVersion();
+    const { version } = askVersion({ command: this.binaries[0] ?? "pi" });
     this.#probe = { path, at: now, version };
     return version;
   }
 
   override invoke(prompt: string, options: InvokeOptions = {}): Promise<InvokeResult> {
-    const error = this.#impostorError();
+    const command = this.invocation?.binary ?? this.binaries[0] ?? "pi";
+    const error = impostorError({ command, cwd: options.cwd, env: options.env });
     return error === null ? super.invoke(prompt, options) : Promise.reject(new Error(error));
   }
 
   override listModels(options: ListModelsOptions = {}): Promise<ListModelsResult> {
-    const error = this.#impostorError();
+    const command = this.binaries[0] ?? "pi";
+    const error = impostorError({ command, cwd: options.cwd, env: options.env });
     return error === null ? super.listModels(options) : Promise.reject(new Error(error));
-  }
-
-  /**
-   * @returns {string | null} The version, or null when no binary answers like Pi.
-   */
-  #readVersion(): string | null {
-    for (const binary of this.binaries) {
-      try {
-        const output = execFileSync(binary, ["--version"], {
-          encoding: "utf8",
-          stdio: ["ignore", "pipe", "ignore"],
-          timeout: 5000,
-        });
-        const version = PI_VERSION.exec(output)?.[1];
-        if (version !== undefined) return version;
-      } catch {
-        continue;
-      }
-    }
-    return null;
-  }
-
-  /**
-   * @returns {string | null} Why the `pi` on PATH can't run, or null when it's Pi or missing.
-   */
-  #impostorError(): string | null {
-    if (this.isInstalled() || !super.isInstalled()) return null;
-    return (
-      "The pi on PATH isn't the Pi coding agent: its --version names no Pi release. " +
-      "Put the coding agent's directory first on PATH"
-    );
   }
 
   readonly capabilities = {
