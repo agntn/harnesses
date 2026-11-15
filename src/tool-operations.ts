@@ -88,6 +88,8 @@ export interface HarnessMetadata {
   modelHint: string | null;
   modelSelection: boolean;
   effortSelection: boolean;
+  /** Whether `extensions: false` works here, starting the run without extension discovery. */
+  extensionsOptional: boolean;
   config: PathCandidate[];
   sessions: PathCandidate[];
   instructions: PathCandidate[];
@@ -130,6 +132,9 @@ export const RUN_DEFAULT_TIMEOUT_SECONDS = RUN_TIMEOUT_DEFAULT_SECONDS;
 /** The run tool's per-stream cap: harness output is unbounded, model context is not. */
 export const RUN_MAX_OUTPUT_CHARS = 8000;
 
+/** What `harnesses run` adds when an extension stopped the run before the prompt. */
+export const EXTENSION_RETRY_HINT = "An extension stopped the run; --no-extensions skips them all";
+
 /** What the run tool and the CLI say about an advisor answer with a tool call written as text. */
 export const TOOL_CALL_TEXT_WARNING =
   "The advisor wrote a tool call as text. Nothing ran it, so any result it reports from that call is unverified";
@@ -155,6 +160,7 @@ function truncate(output: string): string {
 type RunInvocationOptions = Readonly<{
   model?: string;
   effort?: string;
+  extensions?: boolean;
   structured: boolean;
   tools: boolean;
   readOnly: boolean;
@@ -244,6 +250,22 @@ function runText(
   return [{ type: "text", text: blocks.join("\n\n") }];
 }
 
+/**
+ * The model, effort and extension skip a run asked for, each only when set.
+ *
+ * @param options - The run's invocation options.
+ * @returns {Pick<RunOutcome, "model" | "effort" | "extensions">} The selections to echo.
+ */
+function runSelections(
+  options: RunInvocationOptions,
+): Pick<RunOutcome, "model" | "effort" | "extensions"> {
+  return {
+    ...(options.model === undefined ? {} : { model: options.model }),
+    ...(options.effort === undefined ? {} : { effort: options.effort }),
+    ...(options.extensions === false ? { extensions: false } : {}),
+  };
+}
+
 function completedRun(
   harness: Harness,
   result: InvokeResult,
@@ -254,8 +276,7 @@ function completedRun(
     id: harness.id,
     command: result.command,
     args: [...templateArgs],
-    ...(options.model === undefined ? {} : { model: options.model }),
-    ...(options.effort === undefined ? {} : { effort: options.effort }),
+    ...runSelections(options),
     structured: options.structured,
     tools: options.tools,
     readOnly: options.readOnly,
@@ -264,6 +285,7 @@ function completedRun(
     aborted: result.aborted,
     ...(result.idleMs === undefined ? {} : { idleMs: result.idleMs }),
     ...(result.toolCallsAsText ? { warning: TOOL_CALL_TEXT_WARNING } : {}),
+    ...(result.extensionLoadFailed ? { retry: { extensions: false } } : {}),
   };
   const stdout = truncate(result.stdout);
   const stderr = truncate(result.stderr);
@@ -349,6 +371,7 @@ function harnessInfoResult(id: string): HarnessInfoResult {
     modelHint: harness.invocation?.modelHint ?? null,
     modelSelection: harness.invocation?.modelArgs !== undefined,
     effortSelection: harness.invocation?.effortArgs !== undefined,
+    extensionsOptional: harness.invocation?.noExtensionsArgs !== undefined,
     config: harness.config,
     sessions: harness.sessions,
     instructions: harness.instructions,
@@ -409,6 +432,7 @@ function harnessInfoText(result: HarnessInfoResult): HarnessInfoText {
     modelHint,
     modelSelection,
     effortSelection,
+    extensionsOptional,
     envOverrides,
     persistence,
     detection,
@@ -426,6 +450,7 @@ function harnessInfoText(result: HarnessInfoResult): HarnessInfoText {
     modelHint,
     modelSelection,
     effortSelection,
+    extensionsOptional,
     envOverrides: getHarness(id).resolveCandidates(envOverrides),
     persistence,
     detection,
@@ -559,6 +584,8 @@ export interface RunOptions {
   model?: string;
   /** Reasoning effort in the harness's own words; rejected where `effortArgs` is missing. */
   effort?: string;
+  /** Load extensions, the default; `false` skips discovery and is rejected where `noExtensionsArgs` is missing. */
+  extensions?: boolean;
   /** Wall-clock budget in seconds; defaults to {@link RUN_DEFAULT_TIMEOUT_SECONDS}. */
   timeoutSeconds?: number;
   /** Cancel the owned command through the host request signal. */
@@ -579,6 +606,8 @@ export interface RunOutcome {
   args: string[];
   model?: string;
   effort?: string;
+  /** Present when the run skipped extension discovery. */
+  extensions?: false;
   structured: boolean;
   tools: boolean;
   readOnly: boolean;
@@ -589,6 +618,8 @@ export interface RunOutcome {
   idleMs?: number;
   /** Present when an advisor answer holds a tool call written as text. */
   warning?: string;
+  /** Present when the run failed on an extension that `extensions: false` would have skipped. */
+  retry?: { readonly extensions: false };
   stdout: string;
   stderr: string;
 }
@@ -638,6 +669,7 @@ export async function runHarness(
   const invocationOptions = {
     model: options.model,
     effort: options.effort,
+    extensions: options.extensions,
     structured,
     tools,
     readOnly,
@@ -655,6 +687,7 @@ export async function runHarness(
       cwd: options.cwd,
       model: options.model,
       effort: options.effort,
+      extensions: options.extensions,
       timeoutMs: timeoutSeconds * 1000,
       signal: options.signal,
       structured,

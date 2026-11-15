@@ -7,6 +7,7 @@ import { getAllHarnesses, getHarness, isHarnessId, listHarnesses } from "./regis
 import {
   detectHarnesses,
   listHarnessModels,
+  EXTENSION_RETRY_HINT,
   TOOL_CALL_TEXT_WARNING,
   type HarnessStatus,
   type ModelsOutcome,
@@ -103,6 +104,16 @@ function modelSummary(harness: Harness): ModelSummary {
     },
     hint: harness.invocation?.modelHint ?? null,
   };
+}
+
+/**
+ * Whether a run can skip extension discovery, as `--no-extensions` asks.
+ *
+ * @param harness - The harness to ask.
+ * @returns {boolean} True when its recipe carries `noExtensionsArgs`.
+ */
+function extensionsOptional(harness: Harness): boolean {
+  return harness.invocation?.noExtensionsArgs !== undefined;
 }
 
 function renderPathSection(
@@ -203,6 +214,7 @@ function finishInvocation(result: InvokeResult, timeoutSeconds: number | undefin
   if (result.stdout) process.stdout.write(result.stdout);
   if (result.stderr) process.stderr.write(result.stderr);
   if (result.toolCallsAsText) consola.warn(TOOL_CALL_TEXT_WARNING);
+  if (result.extensionLoadFailed) consola.warn(EXTENSION_RETRY_HINT);
   if (result.timedOut) {
     const idle =
       result.idleMs === undefined
@@ -285,6 +297,7 @@ const info = defineCommand({
           modelHint: models.hint,
           modelSelection: models.features.selection,
           effortSelection: models.features.effort,
+          extensionsOptional: extensionsOptional(harness),
           config: harness.config,
           sessions: harness.sessions,
           instructions: harness.instructions,
@@ -320,6 +333,9 @@ const info = defineCommand({
     consola.log(entry(modes));
     consola.log(entry(readOnlyNetworkLine(harness.readOnlyNetwork())));
     consola.log(entry(readOnlyToolsLine(harness.readOnlyTools())));
+    if (extensionsOptional(harness)) {
+      consola.log(entry(s.white("extensions: optional, --no-extensions skips them")));
+    }
 
     consola.log(section("Models"));
     consola.log(
@@ -455,6 +471,13 @@ const run = defineCommand({
       description:
         "Require native read-only tool enforcement; implies --tools, rejected with --no-tools",
     },
+    extensions: {
+      type: "boolean" as const,
+      default: true,
+      negativeDescription:
+        "Start Pi or OMP without extension discovery, so a broken one can't stop it",
+      description: "Load Pi or OMP extensions, as the harness does on its own",
+    },
   },
   async run({ args }) {
     const harness = resolveHarness(args.id as string);
@@ -462,9 +485,11 @@ const run = defineCommand({
     const readOnly = args["read-only"] === true;
     const tools = args.tools ?? readOnly;
 
+    const extensions = args.extensions !== false;
     const invocationOptions = {
       model: args.model,
       effort: args.effort,
+      extensions,
       structured,
       tools,
       readOnly,
@@ -484,6 +509,7 @@ const run = defineCommand({
       cwd: args.cwd,
       model: args.model,
       effort: args.effort,
+      extensions,
       timeoutMs: timeoutSeconds === undefined ? undefined : timeoutSeconds * 1000,
       structured,
       tools,

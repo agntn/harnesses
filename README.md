@@ -78,7 +78,7 @@ harnesses prompts sync --check
 harnesses skills sync --check
 ```
 
-`run` without `--tools` is the advisor. `--tools` is the full agent. `--read-only` asks the CLI for a sandbox and implies tools, so pairing it with `--no-tools` is an error. Timeouts, `--cwd`, `--model` and `--effort` sit in the [CLI guide](https://harnesses.agntn.dev/guide/cli).
+`run` without `--tools` is the advisor. `--tools` is the full agent. `--read-only` asks the CLI for a sandbox and implies tools, so pairing it with `--no-tools` is an error. Timeouts, `--cwd`, `--model`, `--effort` and `--no-extensions` sit in the [CLI guide](https://harnesses.agntn.dev/guide/cli).
 
 ### Commands
 
@@ -115,6 +115,7 @@ await claude.probe(); // { installed, version }, without blocking on `claude --v
 await getHarness("codex").invoke("Review this patch", { readOnly: true, effort: "low" });
 getHarness("grok").readOnlyNetwork(); // false on Linux, so no web for its MCP servers under readOnly
 getHarness("pi").readOnlyTools(); // ["read", "grep", "find", "ls"], no extension or MCP tools
+await getHarness("pi").invoke("Review this patch", { extensions: false }); // a broken extension can't stop this one
 getHarness("claude").invocation?.modelHint; // what model takes, since Claude can't list them
 
 const agy = getHarness("antigravity");

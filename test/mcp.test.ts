@@ -270,6 +270,20 @@ describe("harnesses MCP server", () => {
     expect(onlyTextContent(response.content)).toContain("Invalid arguments at /effort");
   });
 
+  it("refuses extensions: false on a harness that can't skip them", async () => {
+    const client = await connectTestClient();
+
+    const response = await client.callTool({
+      name: "harnesses_run",
+      arguments: { id: "claude", prompt: "x", tools: false, extensions: false },
+    });
+
+    expect(response.isError).toBe(true);
+    expect(onlyTextContent(response.content)).toBe(
+      '{"error":"Harness claude cannot start without extensions"}',
+    );
+  });
+
   it("names an argument the schema does not know instead of dropping it", async () => {
     const client = await connectTestClient();
 
