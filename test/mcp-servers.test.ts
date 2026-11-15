@@ -308,6 +308,7 @@ describe("listMcpServers", () => {
             headers: { Authorization: "Bearer token" },
           },
           short: { url: "https://example.com/other" },
+          off: { command: "idle", disabled: true },
         },
       }),
     );
@@ -323,6 +324,7 @@ describe("listMcpServers", () => {
         headers: { Authorization: "Bearer token" },
       },
       { name: "short", transport: "http", url: "https://example.com/other" },
+      { name: "off", transport: "stdio", command: "idle", enabled: false },
     ]);
   });
 
@@ -960,6 +962,38 @@ describe("syncMcpServers", () => {
       if (previousXdg !== undefined) process.env.XDG_CONFIG_HOME = previousXdg;
       if (previousToken === undefined) delete process.env.HARNESSES_TEST_TOKEN;
       else process.env.HARNESSES_TEST_TOKEN = previousToken;
+    }
+  });
+
+  it("syncs a disabled server into Antigravity as disabled, once", () => {
+    const dirs = fixtureDirs();
+    const previousXdg = process.env.XDG_CONFIG_HOME;
+    delete process.env.XDG_CONFIG_HOME;
+    try {
+      writeMaster(
+        dirs.homeDir,
+        JSON.stringify({
+          mcpServers: {
+            off: { type: "http", url: "https://example.com/mcp", enabled: false },
+            on: { command: "wiki", enabled: true },
+          },
+        }),
+      );
+      const path = join(dirs.homeDir, ".gemini", "config", "mcp_config.json");
+
+      syncMcpServers([getHarness("antigravity")], dirs);
+      expect(nestedRecord(parseJsonRecord(path), "mcpServers")).toEqual({
+        off: { serverUrl: "https://example.com/mcp", disabled: true },
+        on: { command: "wiki", disabled: false },
+      });
+
+      const second = syncMcpServers([getHarness("antigravity")], dirs);
+      expect(targetResults(second.targets, "antigravity")).toEqual([
+        { name: "off", action: "unchanged" },
+        { name: "on", action: "unchanged" },
+      ]);
+    } finally {
+      if (previousXdg !== undefined) process.env.XDG_CONFIG_HOME = previousXdg;
     }
   });
 

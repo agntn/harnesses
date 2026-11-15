@@ -116,8 +116,13 @@ function booleanField(record: Readonly<Record<string, unknown>>, key: string): b
   return typeof value === "boolean" ? value : undefined;
 }
 
+function negated(flag: boolean | undefined): boolean | undefined {
+  return flag === undefined ? undefined : !flag;
+}
+
 /**
  * Stdio from `command`, Streamable HTTP from `serverUrl` or `url`. No SSE, ever.
+ * The off switch is spelled `disabled`.
  *
  * @param name - Server name from the containing map.
  * @param raw - Raw Antigravity server entry.
@@ -136,6 +141,7 @@ function normalizeAntigravity(
     env: asStringRecord(raw.env),
     url,
     headers: asStringRecord(raw.headers),
+    enabled: negated(booleanField(raw, "disabled")),
   });
 }
 
@@ -278,11 +284,13 @@ function normalizeEntry(
 }
 
 function denormalizeAntigravity(server: McpServerConfig): Record<string, unknown> {
-  if (server.url) return compact({ serverUrl: server.url, headers: server.headers });
+  const disabled = negated(server.enabled);
+  if (server.url) return compact({ serverUrl: server.url, headers: server.headers, disabled });
   return compact({
     command: server.command,
     args: server.args?.length ? server.args : undefined,
     env: server.env,
+    disabled,
   });
 }
 
