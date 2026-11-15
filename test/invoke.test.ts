@@ -221,6 +221,32 @@ describe("normalized invocation", () => {
     }
   });
 
+  it("leaves a stopped run unflagged even after Pi printed its hint", async () => {
+    const hint = `process.stderr.write('Hint: Start without extensions using "pi -ne".\\n'); setTimeout(() => {}, 60_000)`;
+    registerHarness(
+      class extends FakeCursor {
+        override readonly invocation: Harness["invocation"] = {
+          args: ["-e", hint],
+          noToolsArgs: ["-e", hint],
+          noExtensionsArgs: ["--"],
+          level: "inferred",
+        };
+        protected override stoppedByExtension(stderr: string): boolean {
+          return stderr.includes("Start without extensions");
+        }
+      },
+    );
+
+    try {
+      const stopped = await getHarness("cursor").invoke("x", { timeoutMs: 1000 });
+      expect(stopped.timedOut).toBe(true);
+      expect(stopped.stderr).toContain("Start without extensions");
+      expect(stopped.extensionLoadFailed).toBeUndefined();
+    } finally {
+      registerHarness(Cursor);
+    }
+  });
+
   it("rejects an effort the harness cannot take", () => {
     const cursor = getHarness("cursor");
     const claude = getHarness("claude");

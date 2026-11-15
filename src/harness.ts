@@ -362,7 +362,8 @@ function runFlags(
   extensionStopped: boolean,
 ): Pick<InvokeResult, "toolCallsAsText" | "extensionLoadFailed"> {
   const advisor = requestedInvocationMode(options).startsWith("advisor");
-  const retryable = options.extensions !== false && result.exitCode !== 0;
+  const failed = result.exitCode !== null && result.exitCode !== 0;
+  const retryable = options.extensions !== false && failed;
   return {
     ...(advisor && TOOL_CALL_TEXT.test(result.stdout) ? { toolCallsAsText: true as const } : {}),
     ...(retryable && extensionStopped ? { extensionLoadFailed: true as const } : {}),
