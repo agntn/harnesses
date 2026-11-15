@@ -1,5 +1,4 @@
 import { describe, expect, it, onTestFinished, vi } from "vite-plus/test";
-import { decode as fromToon } from "@toon-format/toon";
 import { getEventListeners } from "node:events";
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -650,7 +649,7 @@ describe("streamed invocation", () => {
       expect(result.details).toMatchObject({ timedOut: true, stdout: "" });
       const idleMs = "idleMs" in result.details ? result.details.idleMs : undefined;
       expect(idleMs).toBeGreaterThanOrEqual(250);
-      expect(result.content[0]?.text).toContain(`idleMs: ${idleMs}`);
+      expect(result.content[0]?.text).toContain(`"idleMs":${idleMs}`);
     } finally {
       registerHarness(Cursor);
     }
@@ -1023,7 +1022,7 @@ describe("harness metadata for agents", () => {
   it("tells which harnesses take a reasoning effort", () => {
     expect(harnessInfo("claude").details).toMatchObject({ effortSelection: true });
     expect(harnessInfo("cursor").details).toMatchObject({ effortSelection: false });
-    expect(harnessInfo("grok").content[0]?.text).toContain("effortSelection: true");
+    expect(harnessInfo("grok").content[0]?.text).toContain('"effortSelection":true');
   });
 });
 
@@ -1148,7 +1147,7 @@ describe("runHarness tool operation", () => {
       ]) {
         expect(result.isError).toBe(true);
         expect(result.details).toMatchObject({ aborted: true, timedOut: false, exitCode: null });
-        expect(result.content[0]?.text).toContain("aborted: true");
+        expect(result.content[0]?.text).toContain('"aborted":true');
       }
     } finally {
       registerHarness(Cursor);
@@ -1268,7 +1267,7 @@ describe("runHarness tool operation", () => {
       const content = result.content[0]?.text ?? "";
       const [status, output, ...rest] = content.split("\n\nstdout:\n");
       expect(rest).toEqual([]);
-      expect(fromToon(status ?? "")).toMatchObject({ id: "cursor", exitCode: 0, tools: true });
+      expect(JSON.parse(status ?? "")).toMatchObject({ id: "cursor", exitCode: 0, tools: true });
       expect(output).toBe(answer);
       expect(content).not.toContain('stdout: "');
     } finally {
@@ -1318,7 +1317,7 @@ describe("runHarness tool operation", () => {
 
       expect(result.isError).toBe(true);
       const content = result.content[0]?.text ?? "";
-      expect(content).toContain("exitCode: 2\n");
+      expect(content).toContain('"exitCode":2,');
       expect(content).toContain("\n\nstdout:\npartial\n");
       expect(content).toContain("\n\nstderr:\nboom\n");
       expect(content).not.toContain('stdout: "');
@@ -1374,7 +1373,7 @@ describe("runHarness tool operation", () => {
         expect((result.details as { args: string[] }).args).toContain(prompt);
         expect(content).toContain("{prompt}");
         expect(content).toContain("--model");
-        expect(content).toContain("effort: low");
+        expect(content).toContain('"effort":"low"');
         expect(result.details).toMatchObject({ effort: "low" });
         expect(content).not.toContain(prompt);
         expect(content).toContain(options.tools ? "answer" : "trace");

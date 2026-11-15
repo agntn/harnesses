@@ -2,12 +2,10 @@
  * Tool executors behind the agent extensions.
  *
  * Each executor returns the text a caller reads plus the structured details a
- * harness can attach to the call. The text is TOON-encoded so the model sees
- * the same compact shape the CLI's --toon flag prints. A run's output is the
- * exception: it follows the status block as plain text, not as one TOON string.
+ * harness can attach to the call. The text is compact JSON. A run's output is
+ * the exception: it follows the status block as plain text, not as one JSON string.
  */
 import { stripVTControlCharacters } from "node:util";
-import { encode as toToon } from "@toon-format/toon";
 import { getAllHarnesses, getHarness, isHarnessId, listHarnesses } from "./registry.ts";
 import {
   addMcpServer,
@@ -137,7 +135,7 @@ export const TOOL_CALL_TEXT_WARNING =
   "The advisor wrote a tool call as text. Nothing ran it, so any result it reports from that call is unverified";
 
 function text(data: unknown): Array<{ type: "text"; text: string }> {
-  return [{ type: "text", text: toToon(data) }];
+  return [{ type: "text", text: JSON.stringify(data) }];
 }
 
 function unknownHarness(id: string): ToolResult<UnknownHarness> {
@@ -217,7 +215,7 @@ type RunStreams = Readonly<Partial<Pick<RunOutcome, "stdout" | "stderr">>>;
 const OUTPUT_CONTROLS = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F]/g;
 
 /**
- * Strips what TOON quoting used to escape: terminal sequences and control bytes; CRLF becomes LF.
+ * Strips what JSON quoting would escape: terminal sequences and control bytes; CRLF becomes LF.
  *
  * @param output - One capped stream.
  * @returns {string} The stream as plain text.
@@ -227,8 +225,8 @@ function plainOutput(output: string): string {
 }
 
 /**
- * Lays a run or listing out as a TOON status block, then each stream as plain text:
- * quoting a markdown answer into TOON escaped every code block and cost a tenth more tokens.
+ * Lays a run or listing out as a JSON status block, then each stream as plain text:
+ * a markdown answer quoted into a string escapes every code block and costs more tokens.
  *
  * @param outcome - The run or listing without its output.
  * @param streams - The capped streams; empty ones are left out.
@@ -238,7 +236,7 @@ function runText(
   outcome: RunStatus | ListingStatus,
   streams: RunStreams,
 ): Array<{ type: "text"; text: string }> {
-  const blocks = [toToon(outcome)];
+  const blocks = [JSON.stringify(outcome)];
   for (const name of ["stdout", "stderr"] as const) {
     const output = streams[name];
     if (output !== undefined && output.length > 0) blocks.push(`${name}:\n${plainOutput(output)}`);

@@ -96,7 +96,7 @@ harnesses skills sync --check
 | `skills sync`  | Link every skills directory to one shared folder       | `harnesses skills sync --check`             |
 | `mcp`          | The MCP server on stdio                                | `harnesses mcp`                             |
 
-`list`, `detect`, `info`, `paths` and `models` take `--json` or `--toon`. `run --json` is different: that one is the harness's own structured output.
+`list`, `detect`, `info`, `paths` and `models` take `--json`. `run --json` is different: that one is the harness's own structured output.
 
 ## 🧠 Library
 

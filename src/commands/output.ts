@@ -1,11 +1,9 @@
 import { stripVTControlCharacters } from "node:util";
-import { encode as toToon } from "@toon-format/toon";
 import { consola } from "consola";
 import type { ToolResult } from "../tool-operations.ts";
 
 export const formatArgs = {
   json: { type: "boolean" as const, description: "Output as JSON" },
-  toon: { type: "boolean" as const, description: "Output as TOON" },
 };
 
 /**
@@ -21,7 +19,7 @@ export function exitOnClosedPipe(error: Readonly<NodeJS.ErrnoException>): void {
   process.exit();
 }
 
-type OutputFormat = Readonly<{ json?: boolean; toon?: boolean }>;
+type OutputFormat = Readonly<{ json?: boolean }>;
 
 /** Control bytes removed from reports because they can echo untrusted configuration values. */
 /* oxlint-disable-next-line no-control-regex */
@@ -48,7 +46,6 @@ export function sanitize(text: string | undefined): string {
  */
 export function report(result: ToolResult<unknown>, args: OutputFormat): void {
   if (args.json) console.log(JSON.stringify(result.details, null, 2));
-  else if (args.toon) console.log(toToon(result.details));
   else if (result.isError) consola.error(sanitize(result.content[0]?.text));
   else console.log(sanitize(result.content[0]?.text));
 

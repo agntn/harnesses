@@ -2,7 +2,6 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { createMcpServer } from "../src/mcp.ts";
-import { decode as fromToon } from "@toon-format/toon";
 import { getHarness, listHarnesses, registerHarness } from "../src/index.ts";
 import type { InvokeOptions, InvokeResult, ListModelsOptions } from "../src/index.ts";
 import Cursor from "../src/harnesses/cursor.ts";
@@ -157,7 +156,7 @@ describe("harnesses MCP server", () => {
     });
     expect(harnesses).toContainEqual({ id: "codex", advisor: false, readOnly: true, agent: true });
     expect(harnesses).toContainEqual({ id: "claude", advisor: true, readOnly: true, agent: true });
-    expect(fromToon(onlyTextContent(response.content))).toMatchObject({ harnesses });
+    expect(JSON.parse(onlyTextContent(response.content))).toMatchObject({ harnesses });
   });
 
   it("returns full metadata for a known harness id", async () => {
@@ -173,7 +172,7 @@ describe("harnesses MCP server", () => {
     expect(part?.text).toContain("Anthropic Claude Code");
     expect(part?.text).toContain(".claude/skills/");
     expect(part?.text).toContain("invocationModes");
-    expect(part?.text).toContain("advisor: true");
+    expect(part?.text).toContain('"advisor":true');
     expect(part?.text).toContain("resolved");
   });
 

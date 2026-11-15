@@ -50,7 +50,6 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "catalog:deps",
-    "@toon-format/toon": "catalog:deps",
     "citty": "catalog:deps",
     "consola": "catalog:deps",
     "smol-toml": "catalog:deps",
