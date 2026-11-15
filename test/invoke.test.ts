@@ -197,6 +197,9 @@ describe("normalized invocation", () => {
           noExtensionsArgs: ["--"],
           level: "inferred",
         };
+        protected override stoppedByExtension(stderr: string): boolean {
+          return stderr.includes("Start without extensions");
+        }
       },
     );
 

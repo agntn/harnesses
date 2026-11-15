@@ -21,6 +21,9 @@ const MODEL_HEADERS = ["provider", "model", "context", "max-out", "thinking", "i
 /** Pi reads `--tools` as an allowlist: no extension tools, no codemode or tool_search for MCP. */
 const READ_ONLY_TOOLS = ["read", "grep", "find", "ls"];
 
+/** Pi's own advice after an extension stopped it before the prompt. */
+const EXTENSION_STOP_HINT = /Start without extensions using\b/u;
+
 /** Pi prints its bare version; CLN's `pi` calculator prints `pi (CLN 1.3.7)`. */
 const PI_VERSION = /^v?(\d+\.\d+\.\d+(?:-[\w.]+)?)\s*$/u;
 
@@ -231,6 +234,10 @@ export default class Pi extends Harness {
     if (typeof probe === "string") throw new Error(probe);
     if (probe !== null) return probe;
     return super.invoke(prompt, { ...options, timeoutMs: remaining(options.timeoutMs, started) });
+  }
+
+  protected override stoppedByExtension(stderr: string): boolean {
+    return EXTENSION_STOP_HINT.test(stderr);
   }
 
   override async listModels(options: ListModelsOptions = {}): Promise<ListModelsResult> {

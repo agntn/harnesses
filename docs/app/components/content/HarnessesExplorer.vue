@@ -28,6 +28,7 @@ const projectRoot = ref("/srv/app");
 const mode = ref<ModeKey>("advisor");
 const model = ref("");
 const effort = ref("");
+const extensions = ref(true);
 const prompt = ref(DEFAULT_PROMPT);
 
 const harness = computed(() => harnessEntry(id.value) ?? HARNESSES[0]!);
@@ -51,22 +52,29 @@ const groups = computed(() =>
 );
 const shownPaths = computed(() => groups.value.reduce((sum, row) => sum + row.entries.length, 0));
 
-const built = computed(() =>
-  buildCommand(
-    harness.value,
-    mode.value,
-    prompt.value,
-    model.value || undefined,
-    effort.value || undefined,
-  ),
-);
+const selection = computed(() => ({
+  model: model.value || undefined,
+  effort: effort.value || undefined,
+  extensions: extensions.value,
+}));
+const built = computed(() => buildCommand(harness.value, mode.value, prompt.value, selection.value));
 const spawned = computed(() => (built.value ? shellLine(built.value) : null));
 const invokeError = computed(() =>
-  invocationError(harness.value, mode.value, model.value, effort.value),
+  invocationError(harness.value, mode.value, selection.value),
 );
 const effortPlaceholder = computed(() =>
   harness.value.invocation?.effortArgs ? "optional, low keeps it quick" : "no flag for it here",
 );
+
+const extensionItems = computed(() => [
+  { label: "load them, as usual", value: true },
+  {
+    label: harness.value.invocation?.noExtensionsArgs
+      ? "skip them, a broken one can't stop the run"
+      : "skip them (rejected)",
+    value: false,
+  },
+]);
 
 const modeItems = computed(() =>
   MODES.map((entry) => ({
@@ -79,7 +87,8 @@ const tsLines = computed(() => {
   const opts = modeSpec(mode.value).fields;
   const modelPart = model.value ? `model: ${JSON.stringify(model.value)}` : "";
   const effortPart = effort.value ? `effort: ${JSON.stringify(effort.value)}` : "";
-  const merged = [opts, modelPart, effortPart].filter(Boolean).join(", ");
+  const extensionsPart = extensions.value ? "" : "extensions: false";
+  const merged = [opts, modelPart, effortPart, extensionsPart].filter(Boolean).join(", ");
   return [
     'import { getHarness } from "@agntn/harnesses";',
     "",
@@ -102,6 +111,7 @@ const cliLines = computed(() => {
   if (mode.value.endsWith("Structured")) flags.push("--json");
   if (model.value) flags.push(`--model ${model.value}`);
   if (effort.value) flags.push(`--effort ${effort.value}`);
+  if (!extensions.value) flags.push("--no-extensions");
   return [
     `harnesses paths ${harness.value.id} --json`,
     `harnesses run ${harness.value.id}${flags.length ? ` ${flags.join(" ")}` : ""} ${JSON.stringify(prompt.value)}`,
@@ -135,6 +145,7 @@ function readQuery() {
   }
   if (typeof query.model === "string") model.value = query.model;
   if (typeof query.effort === "string") effort.value = query.effort;
+  if (query.extensions === "false") extensions.value = false;
   if (typeof query.prompt === "string" && query.prompt) prompt.value = query.prompt;
 }
 
@@ -156,7 +167,7 @@ onMounted(() => {
   syncing = true;
 });
 
-watch([id, platform, homeDir, projectRoot, mode, model, effort, prompt], () => {
+watch([id, platform, homeDir, projectRoot, mode, model, effort, extensions, prompt], () => {
   if (!syncing) return;
   void router.replace({
     query: {
@@ -167,6 +178,7 @@ watch([id, platform, homeDir, projectRoot, mode, model, effort, prompt], () => {
       mode: mode.value,
       ...(model.value ? { model: model.value } : {}),
       ...(effort.value ? { effort: effort.value } : {}),
+      ...(extensions.value ? {} : { extensions: "false" }),
       ...(prompt.value !== DEFAULT_PROMPT ? { prompt: prompt.value } : {}),
     },
   });
@@ -346,6 +358,21 @@ watch([id, platform, homeDir, projectRoot, mode, model, effort, prompt], () => {
                   :placeholder="effortPlaceholder"
                   spellcheck="false"
                   autocomplete="off"
+                  class="w-full"
+                />
+              </dd>
+            </div>
+            <div>
+              <dt><label for="explorer-extensions">extensions</label></dt>
+              <dd>
+                <USelectMenu
+                  id="explorer-extensions"
+                  aria-label="Extensions"
+                  v-model="extensions"
+                  :items="extensionItems"
+                  value-key="value"
+                  variant="none"
+                  :search-input="false"
                   class="w-full"
                 />
               </dd>

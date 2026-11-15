@@ -235,12 +235,25 @@ export interface BuiltCommand {
 /** Same word rule as `selectionError` in the library. */
 const EFFORT_PATTERN = /^[a-z]+$/u;
 
-/** Mirrors `selectionError`: a model or effort this harness can't take. Empty means unset. */
-function selectionError(harness: HarnessRecord, model?: string, effort?: string): string | null {
+/** What a run picks besides its mode. Empty strings mean unset; `extensions` defaults to true. */
+export interface Selection {
+  model?: string;
+  effort?: string;
+  extensions?: boolean;
+}
+
+/** Mirrors `selectionError`: a model, effort or extension skip this harness can't take. */
+function selectionError(
+  harness: HarnessRecord,
+  { model, effort, extensions }: Readonly<Selection>,
+): string | null {
   const invocation = harness.invocation;
   if (!invocation) return null;
   if (model && !invocation.modelArgs) {
     return `Harness ${harness.id} does not support model selection`;
+  }
+  if (extensions === false && !invocation.noExtensionsArgs) {
+    return `Harness ${harness.id} cannot start without extensions`;
   }
   if (!effort) return null;
   if (!invocation.effortArgs) return `Harness ${harness.id} does not support reasoning effort`;
@@ -254,27 +267,27 @@ function fillArgs(args: readonly string[] | undefined, placeholder: string, valu
 }
 
 /**
- * Mirrors what `Harness.invoke` spawns: template first, model and effort arguments
- * appended, then `streamArgs` for a plain text run.
+ * Mirrors what `Harness.invoke` spawns: template first, model, effort and
+ * extension arguments appended, then `streamArgs` for a plain text run.
  */
 export function buildCommand(
   harness: HarnessRecord,
   mode: ModeKey,
   prompt: string,
-  model?: string,
-  effort?: string,
+  selection: Readonly<Selection> = {},
 ): BuiltCommand | null {
   const invocation = harness.invocation;
   if (!invocation) return null;
   const command = invocation.binary ?? harness.binaries[0];
   if (!command) return null;
-  if (selectionError(harness, model, effort) !== null) return null;
+  if (selectionError(harness, selection) !== null) return null;
   const template = invocation[MODE_TEMPLATE[mode]];
   if (!Array.isArray(template)) return null;
   const args = [
     ...fillArgs(template, "{prompt}", prompt),
-    ...fillArgs(invocation.modelArgs, "{model}", model),
-    ...fillArgs(invocation.effortArgs, "{effort}", effort),
+    ...fillArgs(invocation.modelArgs, "{model}", selection.model),
+    ...fillArgs(invocation.effortArgs, "{effort}", selection.effort),
+    ...(selection.extensions === false ? (invocation.noExtensionsArgs ?? []) : []),
   ];
   if (!mode.endsWith("Structured") && invocation.streamArgs) args.push(...invocation.streamArgs);
   return { command, args };
@@ -284,12 +297,11 @@ export function buildCommand(
 export function invocationError(
   harness: HarnessRecord,
   mode: ModeKey,
-  model?: string,
-  effort?: string,
+  selection: Readonly<Selection> = {},
 ): string {
   if (!harness.invocation) return `Harness ${harness.id} has no non-interactive invocation`;
   return (
-    selectionError(harness, model, effort) ??
+    selectionError(harness, selection) ??
     `Harness ${harness.id} has no ${MODE_DESCRIPTION[mode]} invocation`
   );
 }

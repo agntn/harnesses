@@ -347,30 +347,25 @@ function isDirectory(path: string): boolean {
 /** An `<invoke>` or `<function_calls>` tag, with or without a namespace prefix. */
 const TOOL_CALL_TEXT = /<(?:[\w-]+:)?(?:invoke|function_calls)\b/u;
 
-/** Pi's own advice after an extension stopped it before the prompt. OMP only warns and runs on. */
-const EXTENSION_LOAD_HINT = /Start without extensions using\b/u;
-
 /**
  * Flags what the exit code alone doesn't tell: a tool call an advisor only
  * wrote down, and an extension that stopped a run `extensions: false` could rescue.
  *
  * @param result - The finished run's streams and exit code.
  * @param options - The run's invocation options.
- * @param noExtensionsArgs - The recipe's flag for skipping extensions, if it has one.
+ * @param extensionStopped - Whether the harness read its stderr as an extension that stopped it.
  * @returns {Pick<InvokeResult, "toolCallsAsText" | "extensionLoadFailed">} The flags that apply.
  */
 function runFlags(
-  result: Readonly<Pick<InvokeResult, "stdout" | "stderr" | "exitCode">>,
+  result: Readonly<Pick<InvokeResult, "stdout" | "exitCode">>,
   options: InvocationOptions,
-  noExtensionsArgs: readonly string[] | undefined,
+  extensionStopped: boolean,
 ): Pick<InvokeResult, "toolCallsAsText" | "extensionLoadFailed"> {
   const advisor = requestedInvocationMode(options).startsWith("advisor");
-  const retryable = options.extensions !== false && noExtensionsArgs !== undefined;
+  const retryable = options.extensions !== false && result.exitCode !== 0;
   return {
     ...(advisor && TOOL_CALL_TEXT.test(result.stdout) ? { toolCallsAsText: true as const } : {}),
-    ...(retryable && result.exitCode !== 0 && EXTENSION_LOAD_HINT.test(result.stderr)
-      ? { extensionLoadFailed: true as const }
-      : {}),
+    ...(retryable && extensionStopped ? { extensionLoadFailed: true as const } : {}),
   };
 }
 
@@ -780,17 +775,23 @@ export abstract class Harness {
       : executeCommand(built.command, built.args, command);
     return run.then((result) => ({
       ...result,
-      ...runFlags(result, invocationOptions, this.#noExtensionsArgs()),
+      ...runFlags(
+        result,
+        invocationOptions,
+        this.invocation?.noExtensionsArgs !== undefined && this.stoppedByExtension(result.stderr),
+      ),
     }));
   }
 
   /**
-   * The recipe's flag for skipping extensions. An ECMAScript private name, so a subclass can't collide.
+   * Reads a failed run's stderr for an extension that stopped it before the prompt.
+   * Only asked when the recipe has `noExtensionsArgs`; the base knows no CLI's wording.
    *
-   * @returns {readonly string[] | undefined} The flag, or undefined when the CLI has none.
+   * @param _stderr - The failed run's stderr.
+   * @returns {boolean} True when skipping extensions would let the run through.
    */
-  #noExtensionsArgs(): readonly string[] | undefined {
-    return this.invocation?.noExtensionsArgs;
+  protected stoppedByExtension(_stderr: string): boolean {
+    return false;
   }
 
   /**
