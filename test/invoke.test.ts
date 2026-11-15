@@ -163,6 +163,61 @@ describe("normalized invocation", () => {
     }
   });
 
+  it("skips extension discovery only where the CLI has a flag for it", () => {
+    for (const id of ["pi", "omp"] as const) {
+      const harness = getHarness(id);
+      const plain = harness.buildInvocation("x", { tools: true, model: "m", effort: "low" });
+      const built = harness.buildInvocation("x", {
+        tools: true,
+        model: "m",
+        effort: "low",
+        extensions: false,
+      });
+
+      expect(built?.args).toEqual([...(plain?.args ?? []), "--no-extensions"]);
+      expect(harnessInfo(id).details).toMatchObject({ extensionsOptional: true });
+    }
+
+    const claude = getHarness("claude");
+    expect(claude.buildInvocation("x", { extensions: false })).toBeNull();
+    expect(claude.invocationError({ extensions: false })).toBe(
+      "Harness claude cannot start without extensions",
+    );
+    expect(claude.buildInvocation("x", { extensions: true })).toEqual(claude.buildInvocation("x"));
+    expect(harnessInfo("claude").details).toMatchObject({ extensionsOptional: false });
+  });
+
+  it("points a run stopped by an extension at extensions: false", async () => {
+    const hint = `process.stderr.write('Hint: Start without extensions using "pi -ne".\\n'); process.exit(1)`;
+    registerHarness(
+      class extends FakeCursor {
+        override readonly invocation: Harness["invocation"] = {
+          args: ["-e", hint],
+          noToolsArgs: ["-e", hint],
+          noExtensionsArgs: ["--"],
+          level: "inferred",
+        };
+      },
+    );
+
+    try {
+      const cursor = getHarness("cursor");
+      expect((await cursor.invoke("x")).extensionLoadFailed).toBe(true);
+      expect((await cursor.invoke("x", { extensions: false })).extensionLoadFailed).toBeUndefined();
+
+      const run = await runHarness("cursor", "x");
+      expect(run.isError).toBe(true);
+      expect(run.details).toMatchObject({ retry: { extensions: false } });
+      expect(run.content[0]?.text).toContain('"retry":{"extensions":false}');
+
+      const skipped = await runHarness("cursor", "x", { extensions: false });
+      expect(skipped.details).toMatchObject({ extensions: false });
+      expect(skipped.details).not.toHaveProperty("retry");
+    } finally {
+      registerHarness(Cursor);
+    }
+  });
+
   it("rejects an effort the harness cannot take", () => {
     const cursor = getHarness("cursor");
     const claude = getHarness("claude");

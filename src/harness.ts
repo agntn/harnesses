@@ -65,6 +65,7 @@ const PARENT_ENV = "AGNTN_HARNESSES_PARENT";
 type InvocationOptions = Readonly<{
   model?: string;
   effort?: string;
+  extensions?: boolean;
   structured?: boolean;
   tools?: boolean;
   readOnly?: boolean;
@@ -107,12 +108,12 @@ function requestedInvocationMode(options: InvocationOptions): InvocationMode {
 const EFFORT_PATTERN = /^[a-z]+$/u;
 
 /**
- * Rejects a model or effort the harness can't take. No mode switch fixes that, so no retry.
+ * Rejects a model, effort or extension skip the harness can't take. No mode switch fixes that, so no retry.
  *
  * @param id - Harness id for the message.
  * @param invocation - Templates that decide which selections exist.
- * @param options - Requested model and effort.
- * @returns {string | null} The rejection, or null when both are accepted.
+ * @param options - Requested model, effort and extension skip.
+ * @returns {string | null} The rejection, or null when all are accepted.
  */
 export function selectionError(
   id: string,
@@ -121,6 +122,9 @@ export function selectionError(
 ): string | null {
   if (options.model !== undefined && !invocation.modelArgs) {
     return `Harness ${id} does not support model selection`;
+  }
+  if (options.extensions === false && !invocation.noExtensionsArgs) {
+    return `Harness ${id} cannot start without extensions`;
   }
   if (options.effort === undefined) return null;
   if (!invocation.effortArgs) return `Harness ${id} does not support reasoning effort`;
@@ -274,6 +278,7 @@ function buildInvocationArgs(
     ...fillArgs(template, "{prompt}", prompt),
     ...fillArgs(invocation.modelArgs, "{model}", options.model),
     ...fillArgs(invocation.effortArgs, "{effort}", options.effort),
+    ...(options.extensions === false ? (invocation.noExtensionsArgs ?? []) : []),
   ];
 }
 
@@ -341,6 +346,33 @@ function isDirectory(path: string): boolean {
 
 /** An `<invoke>` or `<function_calls>` tag, with or without a namespace prefix. */
 const TOOL_CALL_TEXT = /<(?:[\w-]+:)?(?:invoke|function_calls)\b/u;
+
+/** Pi's own advice after an extension stopped it before the prompt. OMP only warns and runs on. */
+const EXTENSION_LOAD_HINT = /Start without extensions using\b/u;
+
+/**
+ * Flags what the exit code alone doesn't tell: a tool call an advisor only
+ * wrote down, and an extension that stopped a run `extensions: false` could rescue.
+ *
+ * @param result - The finished run's streams and exit code.
+ * @param options - The run's invocation options.
+ * @param noExtensionsArgs - The recipe's flag for skipping extensions, if it has one.
+ * @returns {Pick<InvokeResult, "toolCallsAsText" | "extensionLoadFailed">} The flags that apply.
+ */
+function runFlags(
+  result: Readonly<Pick<InvokeResult, "stdout" | "stderr" | "exitCode">>,
+  options: InvocationOptions,
+  noExtensionsArgs: readonly string[] | undefined,
+): Pick<InvokeResult, "toolCallsAsText" | "extensionLoadFailed"> {
+  const advisor = requestedInvocationMode(options).startsWith("advisor");
+  const retryable = options.extensions !== false && noExtensionsArgs !== undefined;
+  return {
+    ...(advisor && TOOL_CALL_TEXT.test(result.stdout) ? { toolCallsAsText: true as const } : {}),
+    ...(retryable && result.exitCode !== 0 && EXTENSION_LOAD_HINT.test(result.stderr)
+      ? { extensionLoadFailed: true as const }
+      : {}),
+  };
+}
 
 /**
  * Spawns one command with the deadline, cancellation and tree cleanup every run gets.
@@ -724,6 +756,7 @@ export abstract class Harness {
     const invocationOptions = {
       model: options.model,
       effort: options.effort,
+      extensions: options.extensions,
       structured: options.structured,
       tools: options.tools,
       readOnly: options.readOnly,
@@ -738,7 +771,6 @@ export abstract class Harness {
     if (versionError) return Promise.reject(new Error(versionError));
 
     const command = { ...options, env: { ...options.env, [PARENT_ENV]: this.id } };
-    const advisor = requestedInvocationMode(invocationOptions).startsWith("advisor");
     const streamArgs = options.structured ? undefined : this.invocation?.streamArgs;
     const run = streamArgs
       ? executeCommand(built.command, [...built.args, ...streamArgs], command).then((result) => ({
@@ -746,11 +778,19 @@ export abstract class Harness {
           stdout: this.foldStreamOutput(result.stdout, !result.timedOut && !result.aborted),
         }))
       : executeCommand(built.command, built.args, command);
-    return run.then((result) =>
-      advisor && TOOL_CALL_TEXT.test(result.stdout)
-        ? { ...result, toolCallsAsText: true as const }
-        : result,
-    );
+    return run.then((result) => ({
+      ...result,
+      ...runFlags(result, invocationOptions, this.#noExtensionsArgs()),
+    }));
+  }
+
+  /**
+   * The recipe's flag for skipping extensions. An ECMAScript private name, so a subclass can't collide.
+   *
+   * @returns {readonly string[] | undefined} The flag, or undefined when the CLI has none.
+   */
+  #noExtensionsArgs(): readonly string[] | undefined {
+    return this.invocation?.noExtensionsArgs;
   }
 
   /**

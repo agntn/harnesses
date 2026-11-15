@@ -346,6 +346,7 @@ export default class Pi extends Harness {
     readOnlyTools: READ_ONLY_TOOLS,
     modelArgs: ["--model", "{model}"],
     effortArgs: ["--thinking", "{effort}"],
+    noExtensionsArgs: ["--no-extensions"],
     level: "official",
     note: "Add --mode json for structured event output.",
   };

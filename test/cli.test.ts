@@ -177,6 +177,61 @@ describe("harnesses usage paths", () => {
     expect(text).toContain("readOnly tools: only read, grep, find, ls, no extension or MCP tools");
   });
 
+  it("harnesses run --no-extensions starts Pi without them, and a run that died on one says so", () => {
+    const binDir = mkdtempSync(join(tmpdir(), "harnesses-pi-ext-"));
+    try {
+      writeFileSync(
+        join(binDir, "pi"),
+        [
+          "#!/bin/sh",
+          'if [ "$1" = --version ]; then echo 1.5.2; exit 0; fi',
+          'case "$*" in *--no-extensions*) echo "ARGS $*"; exit 0;; esac',
+          "echo 'Hint: Start without extensions using \"pi -ne\".' >&2",
+          "exit 1",
+          "",
+        ].join("\n"),
+        { mode: 0o755 },
+      );
+      const env = { PATH: `${binDir}:${process.env.PATH ?? ""}`, CONSOLA_LEVEL: "3" };
+      const skipped = runCli(["run", "pi", "--no-extensions", "x"], "", env);
+      const failed = runCli(["run", "pi", "x"], "", env);
+
+      expect(skipped.status).toBe(0);
+      expect(skipped.stdout).toContain("ARGS -p --no-tools x --no-extensions");
+      expect(skipped.stderr).not.toContain("--no-extensions skips");
+      expect(failed.status).toBe(1);
+      expect(failed.stdout).not.toContain("--no-extensions skips");
+      expect(stripVTControlCharacters(failed.stderr)).toContain(
+        "An extension stopped the run; --no-extensions skips them all",
+      );
+    } finally {
+      rmSync(binDir, { recursive: true, force: true });
+    }
+  });
+
+  it("harnesses run --no-extensions refuses a harness without the flag", () => {
+    const result = runCli(["run", "claude", "--no-extensions", "x"]);
+
+    expect(result.status).toBe(1);
+    expect(stripVTControlCharacters(result.stderr)).toContain(
+      "Harness claude cannot start without extensions",
+    );
+  });
+
+  it("harnesses info says where extensions are optional", () => {
+    const pi: unknown = JSON.parse(runCli(["info", "pi", "--json"]).stdout);
+    const claude: unknown = JSON.parse(runCli(["info", "claude", "--json"]).stdout);
+
+    expect(pi).toMatchObject({ extensionsOptional: true });
+    expect(claude).toMatchObject({ extensionsOptional: false });
+    expect(runCli(["info", "pi"], "", { CONSOLA_LEVEL: "3" }).stdout).toContain(
+      "extensions: optional, --no-extensions skips them",
+    );
+    expect(runCli(["info", "claude"], "", { CONSOLA_LEVEL: "3" }).stdout).not.toContain(
+      "extensions: optional",
+    );
+  });
+
   it("harnesses models prints the ids agy --model accepts", () => {
     const binDir = mkdtempSync(join(tmpdir(), "harnesses-agy-"));
     try {

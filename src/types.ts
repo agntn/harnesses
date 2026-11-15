@@ -105,6 +105,8 @@ export interface HarnessInvocation {
   modelHint?: string;
   /** Arguments appended when a reasoning effort is selected; every "{effort}" is replaced. */
   effortArgs?: string[];
+  /** Arguments appended when a run skips extension discovery; absent when the CLI can't. */
+  noExtensionsArgs?: string[];
   /**
    * Arguments appended to a plain text run so a CLI that holds its answer until
    * the end reports it as events instead; `invoke` folds them back into that text,
@@ -171,6 +173,8 @@ export interface InvokeOptions {
   model?: string;
   /** Reasoning effort in the harness's own words (`low`, `high`, `max`), passed through as is. */
   effort?: string;
+  /** Load extensions, the default; `false` skips discovery so a broken one can't stop the run. Rejected where `noExtensionsArgs` is missing. */
+  extensions?: boolean;
   /** Enable the spawned harness's tools; defaults to advisor without tools mode. */
   tools?: boolean;
   /** Require native enforcement of read-only tool access. Implies `tools: true` when `tools` is omitted; `tools: false` rejects the run. */
@@ -197,6 +201,8 @@ export interface InvokeResult {
   idleMs?: number;
   /** Set when an advisor wrote a tool call as text. Nothing ran it, so its output is made up. */
   toolCallsAsText?: true;
+  /** Set when a failed run blamed an extension that `extensions: false` would have skipped. */
+  extensionLoadFailed?: true;
 }
 
 /** Result of one native model-listing command. */

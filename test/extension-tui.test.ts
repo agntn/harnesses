@@ -127,6 +127,16 @@ describe("Pi and OMP extension renderers", () => {
     }
   });
 
+  it("hands extensions: false from both hosts to the run", async () => {
+    for (const definitions of [piTools, ompTools]) {
+      await expectFailure(
+        tool(definitions, "harnesses_run"),
+        [{ id: "claude", prompt: "x", tools: false, extensions: false }],
+        "Harness claude cannot start without extensions",
+      );
+    }
+  });
+
   it("forwards cancellation from both hosts to runs and model listings", async () => {
     registerHarness(
       class extends Cursor {

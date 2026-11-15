@@ -126,6 +126,12 @@ export function harnessToolSchemas<I, S>(Type: McpSchemaBuilder<I, S>) {
           pattern: "^[a-z]+$",
         }),
       ),
+      extensions: Type.Optional(
+        Type.Boolean({
+          description:
+            "Set false to start Pi or OMP without extension discovery, so a broken extension can't stop the run. Harnesses without extensionsOptional in harnesses_info reject it. A run that died on an extension says retry with extensions: false.",
+        }),
+      ),
       timeoutSeconds: Type.Optional(
         Type.Integer({
           description: `Wall-clock budget in seconds (default ${RUN_TIMEOUT_DEFAULT_SECONDS})`,
@@ -236,6 +242,7 @@ export interface RunParams {
   cwd?: string;
   model?: string;
   effort?: string;
+  extensions?: boolean;
   timeoutSeconds?: number;
   structured?: boolean;
   tools: boolean;

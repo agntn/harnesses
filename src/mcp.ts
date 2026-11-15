@@ -99,6 +99,7 @@ const tools: ToolDefinition[] = [
         cwd: args.cwd as string | undefined,
         model: args.model as string | undefined,
         effort: args.effort as string | undefined,
+        extensions: args.extensions as boolean | undefined,
         timeoutSeconds: args.timeoutSeconds as number | undefined,
         signal,
         structured: args.structured as boolean | undefined,
