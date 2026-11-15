@@ -1,5 +1,5 @@
-import { execFileSync } from "node:child_process";
-import { stripVTControlCharacters } from "node:util";
+import { execFile, execFileSync } from "node:child_process";
+import { promisify, stripVTControlCharacters } from "node:util";
 import { Harness } from "../harness.ts";
 import type {
   AvailableModel,
@@ -16,6 +16,15 @@ const READ_ONLY_TOOLS = ["read", "grep", "find", "ls"];
 
 /** Pi prints its bare version; CLN's `pi` calculator prints `pi (CLN 1.3.7)`. */
 const PI_VERSION = /^v?(\d+\.\d+\.\d+(?:-[\w.]+)?)\s*$/u;
+
+/** Same cap the base class gives `--version`. */
+const VERSION_TIMEOUT_MS = 5000;
+
+const IMPOSTOR_ERROR =
+  "The pi on PATH isn't the Pi coding agent: its --version names no Pi release. " +
+  "Put the coding agent's directory first on PATH";
+
+const execFileAsync = promisify(execFile);
 
 function parseTokenCount(value: string, harness: string): number {
   const match = /^(\d+(?:\.\d+)?)([KM])?$/.exec(value);
@@ -87,42 +96,75 @@ interface Spawn {
   readonly command: string;
   readonly cwd?: string;
   readonly env?: Readonly<Record<string, string>>;
+  readonly signal?: AbortSignal;
+  readonly timeoutMs?: number;
 }
 
 /**
- * Asks the binary a spawn would start for its version.
- *
  * @param spawn - Command, working directory and env overrides.
- * @returns {{ found: boolean, version: string | null }} Whether it ran, and its Pi version.
+ * @returns {Record<string, string | undefined>} The env the spawn sees.
  */
-function askVersion(spawn: Spawn): { found: boolean; version: string | null } {
+function spawnEnv(spawn: Spawn): Record<string, string | undefined> {
+  return spawn.env ? { ...process.env, ...spawn.env } : process.env;
+}
+
+/**
+ * @param output - What `--version` printed.
+ * @returns {string | null} The Pi version, or null for anything else.
+ */
+function piVersion(output: string): string | null {
+  return PI_VERSION.exec(output)?.[1] ?? null;
+}
+
+/**
+ * Asks a binary on this process's PATH for its Pi version.
+ *
+ * @param command - Binary to ask.
+ * @returns {string | null} The version, or null when it isn't Pi or doesn't run.
+ */
+function readVersion(command: string): string | null {
   try {
-    const output = execFileSync(spawn.command, ["--version"], {
-      cwd: spawn.cwd,
-      env: spawn.env ? { ...process.env, ...spawn.env } : process.env,
+    const output = execFileSync(command, ["--version"], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
-      timeout: 5000,
+      timeout: VERSION_TIMEOUT_MS,
     });
-    return { found: true, version: PI_VERSION.exec(output)?.[1] ?? null };
-  } catch (error) {
-    const missing = error instanceof Error && "code" in error && error.code === "ENOENT";
-    return { found: !missing, version: null };
+    return piVersion(output);
+  } catch {
+    return null;
   }
 }
 
 /**
- * @param spawn - Command, working directory and env overrides.
- * @returns {string | null} Why that binary can't run, or null when it's Pi or missing.
+ * Asks the binary a run would start whether it's Pi, inside the run's signal and deadline.
+ *
+ * @param spawn - Command, working directory, env, signal and deadline of the run.
+ * @returns {Promise<string | null>} Why it can't run, or null when it's Pi or the probe can't tell.
  */
-function impostorError(spawn: Spawn): string | null {
-  if (process.platform === "win32") return null;
-  const { found, version } = askVersion(spawn);
-  if (!found || version !== null) return null;
-  return (
-    "The pi on PATH isn't the Pi coding agent: its --version names no Pi release. " +
-    "Put the coding agent's directory first on PATH"
-  );
+async function impostorError(spawn: Spawn): Promise<string | null> {
+  if (process.platform === "win32" || spawn.signal?.aborted) return null;
+  try {
+    const { stdout } = await execFileAsync(spawn.command, ["--version"], {
+      cwd: spawn.cwd,
+      env: spawnEnv(spawn),
+      encoding: "utf8",
+      signal: spawn.signal,
+      timeout: spawn.timeoutMs ? Math.min(spawn.timeoutMs, VERSION_TIMEOUT_MS) : VERSION_TIMEOUT_MS,
+    });
+    return piVersion(stdout) === null ? IMPOSTOR_ERROR : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param timeoutMs - The caller's deadline, if any.
+ * @param started - When the run started, from `performance.now()`.
+ * @returns {number | undefined} What's left of it, at least 1 ms so it still fires.
+ */
+function remaining(timeoutMs: number | undefined, started: number): number | undefined {
+  if (!timeoutMs) return timeoutMs;
+  return Math.max(1, Math.ceil(timeoutMs - (performance.now() - started)));
 }
 
 export default class Pi extends Harness {
@@ -152,21 +194,25 @@ export default class Pi extends Harness {
     const now = performance.now();
     const probe = this.#probe;
     if (probe !== undefined && probe.path === path && now - probe.at < 1000) return probe.version;
-    const { version } = askVersion({ command: this.binaries[0] ?? "pi" });
+    const version = readVersion(this.binaries[0] ?? "pi");
     this.#probe = { path, at: now, version };
     return version;
   }
 
-  override invoke(prompt: string, options: InvokeOptions = {}): Promise<InvokeResult> {
+  override async invoke(prompt: string, options: InvokeOptions = {}): Promise<InvokeResult> {
     const command = this.invocation?.binary ?? this.binaries[0] ?? "pi";
-    const error = impostorError({ command, cwd: options.cwd, env: options.env });
-    return error === null ? super.invoke(prompt, options) : Promise.reject(new Error(error));
+    const started = performance.now();
+    const error = await impostorError({ ...options, command });
+    if (error !== null) throw new Error(error);
+    return super.invoke(prompt, { ...options, timeoutMs: remaining(options.timeoutMs, started) });
   }
 
-  override listModels(options: ListModelsOptions = {}): Promise<ListModelsResult> {
+  override async listModels(options: ListModelsOptions = {}): Promise<ListModelsResult> {
     const command = this.binaries[0] ?? "pi";
-    const error = impostorError({ command, cwd: options.cwd, env: options.env });
-    return error === null ? super.listModels(options) : Promise.reject(new Error(error));
+    const started = performance.now();
+    const error = await impostorError({ ...options, command });
+    if (error !== null) throw new Error(error);
+    return super.listModels({ ...options, timeoutMs: remaining(options.timeoutMs, started) });
   }
 
   readonly capabilities = {

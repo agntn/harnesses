@@ -1061,6 +1061,30 @@ describe("runHarness tool operation", () => {
     },
   );
 
+  it.skipIf(process.platform === "win32")(
+    "keeps the pi probe inside the caller's deadline",
+    async () => {
+      const dir = await mkdtemp(join(tmpdir(), "harnesses-pi-slow-"));
+      onTestFinished(() => rm(dir, { recursive: true, force: true }));
+      const marker = join(dir, "probed");
+      const probe = `[ "$1" = --version ] && touch '${marker}' && sleep 2 && echo 1.5.2 && exit`;
+      await writeFile(join(dir, "pi"), `#!/bin/sh\n${probe}\nsleep 2\n`, { mode: 0o755 });
+      const env = { PATH: `${dir}${delimiter}${process.env.PATH ?? ""}` };
+      const pi = getHarness("pi");
+
+      await expect(pi.invoke("hi", { env, signal: AbortSignal.abort() })).resolves.toMatchObject({
+        aborted: true,
+      });
+      await expect(readFile(marker)).rejects.toThrow();
+
+      const started = performance.now();
+      await expect(pi.invoke("hi", { env, timeoutMs: 100 })).resolves.toMatchObject({
+        timedOut: true,
+      });
+      expect(performance.now() - started).toBeLessThan(1500);
+    },
+  );
+
   it.skipIf(process.platform === "win32")("checks the pi a run's own PATH reaches", async () => {
     const root = await mkdtemp(join(tmpdir(), "harnesses-pi-env-"));
     onTestFinished(() => rm(root, { recursive: true, force: true }));
