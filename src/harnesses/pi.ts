@@ -109,31 +109,63 @@ function readVersion(command: string): string | null {
 }
 
 /**
- * Asks the binary a run would start whether it's Pi, with the run's own cleanup.
+ * @param timeoutMs - The caller's deadline; unset or 0 means none.
+ * @returns {boolean} Whether it ends before the probe's own cap does.
+ */
+function deadlineBeforeCap(timeoutMs: number | undefined): boolean {
+  return timeoutMs !== undefined && timeoutMs > 0 && timeoutMs <= VERSION_TIMEOUT_MS;
+}
+
+/**
+ * Asks the binary a run would start for `--version`, inside the run's deadline and signal.
  *
  * @param command - Binary the run spawns.
  * @param options - The run's working directory, env, deadline and signal.
- * @returns {Promise<string | null>} Why it can't run, or null when it's Pi or the probe can't tell.
+ * @returns {Promise<InvokeResult | null>} The probe, or null when it couldn't start.
  */
-async function impostorError(command: string, options: CommandOptions): Promise<string | null> {
-  if (process.platform === "win32" || options.signal?.aborted) return null;
-  const deadline = options.timeoutMs ? Math.min(options.timeoutMs, VERSION_TIMEOUT_MS) : undefined;
+async function askVersion(command: string, options: CommandOptions): Promise<InvokeResult | null> {
+  const callerFirst = deadlineBeforeCap(options.timeoutMs);
+  const timeoutMs = callerFirst ? options.timeoutMs : VERSION_TIMEOUT_MS;
   try {
-    const probe = await executeCommand(command, ["--version"], {
-      ...options,
-      timeoutMs: deadline ?? VERSION_TIMEOUT_MS,
-    });
-    if (probe.exitCode !== 0) return null;
-    return PI_VERSION.test(probe.stdout) ? null : IMPOSTOR_ERROR;
+    return await executeCommand(command, ["--version"], { ...options, timeoutMs });
   } catch {
     return null;
   }
 }
 
 /**
+ * @param probe - The `--version` run.
+ * @param options - The caller's deadline and signal.
+ * @returns {boolean} Whether the probe ended the run: cancelled, or out of the caller's time.
+ */
+function usedUpRun(probe: InvokeResult, options: CommandOptions): boolean {
+  return probe.aborted || (probe.timedOut && deadlineBeforeCap(options.timeoutMs));
+}
+
+/**
+ * Checks the binary a run would start before the run itself.
+ *
+ * @param command - Binary the run spawns.
+ * @param options - The run's working directory, env, deadline and signal.
+ * @returns {Promise<InvokeResult | string | null>} The probe when it used up the run, the refusal,
+ *   or null when the run may start.
+ */
+async function probeRun(
+  command: string,
+  options: CommandOptions,
+): Promise<InvokeResult | string | null> {
+  if (process.platform === "win32" || options.signal?.aborted) return null;
+  const probe = await askVersion(command, options);
+  if (probe === null) return null;
+  if (usedUpRun(probe, options)) return { ...probe, stdout: "", stderr: "" };
+  if (probe.exitCode !== 0) return null;
+  return PI_VERSION.test(probe.stdout) ? null : IMPOSTOR_ERROR;
+}
+
+/**
  * @param timeoutMs - The caller's deadline, if any.
  * @param started - When the run started, from `performance.now()`.
- * @returns {number | undefined} What's left of it, at least 1 ms so it still fires.
+ * @returns {number | undefined} What's left of it.
  */
 function remaining(timeoutMs: number | undefined, started: number): number | undefined {
   if (!timeoutMs) return timeoutMs;
@@ -175,16 +207,18 @@ export default class Pi extends Harness {
   override async invoke(prompt: string, options: InvokeOptions = {}): Promise<InvokeResult> {
     const command = this.invocation?.binary ?? this.binaries[0] ?? "pi";
     const started = performance.now();
-    const error = await impostorError(command, options);
-    if (error !== null) throw new Error(error);
+    const probe = await probeRun(command, options);
+    if (typeof probe === "string") throw new Error(probe);
+    if (probe !== null) return probe;
     return super.invoke(prompt, { ...options, timeoutMs: remaining(options.timeoutMs, started) });
   }
 
   override async listModels(options: ListModelsOptions = {}): Promise<ListModelsResult> {
     const command = this.binaries[0] ?? "pi";
     const started = performance.now();
-    const error = await impostorError(command, options);
-    if (error !== null) throw new Error(error);
+    const probe = await probeRun(command, options);
+    if (typeof probe === "string") throw new Error(probe);
+    if (probe !== null) return { ...probe, models: [] };
     return super.listModels({ ...options, timeoutMs: remaining(options.timeoutMs, started) });
   }
 
