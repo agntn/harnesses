@@ -184,7 +184,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     name: "harnesses_mcp_sync",
     label: HARNESS_TOOL_LABELS.harnesses_mcp_sync,
     description:
-      "Reset every harness's user-scope MCP config to exactly the master list from ~/.config/agntn/mcp.jsonc; extras are removed unless the list's keep names them for that harness, a server's own excludes replaces the global one, and master names a harness is excluded from are withdrawn from it",
+      "Reset every harness's user-scope MCP config to exactly the master list from ~/.config/agntn/mcp.jsonc; extras are removed unless the list's keep names them for that harness, a server's own excludes replaces the global one, and master names a harness is excluded from are withdrawn from it. Pass check to only report",
     parameters: schemas.mcpSync,
     approval: HARNESS_TOOL_APPROVALS.harnesses_mcp_sync,
     async execute(
@@ -192,7 +192,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       params: HarnessSchemas.McpSyncParams,
     ): Promise<AgentToolResult<HarnessTools.SyncReport | HarnessTools.RunFailure>> {
       const { mcpSync } = await loadToolOperations();
-      return mcpSync(params.id);
+      return mcpSync(params.id, params.check === true);
     },
     ...statusRenderers("harnesses_mcp_sync"),
   });

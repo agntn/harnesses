@@ -18,6 +18,7 @@ import { readIfExists } from "./files.ts";
 import type { Harness } from "./harness.ts";
 import { parseJsonc } from "./jsonc.ts";
 import {
+  checkRoom,
   McpLimitError,
   openBotServer,
   readSqliteServers,
@@ -933,8 +934,15 @@ export interface SyncTargetResult {
 /** Outcome of resetting the harness configs to the master list. */
 export interface SyncReport {
   source: string;
+  /** True when nothing was written. */
+  check: boolean;
   servers: string[];
   targets: SyncTargetResult[];
+}
+
+/** Path overrides for a sync, and `check` to only report. */
+export interface McpSyncOptions extends ResolveOptions {
+  check?: boolean;
 }
 
 function canonical(server: McpServerConfig): string {
@@ -1102,23 +1110,31 @@ function excludedFrom(master: MasterSyncInput, name: string, id: string): boolea
   return excludes?.includes(id) === true;
 }
 
+/**
+ * Removes one server, or only reports it in check mode.
+ *
+ * @param harness - Target harness.
+ * @param name - Server name the user config holds.
+ * @param options - Path-resolution overrides and check mode.
+ * @returns {SyncStep} The removal, or no result when the server was already gone.
+ */
+function removeServer(harness: Harness, name: string, options: Readonly<McpSyncOptions>): SyncStep {
+  if (options.check === true) return { results: [{ name, action: "removed" }] };
+  const removed = removeMcpServer(harness, name, "user", options);
+  return removed.removed
+    ? { path: removed.path, results: [{ name, action: "removed" }] }
+    : { results: [] };
+}
+
 function withdrawMasterServers(
   harness: Harness,
   existing: ReadonlyMap<string, string>,
   withdrawn: ReadonlySet<string>,
-  options: ResolveOptions,
-): SyncStep {
-  const results: SyncTargetResult["results"] = [];
-  let path: string | undefined;
-  for (const name of existing.keys()) {
-    if (!withdrawn.has(name)) continue;
-    const removed = removeMcpServer(harness, name, "user", options);
-    if (removed.removed) {
-      path = removed.path;
-      results.push({ name, action: "removed" });
-    }
-  }
-  return { ...optionalPath(path), results };
+  options: Readonly<McpSyncOptions>,
+): SyncStep[] {
+  return [...existing.keys()]
+    .filter((name) => withdrawn.has(name))
+    .map((name) => removeServer(harness, name, options));
 }
 
 /**
@@ -1140,53 +1156,77 @@ function removeExtraServers(
   existing: ReadonlyMap<string, string>,
   masterNames: ReadonlySet<string>,
   keep: Readonly<Record<string, readonly string[]>>,
-  options: ResolveOptions,
-): SyncStep {
+  options: Readonly<McpSyncOptions>,
+): SyncStep[] {
   const kept = (Object.hasOwn(keep, harness.id) ? keep[harness.id] : undefined) ?? [];
-  const results: SyncTargetResult["results"] = [];
-  let path: string | undefined;
-  for (const name of existing.keys()) {
-    if (masterNames.has(name)) continue;
-    if (kept.includes(name)) {
-      results.push({ name, action: "kept" });
-      continue;
-    }
-    const removed = removeMcpServer(harness, name, "user", options);
-    if (removed.removed) {
-      path = removed.path;
-      results.push({ name, action: "removed" });
-    }
+  return [...existing.keys()]
+    .filter((name) => !masterNames.has(name))
+    .map((name) =>
+      kept.includes(name)
+        ? { results: [{ name, action: "kept" as const }] }
+        : removeServer(harness, name, options),
+    );
+}
+
+/** Where a sync writes, and for a SQLite table the rows it holds so far. */
+type WriteTarget = Readonly<{
+  harness: Harness;
+  remaining: ReadonlyMap<string, string>;
+  rows?: number;
+}>;
+
+/**
+ * Writes one shaped server, or only reports it in check mode, full OpenBot table included.
+ *
+ * @param target - Harness, servers left after removals, SQLite rows.
+ * @param resolved - Server as {@link shapeForDialect} returned it for this harness.
+ * @param options - Path-resolution overrides and check mode.
+ * @returns {SyncStep} The added or replaced server.
+ * @throws {McpLimitError} When OpenBot's table is full.
+ */
+function writeServer(
+  target: WriteTarget,
+  resolved: McpServerConfig,
+  options: Readonly<McpSyncOptions>,
+): SyncStep {
+  const { name } = resolved;
+  if (options.check === true) {
+    if (target.remaining.has(name)) return { results: [{ name, action: "replaced" }] };
+    if (target.rows !== undefined) checkRoom(target.rows, name);
+    return { results: [{ name, action: "added" }] };
   }
-  return { ...optionalPath(path), results };
+  const written = writeShapedServer(target.harness, resolved, "user", options);
+  return {
+    path: written.path,
+    results: [{ name, action: written.replaced ? "replaced" : "added" }],
+  };
 }
 
 function writeMasterServers(
   harness: Harness,
   servers: readonly McpServerConfig[],
-  existing: ReadonlyMap<string, string>,
-  options: ResolveOptions,
-): SyncStep {
-  const results: SyncTargetResult["results"] = [];
-  let path: string | undefined;
-  if (servers.length === 0) return { results };
-  const { dialect } = writableConfig(harness, "user", options).entry;
-  for (const server of servers) {
+  remaining: ReadonlyMap<string, string>,
+  options: Readonly<McpSyncOptions>,
+): SyncStep[] {
+  if (servers.length === 0) return [];
+  const { dialect, format } = writableConfig(harness, "user", options).entry;
+  let added = 0;
+  return servers.map((server): SyncStep => {
     try {
       const resolved = shapeForDialect(server, dialect);
-      if (existing.get(server.name) === canonical(resolved)) {
-        results.push({ name: server.name, action: "unchanged" });
-        continue;
+      if (remaining.get(server.name) === canonical(resolved)) {
+        return { results: [{ name: server.name, action: "unchanged" }] };
       }
-      const written = writeShapedServer(harness, resolved, "user", options);
-      path = written.path;
-      results.push({ name: server.name, action: written.replaced ? "replaced" : "added" });
+      const rows = format === "sqlite" ? { rows: remaining.size + added } : {};
+      const step = writeServer({ harness, remaining, ...rows }, resolved, options);
+      if (step.results[0]?.action === "added") added += 1;
+      return step;
     } catch (error) {
       // One server the dialect cannot hold must not stop the rest of the list.
       if (!cannotHold(error)) throw error;
-      results.push({ name: server.name, action: "skipped", reason: error.message });
+      return { results: [{ name: server.name, action: "skipped", reason: error.message }] };
     }
-  }
-  return { ...optionalPath(path), results };
+  });
 }
 
 /**
@@ -1199,7 +1239,7 @@ function writeMasterServers(
  * @param master - Master list to sync from.
  * @param existing - Servers the harness config holds now, by name.
  * @param masterNames - Every server name on the master list.
- * @param options - Path-resolution overrides.
+ * @param options - Path-resolution overrides and check mode.
  * @returns {SyncStep[]} The outcome of each step, in report order.
  */
 function syncMasterServers(
@@ -1207,16 +1247,23 @@ function syncMasterServers(
   master: MasterSyncInput,
   existing: ReadonlyMap<string, string>,
   masterNames: ReadonlySet<string>,
-  options: ResolveOptions,
+  options: Readonly<McpSyncOptions>,
 ): SyncStep[] {
   const allowed = master.servers.filter((server) => !excludedFrom(master, server.name, harness.id));
   const allowedNames = new Set(allowed.map((server) => server.name));
   const withdrawn = new Set([...masterNames].filter((name) => !allowedNames.has(name)));
-  const removals = [withdrawMasterServers(harness, existing, withdrawn, options)];
+  const removals = withdrawMasterServers(harness, existing, withdrawn, options);
   if (!master.excludes.includes(harness.id)) {
-    removals.push(removeExtraServers(harness, existing, masterNames, master.keep, options));
+    removals.push(...removeExtraServers(harness, existing, masterNames, master.keep, options));
   }
-  return [writeMasterServers(harness, allowed, existing, options), ...removals];
+  const removed = new Set(
+    removals
+      .flatMap((step) => step.results)
+      .filter((result) => result.action === "removed")
+      .map((result) => result.name),
+  );
+  const remaining = new Map([...existing].filter(([name]) => !removed.has(name)));
+  return [...writeMasterServers(harness, allowed, remaining, options), ...removals];
 }
 
 /**
@@ -1240,7 +1287,7 @@ function syncMcpTarget(
   harness: Harness,
   master: MasterSyncInput,
   masterNames: ReadonlySet<string>,
-  options: ResolveOptions,
+  options: Readonly<McpSyncOptions>,
 ): SyncTargetResult {
   const hasUserConfig = harness.mcpConfigs.some((candidate) => candidate.scope === "user");
   if (!hasUserConfig) {
@@ -1268,20 +1315,22 @@ function syncMcpTarget(
  * missing servers are added, drifted ones replaced, and servers absent from
  * the master are removed unless its `keep` names them for that harness. A
  * server's own `excludes` replaces the global one for that server. The
- * master file is the single source of truth, exceptions included.
+ * master file is the single source of truth, exceptions included. `check`
+ * gives the same report without writing a byte.
  *
  * @param harnesses - Harnesses to synchronize.
- * @param options - Platform and path-resolution overrides.
+ * @param options - Path overrides, and `check` to only report.
  * @returns {SyncReport} Per-harness synchronization outcomes.
  */
 export function syncMcpServers(
   harnesses: readonly Harness[],
-  options: ResolveOptions = {},
+  options: Readonly<McpSyncOptions> = {},
 ): SyncReport {
   const master = readMasterMcpServers(options);
   const masterNames = new Set(master.servers.map((server) => server.name));
   return {
     source: master.path,
+    check: options.check === true,
     servers: master.servers.map((server) => server.name),
     targets: harnesses.map((harness) => syncMcpTarget(harness, master, masterNames, options)),
   };

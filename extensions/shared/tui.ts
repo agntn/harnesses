@@ -161,7 +161,7 @@ const CALL_DESCRIPTIONS: Record<HarnessToolName, CallDescriptionRenderer> = {
   harnesses_run: runDescription,
   harnesses_mcp_list: idDescription,
   harnesses_mcp_add: mutationDescription,
-  harnesses_mcp_sync: idDescription,
+  harnesses_mcp_sync: agentsDescription,
   harnesses_agents_sync: agentsDescription,
   harnesses_prompts_sync: agentsDescription,
   harnesses_skills_sync: agentsDescription,

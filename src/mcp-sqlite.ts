@@ -47,6 +47,19 @@ function checkName(name: string): void {
   }
 }
 
+/**
+ * Refuses a row past OpenBot's limit.
+ *
+ * @param rows - Rows the table holds before this one.
+ * @param name - Name of the server that wants a row.
+ * @throws {McpLimitError} When the table is full.
+ */
+export function checkRoom(rows: number, name: string): void {
+  if (rows >= MAX_SERVERS) {
+    throw new McpLimitError(`${name}: OpenBot holds ${MAX_SERVERS} MCP servers at most`);
+  }
+}
+
 function httpServer(server: McpServerConfig, enabled: boolean): McpServerConfig {
   const http: McpServerConfig = { name: server.name, transport: "http", enabled };
   if (server.url) http.url = server.url;
@@ -224,9 +237,7 @@ function writeRow(db: DatabaseSync, table: string, server: McpServerConfig): boo
     return true;
   }
   const count = db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get()?.count;
-  if (typeof count === "number" && count >= MAX_SERVERS) {
-    throw new McpLimitError(`${server.name}: OpenBot holds ${MAX_SERVERS} MCP servers at most`);
-  }
+  if (typeof count === "number") checkRoom(count, server.name);
   db.prepare(
     `INSERT INTO ${table} (mcp_server_id, name, transport, enabled, command, args_json, env_json,
        env_passthrough_json, working_directory, url, headers_json, position, created_at, updated_at)
