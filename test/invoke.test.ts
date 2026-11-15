@@ -1,9 +1,9 @@
-import { describe, expect, it, vi } from "vite-plus/test";
+import { describe, expect, it, onTestFinished, vi } from "vite-plus/test";
 import { decode as fromToon } from "@toon-format/toon";
 import { getEventListeners } from "node:events";
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { getHarness, registerHarness } from "../src/index.ts";
 import { Harness } from "../src/harness.ts";
 import Claude, { foldClaudeStream } from "../src/harnesses/claude.ts";
@@ -1028,6 +1028,111 @@ describe("harness metadata for agents", () => {
 });
 
 describe("runHarness tool operation", () => {
+  it.skipIf(process.platform === "win32")(
+    "tells Pi from the CLN calculator that also installs as pi",
+    async () => {
+      const root = await mkdtemp(join(tmpdir(), "harnesses-pi-impostor-"));
+      onTestFinished(() => rm(root, { recursive: true, force: true }));
+      onTestFinished(() => vi.unstubAllEnvs());
+      const putOnPath = async (name: string, version: string) => {
+        const dir = join(root, name);
+        await mkdir(dir);
+        const script = `#!/bin/sh\n[ "$1" = --version ] && echo '${version}' && exit\necho "ran $*"\n`;
+        await writeFile(join(dir, "pi"), script, { mode: 0o755 });
+        vi.stubEnv("PATH", `${dir}${delimiter}${process.env.PATH ?? ""}`);
+      };
+      const row = () => detectHarnesses().details.harnesses.find(({ id }) => id === "pi");
+
+      await putOnPath("cln", "pi (CLN 1.3.7)");
+      expect(row()).toMatchObject({ installed: false, version: null });
+      for (const result of [
+        await runHarness("pi", "hi", { tools: true }),
+        await listHarnessModels("pi"),
+      ]) {
+        expect(result.isError).toBe(true);
+        expect(result.content[0]?.text).toContain("isn't the Pi coding agent");
+      }
+
+      await putOnPath("agent", "1.5.2");
+      expect(row()).toMatchObject({ installed: true, version: "1.5.2" });
+      const run = await runHarness("pi", "hi", { tools: true });
+      expect(run.isError).toBeUndefined();
+      expect(run.content[0]?.text).toContain("ran -p hi");
+    },
+  );
+
+  it.skipIf(process.platform === "win32")(
+    "keeps the pi probe inside the caller's deadline",
+    async () => {
+      const dir = await mkdtemp(join(tmpdir(), "harnesses-pi-slow-"));
+      onTestFinished(() => rm(dir, { recursive: true, force: true }));
+      const marker = join(dir, "probed");
+      const leaked = join(dir, "leaked");
+      const child = `(sleep 1; touch '${leaked}') & sleep 3`;
+      const probe = `[ "$1" = --version ] && touch '${marker}' && ${child}`;
+      await writeFile(join(dir, "pi"), `#!/bin/sh\n${probe}\nsleep 2\n`, { mode: 0o755 });
+      const env = { PATH: `${dir}${delimiter}${process.env.PATH ?? ""}` };
+      const pi = getHarness("pi");
+
+      await expect(pi.invoke("hi", { env, signal: AbortSignal.abort() })).resolves.toMatchObject({
+        aborted: true,
+      });
+      await expect(readFile(marker)).rejects.toThrow();
+
+      const started = performance.now();
+      await expect(pi.invoke("hi", { env, timeoutMs: 100 })).resolves.toMatchObject({
+        timedOut: true,
+      });
+      expect(performance.now() - started).toBeLessThan(2500);
+      await new Promise((settle) => setTimeout(settle, 1200));
+      await expect(readFile(leaked)).rejects.toThrow();
+    },
+  );
+
+  it.skipIf(process.platform === "win32")(
+    "starts nothing after a pi probe that used up the deadline",
+    async () => {
+      const dir = await mkdtemp(join(tmpdir(), "harnesses-pi-late-"));
+      onTestFinished(() => rm(dir, { recursive: true, force: true }));
+      const probe = `[ "$1" = --version ] && sleep 3 && echo 1.5.2 && exit`;
+      await writeFile(join(dir, "pi"), `#!/bin/sh\n${probe}\necho ran\n`, { mode: 0o755 });
+      const env = { PATH: `${dir}${delimiter}${process.env.PATH ?? ""}` };
+      const pi = getHarness("pi");
+      const timedOutProbe = { timedOut: true, args: ["--version"] };
+
+      await expect(pi.invoke("hi", { env, timeoutMs: 50 })).resolves.toMatchObject(timedOutProbe);
+      await expect(pi.listModels({ env, timeoutMs: 50 })).resolves.toMatchObject({
+        ...timedOutProbe,
+        models: [],
+      });
+    },
+  );
+
+  it.skipIf(process.platform === "win32")("checks the pi a run's own PATH reaches", async () => {
+    const root = await mkdtemp(join(tmpdir(), "harnesses-pi-env-"));
+    onTestFinished(() => rm(root, { recursive: true, force: true }));
+    onTestFinished(() => vi.unstubAllEnvs());
+    const dirWith = async (name: string, version: string) => {
+      const dir = join(root, name);
+      await mkdir(dir);
+      const script = `#!/bin/sh\n[ "$1" = --version ] && echo '${version}' && exit\necho "ran $*"\n`;
+      await writeFile(join(dir, "pi"), script, { mode: 0o755 });
+      return `${dir}${delimiter}${process.env.PATH ?? ""}`;
+    };
+    const agent = await dirWith("agent", "1.5.2");
+    const cln = await dirWith("cln", "pi (CLN 1.3.7)");
+    const pi = getHarness("pi");
+
+    vi.stubEnv("PATH", cln);
+    await expect(pi.invoke("hi", { tools: true, env: { PATH: agent } })).resolves.toMatchObject({
+      stdout: "ran -p hi\n",
+    });
+    vi.stubEnv("PATH", agent);
+    await expect(pi.listModels({ env: { PATH: cln } })).rejects.toThrow(
+      "isn't the Pi coding agent",
+    );
+  });
+
   it("reports cancellation through both shared tool operations", async () => {
     registerHarness(
       class extends FakeCursor {

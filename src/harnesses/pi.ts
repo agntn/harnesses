@@ -1,11 +1,28 @@
+import { execFileSync } from "node:child_process";
 import { stripVTControlCharacters } from "node:util";
-import { Harness } from "../harness.ts";
-import type { AvailableModel } from "../types.ts";
+import { executeCommand, Harness, type CommandOptions } from "../harness.ts";
+import type {
+  AvailableModel,
+  InvokeOptions,
+  InvokeResult,
+  ListModelsOptions,
+  ListModelsResult,
+} from "../types.ts";
 
 const MODEL_HEADERS = ["provider", "model", "context", "max-out", "thinking", "images"];
 
 /** Pi reads `--tools` as an allowlist: no extension tools, no codemode or tool_search for MCP. */
 const READ_ONLY_TOOLS = ["read", "grep", "find", "ls"];
+
+/** Pi prints its bare version; CLN's `pi` calculator prints `pi (CLN 1.3.7)`. */
+const PI_VERSION = /^v?(\d+\.\d+\.\d+(?:-[\w.]+)?)\s*$/u;
+
+/** Same cap the base class gives `--version`. */
+const VERSION_TIMEOUT_MS = 5000;
+
+const IMPOSTOR_ERROR =
+  "The pi on PATH isn't the Pi coding agent: its --version names no Pi release. " +
+  "Put the coding agent's directory first on PATH";
 
 function parseTokenCount(value: string, harness: string): number {
   const match = /^(\d+(?:\.\d+)?)([KM])?$/.exec(value);
@@ -72,10 +89,139 @@ export function parsePiModelTable(stdout: string, harness: string): AvailableMod
   });
 }
 
+/**
+ * Asks a binary on this process's PATH for its Pi version.
+ *
+ * @param command - Binary to ask.
+ * @returns {string | null} The version, or null when it isn't Pi or doesn't run.
+ */
+function readVersion(command: string): string | null {
+  try {
+    const output = execFileSync(command, ["--version"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: VERSION_TIMEOUT_MS,
+    });
+    return PI_VERSION.exec(output)?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param timeoutMs - The caller's deadline; unset or 0 means none.
+ * @returns {boolean} Whether it ends before the probe's own cap does.
+ */
+function deadlineBeforeCap(timeoutMs: number | undefined): boolean {
+  return timeoutMs !== undefined && timeoutMs > 0 && timeoutMs <= VERSION_TIMEOUT_MS;
+}
+
+/**
+ * Asks the binary a run would start for `--version`, inside the run's deadline and signal.
+ *
+ * @param command - Binary the run spawns.
+ * @param options - The run's working directory, env, deadline and signal.
+ * @returns {Promise<InvokeResult | null>} The probe, or null when it couldn't start.
+ */
+async function askVersion(command: string, options: CommandOptions): Promise<InvokeResult | null> {
+  const callerFirst = deadlineBeforeCap(options.timeoutMs);
+  const timeoutMs = callerFirst ? options.timeoutMs : VERSION_TIMEOUT_MS;
+  try {
+    return await executeCommand(command, ["--version"], { ...options, timeoutMs });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param probe - The `--version` run.
+ * @param options - The caller's deadline and signal.
+ * @returns {boolean} Whether the probe ended the run: cancelled, or out of the caller's time.
+ */
+function usedUpRun(probe: InvokeResult, options: CommandOptions): boolean {
+  return probe.aborted || (probe.timedOut && deadlineBeforeCap(options.timeoutMs));
+}
+
+/**
+ * Checks the binary a run would start before the run itself.
+ *
+ * @param command - Binary the run spawns.
+ * @param options - The run's working directory, env, deadline and signal.
+ * @returns {Promise<InvokeResult | string | null>} The probe when it used up the run, the refusal,
+ *   or null when the run may start.
+ */
+async function probeRun(
+  command: string,
+  options: CommandOptions,
+): Promise<InvokeResult | string | null> {
+  if (process.platform === "win32" || options.signal?.aborted) return null;
+  const probe = await askVersion(command, options);
+  if (probe === null) return null;
+  if (usedUpRun(probe, options)) return { ...probe, stdout: "", stderr: "" };
+  if (probe.exitCode !== 0) return null;
+  return PI_VERSION.test(probe.stdout) ? null : IMPOSTOR_ERROR;
+}
+
+/**
+ * @param timeoutMs - The caller's deadline, if any.
+ * @param started - When the run started, from `performance.now()`.
+ * @returns {number | undefined} What's left of it.
+ */
+function remaining(timeoutMs: number | undefined, started: number): number | undefined {
+  if (!timeoutMs) return timeoutMs;
+  return Math.max(1, Math.ceil(timeoutMs - (performance.now() - started)));
+}
+
 export default class Pi extends Harness {
   readonly id = "pi";
   readonly name = "Pi Coding Agent";
   readonly binaries = ["pi"];
+
+  #probe: { path: string | undefined; at: number; version: string | null } | undefined;
+
+  /**
+   * A `pi` without a bare Pi version is someone else's. Windows' `pi.cmd` won't run unshelled.
+   *
+   * @returns {boolean} Whether the `pi` on PATH is the coding agent.
+   */
+  override isInstalled(): boolean {
+    if (!super.isInstalled()) return false;
+    return process.platform === "win32" || this.version !== null;
+  }
+
+  /**
+   * Detection reads this right after `isInstalled()`, so one probe serves both for a second.
+   *
+   * @returns {string | null} The Pi version, or null when no `pi` answers like Pi.
+   */
+  override get version(): string | null {
+    const path = process.env.PATH;
+    const now = performance.now();
+    const probe = this.#probe;
+    if (probe !== undefined && probe.path === path && now - probe.at < 1000) return probe.version;
+    const version = readVersion(this.binaries[0] ?? "pi");
+    this.#probe = { path, at: now, version };
+    return version;
+  }
+
+  override async invoke(prompt: string, options: InvokeOptions = {}): Promise<InvokeResult> {
+    const command = this.invocation?.binary ?? this.binaries[0] ?? "pi";
+    const started = performance.now();
+    const probe = await probeRun(command, options);
+    if (typeof probe === "string") throw new Error(probe);
+    if (probe !== null) return probe;
+    return super.invoke(prompt, { ...options, timeoutMs: remaining(options.timeoutMs, started) });
+  }
+
+  override async listModels(options: ListModelsOptions = {}): Promise<ListModelsResult> {
+    const command = this.binaries[0] ?? "pi";
+    const started = performance.now();
+    const probe = await probeRun(command, options);
+    if (typeof probe === "string") throw new Error(probe);
+    if (probe !== null) return { ...probe, models: [] };
+    return super.listModels({ ...options, timeoutMs: remaining(options.timeoutMs, started) });
+  }
+
   readonly capabilities = {
     mcp: true,
     vision: true,
