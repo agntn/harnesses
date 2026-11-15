@@ -605,7 +605,7 @@ export abstract class Harness {
   }
 
   /**
-   * `isInstalled()` and `version` without blocking the event loop.
+   * `isInstalled()` and `version` off the event loop, unless a subclass overrides them sync.
    *
    * @returns {Promise<HarnessProbe>} Install state and version.
    */
