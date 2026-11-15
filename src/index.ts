@@ -26,7 +26,7 @@ export type {
 } from "./types.ts";
 
 export { Harness } from "./harness.ts";
-export type { HarnessConstructor } from "./harness.ts";
+export type { HarnessConstructor, HarnessProbe } from "./harness.ts";
 export {
   registerHarness,
   getHarness,

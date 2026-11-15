@@ -1,6 +1,7 @@
 import { describe, expect, it, onTestFinished, vi } from "vite-plus/test";
 import { getEventListeners } from "node:events";
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { getHarness, registerHarness } from "../src/index.ts";
@@ -60,10 +61,10 @@ class FakeCursor extends Harness {
 }
 
 /* Reads the fake cursor's row with an empty PATH, so the scan skips every real CLI on this machine. */
-function fakeCursorRow(): HarnessListing["harnesses"][number] | undefined {
+async function fakeCursorRow(): Promise<HarnessListing["harnesses"][number] | undefined> {
   vi.stubEnv("PATH", "");
   try {
-    return detectHarnesses().details.harnesses.find(({ id }) => id === "cursor");
+    return (await detectHarnesses()).details.harnesses.find(({ id }) => id === "cursor");
   } finally {
     vi.unstubAllEnvs();
   }
@@ -1028,6 +1029,36 @@ describe("harness metadata for agents", () => {
 
 describe("runHarness tool operation", () => {
   it.skipIf(process.platform === "win32")(
+    "asks every installed CLI for its version at the same time",
+    async () => {
+      const root = await mkdtemp(join(tmpdir(), "harnesses-detect-"));
+      onTestFinished(() => rm(root, { recursive: true, force: true }));
+      onTestFinished(() => vi.unstubAllEnvs());
+      const started = (id: string) => join(root, `${id}.started`);
+      for (const [id, other] of [
+        ["claude", "codex"],
+        ["codex", "claude"],
+      ] as const) {
+        const wait = `i=0; while [ ! -e '${started(other)}' ] && [ $i -lt 30 ]; do /bin/sleep 0.1; i=$((i+1)); done`;
+        const answer = `[ -e '${started(other)}' ] && echo 2.0.0 || echo 1.0.0`;
+        const script = `#!/bin/sh\n: > '${started(id)}'\n${wait}\n${answer}\n`;
+        await writeFile(join(root, id), script, { mode: 0o755 });
+      }
+      const which = execFileSync("sh", ["-c", "command -v which"], { encoding: "utf8" }).trim();
+      await symlink(which, join(root, "which"));
+      vi.stubEnv("PATH", root);
+
+      const { harnesses } = (await detectHarnesses()).details;
+      const installed = harnesses.filter((row) => row.installed);
+
+      expect(installed.map(({ id, version }) => [id, version])).toEqual([
+        ["claude", "2.0.0"],
+        ["codex", "2.0.0"],
+      ]);
+    },
+  );
+
+  it.skipIf(process.platform === "win32")(
     "tells Pi from the CLN calculator that also installs as pi",
     async () => {
       const root = await mkdtemp(join(tmpdir(), "harnesses-pi-impostor-"));
@@ -1040,10 +1071,11 @@ describe("runHarness tool operation", () => {
         await writeFile(join(dir, "pi"), script, { mode: 0o755 });
         vi.stubEnv("PATH", `${dir}${delimiter}${process.env.PATH ?? ""}`);
       };
-      const row = () => detectHarnesses().details.harnesses.find(({ id }) => id === "pi");
+      const row = async () =>
+        (await detectHarnesses()).details.harnesses.find(({ id }) => id === "pi");
 
       await putOnPath("cln", "pi (CLN 1.3.7)");
-      expect(row()).toMatchObject({ installed: false, version: null });
+      expect(await row()).toMatchObject({ installed: false, version: null });
       for (const result of [
         await runHarness("pi", "hi", { tools: true }),
         await listHarnessModels("pi"),
@@ -1053,7 +1085,7 @@ describe("runHarness tool operation", () => {
       }
 
       await putOnPath("agent", "1.5.2");
-      expect(row()).toMatchObject({ installed: true, version: "1.5.2" });
+      expect(await row()).toMatchObject({ installed: true, version: "1.5.2" });
       const run = await runHarness("pi", "hi", { tools: true });
       expect(run.isError).toBeUndefined();
       expect(run.content[0]?.text).toContain("ran -p hi");
@@ -1491,7 +1523,11 @@ describe("runHarness tool operation", () => {
 
         const agent = await runHarness("cursor", "review", { tools: true });
         expect(agent.isError).toBeUndefined();
-        expect(fakeCursorRow()).toMatchObject({ installed: true, readOnly: false, agent: true });
+        expect(await fakeCursorRow()).toMatchObject({
+          installed: true,
+          readOnly: false,
+          agent: true,
+        });
       } finally {
         registerHarness(Cursor);
       }
@@ -1521,7 +1557,7 @@ describe("runHarness tool operation", () => {
 
       expect(result.isError).toBeUndefined();
       expect(result.details).toMatchObject({ stdout: "read:review\n", readOnly: true });
-      expect(fakeCursorRow()).toMatchObject({ installed: true, readOnly: true });
+      expect(await fakeCursorRow()).toMatchObject({ installed: true, readOnly: true });
     } finally {
       registerHarness(Cursor);
     }

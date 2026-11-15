@@ -110,6 +110,7 @@ console.log(paths.temp, claude.envOverrides);
 
 const active = detectHarness();
 if (active) console.log(active.id);
+await claude.probe(); // { installed, version }, without blocking on `claude --version`
 
 await getHarness("codex").invoke("Review this patch", { readOnly: true, effort: "low" });
 getHarness("grok").readOnlyNetwork(); // false on Linux, so no web for its MCP servers under readOnly
