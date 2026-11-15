@@ -180,7 +180,7 @@ export default class Pi extends Harness {
   #probe: { path: string | undefined; at: number; version: string | null } | undefined;
 
   /**
-   * A `pi` that doesn't print a bare Pi version is someone else's. Windows keeps the PATH check.
+   * A `pi` without a bare Pi version is someone else's. Windows' `pi.cmd` won't run unshelled.
    *
    * @returns {boolean} Whether the `pi` on PATH is the coding agent.
    */
