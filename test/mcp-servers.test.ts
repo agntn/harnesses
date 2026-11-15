@@ -303,7 +303,11 @@ describe("listMcpServers", () => {
       JSON.stringify({
         mcpServers: {
           local: { command: "node", args: ["srv.mjs"], env: { K: "v" } },
-          remote: { serverUrl: "https://example.com/sse" },
+          remote: {
+            serverUrl: "https://example.com/mcp",
+            headers: { Authorization: "Bearer token" },
+          },
+          short: { url: "https://example.com/other" },
         },
       }),
     );
@@ -312,7 +316,13 @@ describe("listMcpServers", () => {
 
     expect(listing?.servers).toEqual([
       { name: "local", transport: "stdio", command: "node", args: ["srv.mjs"], env: { K: "v" } },
-      { name: "remote", transport: "sse", url: "https://example.com/sse" },
+      {
+        name: "remote",
+        transport: "http",
+        url: "https://example.com/mcp",
+        headers: { Authorization: "Bearer token" },
+      },
+      { name: "short", transport: "http", url: "https://example.com/other" },
     ]);
   });
 
@@ -511,12 +521,17 @@ describe("addMcpServer / removeMcpServer", () => {
     expect(existsSync(join(dirs.projectRoot, ".pi", "mcp.json"))).toBe(false);
   });
 
-  it("writes the Antigravity serverUrl dialect shape", () => {
+  it("writes the Antigravity serverUrl dialect shape with its headers", () => {
     const dirs = fixtureDirs();
 
     addMcpServer(
       getHarness("antigravity"),
-      { name: "remote", transport: "sse", url: "https://example.com/sse" },
+      {
+        name: "remote",
+        transport: "http",
+        url: "https://example.com/mcp",
+        headers: { Authorization: "Bearer token" },
+      },
       "user",
       dirs,
     );
@@ -524,8 +539,23 @@ describe("addMcpServer / removeMcpServer", () => {
     const path = join(dirs.homeDir, ".gemini", "config", "mcp_config.json");
     const raw = parseJsonRecord(path);
     expect(nestedRecord(raw, "mcpServers").remote).toEqual({
-      serverUrl: "https://example.com/sse",
+      serverUrl: "https://example.com/mcp",
+      headers: { Authorization: "Bearer token" },
     });
+  });
+
+  it("refuses an sse server for Antigravity", () => {
+    const dirs = fixtureDirs();
+
+    expect(() =>
+      addMcpServer(
+        getHarness("antigravity"),
+        { name: "events", transport: "sse", url: "https://example.com/sse" },
+        "user",
+        dirs,
+      ),
+    ).toThrow(McpTransportError);
+    expect(existsSync(join(dirs.homeDir, ".gemini", "config", "mcp_config.json"))).toBe(false);
   });
 
   it("writes the opencode dialect shape", () => {
@@ -887,6 +917,49 @@ describe("syncMcpServers", () => {
       ]);
     } finally {
       if (previousXdg !== undefined) process.env.XDG_CONFIG_HOME = previousXdg;
+    }
+  });
+
+  it("syncs an HTTP server with a header token into Antigravity once", () => {
+    const dirs = fixtureDirs();
+    const previousXdg = process.env.XDG_CONFIG_HOME;
+    const previousToken = process.env.HARNESSES_TEST_TOKEN;
+    delete process.env.XDG_CONFIG_HOME;
+    process.env.HARNESSES_TEST_TOKEN = "secret";
+    try {
+      writeMaster(
+        dirs.homeDir,
+        JSON.stringify({
+          mcpServers: {
+            hub: {
+              type: "http",
+              url: "http://127.0.0.1:7340/mcp/hub",
+              headers: { Authorization: "Bearer ${HARNESSES_TEST_TOKEN}" },
+            },
+          },
+        }),
+      );
+      const path = join(dirs.homeDir, ".gemini", "config", "mcp_config.json");
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, JSON.stringify({ mcpServers: {} }));
+
+      const first = syncMcpServers([getHarness("antigravity")], dirs);
+      expect(targetResults(first.targets, "antigravity")).toEqual([
+        { name: "hub", action: "added" },
+      ]);
+      expect(nestedRecord(parseJsonRecord(path), "mcpServers").hub).toEqual({
+        serverUrl: "http://127.0.0.1:7340/mcp/hub",
+        headers: { Authorization: "Bearer secret" },
+      });
+
+      const second = syncMcpServers([getHarness("antigravity")], dirs);
+      expect(targetResults(second.targets, "antigravity")).toEqual([
+        { name: "hub", action: "unchanged" },
+      ]);
+    } finally {
+      if (previousXdg !== undefined) process.env.XDG_CONFIG_HOME = previousXdg;
+      if (previousToken === undefined) delete process.env.HARNESSES_TEST_TOKEN;
+      else process.env.HARNESSES_TEST_TOKEN = previousToken;
     }
   });
 
