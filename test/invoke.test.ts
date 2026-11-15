@@ -1,9 +1,9 @@
-import { describe, expect, it, vi } from "vite-plus/test";
+import { describe, expect, it, onTestFinished, vi } from "vite-plus/test";
 import { decode as fromToon } from "@toon-format/toon";
 import { getEventListeners } from "node:events";
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { getHarness, registerHarness } from "../src/index.ts";
 import { Harness } from "../src/harness.ts";
 import Claude, { foldClaudeStream } from "../src/harnesses/claude.ts";
@@ -1028,6 +1028,39 @@ describe("harness metadata for agents", () => {
 });
 
 describe("runHarness tool operation", () => {
+  it.skipIf(process.platform === "win32")(
+    "tells Pi from the CLN calculator that also installs as pi",
+    async () => {
+      const root = await mkdtemp(join(tmpdir(), "harnesses-pi-impostor-"));
+      onTestFinished(() => rm(root, { recursive: true, force: true }));
+      onTestFinished(() => vi.unstubAllEnvs());
+      const putOnPath = async (name: string, version: string) => {
+        const dir = join(root, name);
+        await mkdir(dir);
+        const script = `#!/bin/sh\n[ "$1" = --version ] && echo '${version}' && exit\necho "ran $*"\n`;
+        await writeFile(join(dir, "pi"), script, { mode: 0o755 });
+        vi.stubEnv("PATH", `${dir}${delimiter}${process.env.PATH ?? ""}`);
+      };
+      const row = () => detectHarnesses().details.harnesses.find(({ id }) => id === "pi");
+
+      await putOnPath("cln", "pi (CLN 1.3.7)");
+      expect(row()).toMatchObject({ installed: false, version: null });
+      for (const result of [
+        await runHarness("pi", "hi", { tools: true }),
+        await listHarnessModels("pi"),
+      ]) {
+        expect(result.isError).toBe(true);
+        expect(result.content[0]?.text).toContain("isn't the Pi coding agent");
+      }
+
+      await putOnPath("agent", "1.5.2");
+      expect(row()).toMatchObject({ installed: true, version: "1.5.2" });
+      const run = await runHarness("pi", "hi", { tools: true });
+      expect(run.isError).toBeUndefined();
+      expect(run.content[0]?.text).toContain("ran -p hi");
+    },
+  );
+
   it("reports cancellation through both shared tool operations", async () => {
     registerHarness(
       class extends FakeCursor {

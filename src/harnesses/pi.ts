@@ -1,11 +1,21 @@
+import { execFileSync } from "node:child_process";
 import { stripVTControlCharacters } from "node:util";
 import { Harness } from "../harness.ts";
-import type { AvailableModel } from "../types.ts";
+import type {
+  AvailableModel,
+  InvokeOptions,
+  InvokeResult,
+  ListModelsOptions,
+  ListModelsResult,
+} from "../types.ts";
 
 const MODEL_HEADERS = ["provider", "model", "context", "max-out", "thinking", "images"];
 
 /** Pi reads `--tools` as an allowlist: no extension tools, no codemode or tool_search for MCP. */
 const READ_ONLY_TOOLS = ["read", "grep", "find", "ls"];
+
+/** Pi prints its bare version; CLN's `pi` calculator prints `pi (CLN 1.3.7)`. */
+const PI_VERSION = /^v?(\d+\.\d+\.\d+(?:-[\w.]+)?)\s*$/u;
 
 function parseTokenCount(value: string, harness: string): number {
   const match = /^(\d+(?:\.\d+)?)([KM])?$/.exec(value);
@@ -76,6 +86,75 @@ export default class Pi extends Harness {
   readonly id = "pi";
   readonly name = "Pi Coding Agent";
   readonly binaries = ["pi"];
+
+  #probe: { path: string | undefined; at: number; version: string | null } | undefined;
+
+  /**
+   * A `pi` that doesn't print a bare Pi version is someone else's. Windows keeps the PATH check.
+   *
+   * @returns {boolean} Whether the `pi` on PATH is the coding agent.
+   */
+  override isInstalled(): boolean {
+    if (!super.isInstalled()) return false;
+    return process.platform === "win32" || this.version !== null;
+  }
+
+  /**
+   * Detection reads this right after `isInstalled()`, so one probe serves both for a second.
+   *
+   * @returns {string | null} The Pi version, or null when no `pi` answers like Pi.
+   */
+  override get version(): string | null {
+    const path = process.env.PATH;
+    const now = performance.now();
+    const probe = this.#probe;
+    if (probe !== undefined && probe.path === path && now - probe.at < 1000) return probe.version;
+    const version = this.#readVersion();
+    this.#probe = { path, at: now, version };
+    return version;
+  }
+
+  override invoke(prompt: string, options: InvokeOptions = {}): Promise<InvokeResult> {
+    const error = this.#impostorError();
+    return error === null ? super.invoke(prompt, options) : Promise.reject(new Error(error));
+  }
+
+  override listModels(options: ListModelsOptions = {}): Promise<ListModelsResult> {
+    const error = this.#impostorError();
+    return error === null ? super.listModels(options) : Promise.reject(new Error(error));
+  }
+
+  /**
+   * @returns {string | null} The version, or null when no binary answers like Pi.
+   */
+  #readVersion(): string | null {
+    for (const binary of this.binaries) {
+      try {
+        const output = execFileSync(binary, ["--version"], {
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "ignore"],
+          timeout: 5000,
+        });
+        const version = PI_VERSION.exec(output)?.[1];
+        if (version !== undefined) return version;
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * @returns {string | null} Why the `pi` on PATH can't run, or null when it's Pi or missing.
+   */
+  #impostorError(): string | null {
+    if (this.isInstalled() || !super.isInstalled()) return null;
+    return (
+      "The pi on PATH isn't the Pi coding agent: its --version names no Pi release. " +
+      "Put the coding agent's directory first on PATH"
+    );
+  }
+
   readonly capabilities = {
     mcp: true,
     vision: true,
