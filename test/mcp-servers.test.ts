@@ -294,6 +294,21 @@ describe("listMcpServers", () => {
     expect(listings[1]?.servers).toEqual([{ name: "tools", transport: "stdio", command: "uvx" }]);
   });
 
+  it("lists a config once, as user, when the project root is the home directory", () => {
+    const { homeDir } = fixtureDirs();
+    const config = join(homeDir, ".codex", "config.toml");
+    mkdirSync(dirname(config), { recursive: true });
+    writeFileSync(config, '[mcp_servers.files]\ncommand = "npx"\n');
+
+    const listings = listMcpServers(getHarness("codex"), { homeDir, projectRoot: homeDir });
+
+    expect(listings.map((l) => [l.scope, l.path])).toEqual([["user", config]]);
+    expect(listings[0]?.servers).toEqual([{ name: "files", transport: "stdio", command: "npx" }]);
+    expect(
+      listMcpServers(getHarness("codex"), { homeDir: `${homeDir}/`, projectRoot: homeDir }),
+    ).toHaveLength(1);
+  });
+
   it("normalizes the Antigravity serverUrl dialect", () => {
     const dirs = fixtureDirs();
     const configDir = join(dirs.homeDir, ".gemini", "config");
@@ -673,6 +688,20 @@ describe("addMcpServer / removeMcpServer", () => {
     expect(servers).toEqual([
       { name: "files", transport: "stdio", command: "npx", args: ["-y", "server-files"] },
     ]);
+  });
+
+  it("refuses a project-scope write that would land in the user config", () => {
+    const { homeDir } = fixtureDirs();
+    const dirs = { homeDir, projectRoot: homeDir };
+    const server = { name: "x", transport: "stdio" as const, command: "y" };
+
+    expect(() => addMcpServer(getHarness("codex"), server, "project", dirs)).toThrow(
+      /project-scope MCP config is the user config .*config\.toml.*scope "user"/,
+    );
+    expect(() => removeMcpServer(getHarness("codex"), "x", "project", dirs)).toThrow(
+      /project-scope MCP config is the user config/,
+    );
+    expect(existsSync(join(homeDir, ".codex", "config.toml"))).toBe(false);
   });
 
   it("refuses a scope the harness does not declare", () => {
