@@ -1,6 +1,5 @@
 import { defineCommand } from "citty";
 import { consola, LogLevels } from "consola";
-import { exitOnClosedPipe } from "./output.ts";
 
 export default defineCommand({
   meta: {
@@ -22,7 +21,8 @@ export default defineCommand({
    * stops each run's process group the same way a cancellation does, and the
    * process then exits once that cleanup has nothing left to wait for. A
    * write to a stdout the client already closed means the same, so it closes
-   * the server too instead of exiting past that cleanup.
+   * the server too instead of exiting past that cleanup. Every listener goes,
+   * since a bin serving `src/` registered the bundle's `exitOnClosedPipe`.
    */
   async run() {
     consola.level = LogLevels.warn;
@@ -35,7 +35,7 @@ export default defineCommand({
     await server.connect(new StdioServerTransport());
     process.stdin.once("end", () => void server.close());
     process.stdout
-      .off("error", exitOnClosedPipe)
+      .removeAllListeners("error")
       .on("error", (error: Readonly<NodeJS.ErrnoException>) => {
         if (error.code !== "EPIPE") throw error;
         void server.close();

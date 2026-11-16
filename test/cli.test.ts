@@ -388,9 +388,17 @@ describe("harnesses usage paths", () => {
     expect(result.loaded.some((url) => url.endsWith("/src/mcp.ts"))).toBe(true);
   });
 
-  it.each(["closes stdin", "stops reading stdout"])(
-    "harnesses mcp stops an in-flight run when the client %s",
-    async (how) => {
+  /* The built bin serves `src/`, with the bundle's own pipe guard. */
+  const entries = existsSync(resolve(root, "dist/cli.mjs"))
+    ? [cli, resolve(root, "dist/cli.mjs")]
+    : [cli];
+  it.each(
+    entries.flatMap((entry) =>
+      ["closes stdin", "stops reading stdout"].map((how) => ({ how, entry })),
+    ),
+  )(
+    "harnesses mcp stops an in-flight run when the client $how ($entry)",
+    async ({ how, entry }) => {
       const binDir = mkdtempSync(join(tmpdir(), "harnesses-grok-"));
       const pidFile = join(binDir, "pid");
       writeFileSync(
@@ -404,7 +412,7 @@ describe("harnesses usage paths", () => {
         ].join("\n"),
         { mode: 0o755 },
       );
-      const server = spawn(process.execPath, [cli, "mcp"], {
+      const server = spawn(process.execPath, [entry, "mcp"], {
         cwd: root,
         env: { ...process.env, PATH: `${binDir}:${process.env.PATH ?? ""}` },
         stdio: ["pipe", "pipe", "pipe"],

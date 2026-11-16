@@ -4,7 +4,9 @@
 
 `pnpm install`, and you're in. CI runs `pnpm lint`, `pnpm typecheck`, `pnpm build` and `pnpm test:run` in that order, so run the same four before you push.
 
-`lint` and `typecheck` build first, because the Pi and OMP extensions import their schemas and types from `dist/`. That means `build`, `lint`, `typecheck` and packing all rewrite `dist/`. Running `harnesses mcp` or an extension straight from your checkout? Work in a separate worktree, or the live server gets a new bundle under its feet.
+`lint` and `typecheck` build first, because the Pi and OMP extensions import their schemas and types from `dist/`. That means `build`, `lint`, `typecheck` and packing all rewrite `dist/`.
+
+Point an MCP client at `node <checkout>/dist/cli.mjs mcp` and it serves `src/`. The rebuild and reconnect dance is over: edit, restart, done. Only `src/cli.ts` still wants `pnpm build`. Skip the restart and every tool call refuses, asking for one. `HARNESSES_DIST=1` and the Pi and OMP extensions still read `dist/`, so build in a separate worktree while they run.
 
 The docs site rides along for free. `docs/` is a workspace member, so the same install and the one lockfile cover it. `pnpm run docs` starts it. The `run` isn't optional: bare `pnpm docs` is pnpm 12's own command, and it just asks which package you meant.
 
