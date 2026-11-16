@@ -108,6 +108,16 @@ function writableCheckout() {
   return checkout;
 }
 
+const dropped = {
+  isError: true,
+  content: [
+    {
+      type: "text",
+      text: "src/ changed during this call, so its answer was dropped. It may have run: check before retrying, then restart the server",
+    },
+  ],
+};
+
 const refused = {
   isError: true,
   content: [
@@ -189,7 +199,7 @@ describe.skipIf(!existsSync(join(root, "dist/cli.mjs")))("harnesses mcp from the
     }
   });
 
-  it("refuses a call that succeeded while a pull landed", async () => {
+  it("drops the answer of a call a pull landed under, saying it may have run", async () => {
     const checkout = writableCheckout();
     const operations = join(checkout, "src/tool-operations.ts");
     writeFileSync(
@@ -204,7 +214,7 @@ describe.skipIf(!existsSync(join(root, "dist/cli.mjs")))("harnesses mcp from the
     try {
       expect(
         await client.callTool({ name: "harnesses_info", arguments: { id: "pi" } }),
-      ).toMatchObject(refused);
+      ).toMatchObject(dropped);
     } finally {
       await client.close();
     }

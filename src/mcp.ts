@@ -50,6 +50,8 @@ const schemas = harnessToolSchemas<TSchema, TSchema>(Type);
 let operationsPromise: Promise<typeof import("./tool-operations.ts")> | undefined;
 
 const RESTART = "src/ changed under this server, restart it to load the new code";
+const RAN =
+  "src/ changed during this call, so its answer was dropped. It may have run: check before retrying, then restart the server";
 
 /** Counted from process start, so a pull during the first imports counts. */
 const sourceChanged = import.meta.url.endsWith(".ts")
@@ -306,7 +308,7 @@ export function createMcpServer(): Server {
     if (sourceChanged?.()) return errorResult(RESTART);
     const { name, arguments: args = {} } = request.params;
     const result = await callTool(name, args, extra.signal);
-    return sourceChanged?.() ? errorResult(RESTART) : result;
+    return sourceChanged?.() ? errorResult(RAN) : result;
   });
 
   return server;
