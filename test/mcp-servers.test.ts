@@ -785,7 +785,7 @@ describe("syncMcpServers", () => {
     const grokPath = join(dirs.homeDir, ".grok", "config.toml");
     writeFileSync(
       claudePath,
-      JSON.stringify({ mcpServers: { probe: { command: "old" }, stale: { command: "x" } } }),
+      JSON.stringify({ mcpServers: { probe: "old", stale: { command: "x" } } }),
     );
     mkdirSync(dirname(grokPath), { recursive: true });
     writeFileSync(grokPath, '# grok\n[mcp_servers.mine]\ncommand = "own"\n');
