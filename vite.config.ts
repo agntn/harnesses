@@ -7,7 +7,7 @@ export default defineConfig({
     globals: true,
     include: ["test/**/*.test.ts"],
   },
-  fmt: { ...oxfmt, ignorePatterns: ["dist", "coverage", "docs", "CHANGELOG.md"] },
+  fmt: { ...oxfmt, ignorePatterns: ["dist", "coverage", "docs"] },
   lint: {
     ...oxlint,
     rules: {

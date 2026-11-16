@@ -45,8 +45,7 @@
     "typecheck": "tsgo --noEmit --skipLibCheck && pnpm build && tsgo --noEmit --skipLibCheck -p tsconfig.extensions.json",
     "test": "vp test watch",
     "test:run": "vp test run",
-    "prepack": "pnpm run build",
-    "release": "pnpm test:run && pnpm build && changelogen --release --push"
+    "prepack": "pnpm run build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "catalog:deps",
@@ -64,7 +63,6 @@
     "@oh-my-pi/pi-coding-agent": "catalog:dev",
     "@types/node": "latest",
     "@typescript/native-preview": "latest",
-    "changelogen": "catalog:dev",
     "obuild": "catalog:dev",
     "typebox": "catalog:dev",
     "typescript": "catalog:dev",
