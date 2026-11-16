@@ -150,6 +150,7 @@ describe("normalized invocation", () => {
       claude: ["--effort", "low"],
       codex: ["-c", "model_reasoning_effort=low"],
       grok: ["--reasoning-effort", "low"],
+      kilo: ["--variant", "low"],
       pi: ["--thinking", "low"],
       omp: ["--thinking=low"],
     } as const;
@@ -177,6 +178,14 @@ describe("normalized invocation", () => {
       expect(built?.args).toEqual([...(plain?.args ?? []), "--no-extensions"]);
       expect(harnessInfo(id).details).toMatchObject({ extensionsOptional: true });
     }
+
+    const kilo = getHarness("kilo");
+    expect(kilo.buildInvocation("x", { tools: true, extensions: false })?.args).toEqual([
+      "run",
+      "x",
+      "--pure",
+    ]);
+    expect(harnessInfo("kilo").details).toMatchObject({ extensionsOptional: true });
 
     const claude = getHarness("claude");
     expect(claude.buildInvocation("x", { extensions: false })).toBeNull();

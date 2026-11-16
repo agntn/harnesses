@@ -7,6 +7,7 @@ const WALK = [
   "pi",
   "gemini",
   "opencode",
+  "kilo",
   "grok",
   "omp",
   "cursor",
