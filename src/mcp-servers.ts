@@ -1075,7 +1075,7 @@ function writeShapedServer(
 }
 
 /**
- * Removes one MCP server from a harness's config.
+ * Removes one MCP server from a harness's config, and from every user file merged beside it.
  *
  * @param harness - Target harness.
  * @param name - Server name to remove.
@@ -1089,7 +1089,13 @@ export function removeMcpServer(
   scope: "user" | "project" = "user",
   options: ResolveOptions = {},
 ): { path: string; removed: boolean } {
-  return removeConfigServer(harness, name, scope, options);
+  const result = removeConfigServer(harness, name, scope, options);
+  if (scope !== "user") return result;
+  const siblings = mergedUserConfigs(harness, result.path, options).filter(
+    (config) => removeFromConfig(config, name, options).removed,
+  );
+  if (result.removed || siblings.length === 0) return result;
+  return { path: siblings[0]?.path ?? result.path, removed: true };
 }
 
 function removeConfigServer(

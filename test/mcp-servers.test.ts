@@ -820,6 +820,26 @@ describe("addMcpServer / removeMcpServer", () => {
     );
   });
 
+  it("removes a server from every Kilo file it is merged from", () => {
+    const dirs = fixtureDirs();
+    const kilo = getHarness("kilo");
+    const dir = join(dirs.homeDir, ".config", "kilo");
+    mkdirSync(dir, { recursive: true });
+    const jsonc = join(dir, "kilo.jsonc");
+    const json = join(dir, "kilo.json");
+    writeFileSync(jsonc, "{}\n");
+    writeFileSync(json, JSON.stringify({ mcp: { probe: { type: "local", command: ["x"] } } }));
+
+    expect(removeMcpServer(kilo, "probe", "user", dirs)).toEqual({ path: json, removed: true });
+    expect(parseJsonRecord(json)).toEqual({ mcp: {} });
+
+    writeFileSync(jsonc, '{ "mcp": { "probe": { "type": "local", "command": ["y"] } } }\n');
+    writeFileSync(json, JSON.stringify({ mcp: { probe: { type: "local", command: ["x"] } } }));
+    expect(removeMcpServer(kilo, "probe", "user", dirs)).toEqual({ path: jsonc, removed: true });
+    const servers = listMcpServers(kilo, dirs).flatMap((l) => l.servers);
+    expect(servers).toEqual([]);
+  });
+
   it("refuses a JSONC edit when the server map is not an object", () => {
     const dirs = fixtureDirs();
     const path = join(dirs.homeDir, ".config", "kilo", "kilo.jsonc");
