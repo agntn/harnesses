@@ -8,6 +8,14 @@ export default defineNuxtConfig({
     url: "https://harnesses.agntn.dev",
     name: "@agntn/harnesses",
   },
+  /** The explorer has no markdown twin, so agents get the page itself, not a `/raw` 404. */
+  agentDiscovery: {
+    excludePrefixes: { extend: ["/explorer"] },
+  },
+  /** Docus lists `content/` only and leaves app routes out, so the Vue pages come from here. */
+  sitemap: {
+    sources: ["/api/__sitemap__/pages"],
+  },
   llms: {
     domain: "https://harnesses.agntn.dev",
     title: "@agntn/harnesses",
@@ -25,6 +33,17 @@ export default defineNuxtConfig({
             href: "https://harnesses.agntn.dev/explorer",
           },
         ],
+      },
+      /** One section per content folder, or agent discovery lumps every page into one `Docs`. */
+      {
+        title: "Guide",
+        contentCollection: "docs",
+        contentFilters: [{ field: "path", operator: "LIKE", value: "/guide%" }],
+      },
+      {
+        title: "Harnesses",
+        contentCollection: "docs",
+        contentFilters: [{ field: "path", operator: "LIKE", value: "/harnesses%" }],
       },
     ],
     notes: [
@@ -120,14 +139,15 @@ export default defineNuxtConfig({
   nitro: {
     preset: "cloudflare_module",
     compatibilityDate: "2026-09-03",
-    prerender: {
-      crawlLinks: true,
-      routes: ["/", "/explorer", "/sitemap.xml", "/robots.txt", "/llms.txt", "/llms-full.txt"],
-    },
     cloudflare: {
       deployConfig: true,
       nodeCompat: true,
     },
+  },
+  /** Nuxt's own prerender option. The same keys under `nitro.prerender` are deprecated. */
+  prerender: {
+    crawlLinks: true,
+    routes: ["/", "/explorer", "/sitemap.xml", "/robots.txt", "/llms.txt", "/llms-full.txt"],
   },
   compatibilityDate: "2026-09-03",
   /** Fonts live in public/fonts and app/assets/fonts.css, which is the only place nuxt-og-image reads them from. */
