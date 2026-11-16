@@ -8,7 +8,7 @@ const props = defineProps<{ sample: HarnessEntry }>();
 /** User-scope MCP config files, the targets `syncMcpServers` rewrites. */
 const targets = HARNESSES.flatMap((harness) =>
   harness.mcpConfigs
-    .filter((file) => file.scope === "user")
+    .filter((file) => file.scope === "user" && !file.readOnly)
     .map((file) => ({ id: harness.id, short: harness.short, icon: harness.icon, ...file })),
 );
 

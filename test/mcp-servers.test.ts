@@ -802,6 +802,24 @@ describe("addMcpServer / removeMcpServer", () => {
     );
   });
 
+  it("leaves Claude's .mcp.json alone when Mastra Code writes its project servers", () => {
+    const dirs = fixtureDirs();
+    const claudeFile = join(dirs.projectRoot, ".mcp.json");
+    writeFileSync(claudeFile, '{ "mcpServers": { "claude": { "command": "c" } } }\n');
+
+    const added = addMcpServer(
+      getHarness("mastracode"),
+      { name: "probe", transport: "stdio", command: "node" },
+      "project",
+      dirs,
+    );
+
+    expect(added.path).toBe(join(dirs.projectRoot, ".mastracode", "mcp.json"));
+    expect(readFileSync(claudeFile, "utf8")).toBe(
+      '{ "mcpServers": { "claude": { "command": "c" } } }\n',
+    );
+  });
+
   it("refuses a JSONC edit when the server map is not an object", () => {
     const dirs = fixtureDirs();
     const path = join(dirs.homeDir, ".config", "kilo", "kilo.jsonc");
@@ -1042,6 +1060,48 @@ describe("syncMcpServers", () => {
 
     const second = syncMcpServers([getHarness("kilo")], dirs);
     expect(second.targets[0]?.results.map((r) => r.action)).toEqual(["unchanged", "unchanged"]);
+  });
+
+  it("clears the other Kilo file it merges, apart from what keep names", () => {
+    const dirs = fixtureDirs();
+    vi.stubEnv("XDG_CONFIG_HOME", undefined);
+    writeMaster(
+      dirs.homeDir,
+      JSON.stringify({ keep: { kilo: ["mine"] }, mcpServers: { probe: { command: "node" } } }),
+    );
+    const dir = join(dirs.homeDir, ".config", "kilo");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "kilo.jsonc"), "{}\n");
+    const json = join(dir, "kilo.json");
+    writeFileSync(
+      json,
+      JSON.stringify({
+        theme: "dark",
+        mcp: {
+          probe: { type: "local", command: ["node"] },
+          extra: { type: "remote", url: "https://x" },
+          mine: { type: "remote", url: "https://mine" },
+        },
+      }),
+    );
+
+    const first = syncMcpServers([getHarness("kilo")], dirs);
+    expect(first.targets[0]?.results).toEqual([
+      { name: "probe", action: "added" },
+      { name: "probe", action: "removed", path: json },
+      { name: "extra", action: "removed", path: json },
+      { name: "mine", action: "kept", path: json },
+    ]);
+    expect(parseJsonRecord(json)).toEqual({
+      theme: "dark",
+      mcp: { mine: { type: "remote", url: "https://mine" } },
+    });
+
+    const second = syncMcpServers([getHarness("kilo")], dirs);
+    expect(second.targets[0]?.results).toEqual([
+      { name: "probe", action: "unchanged" },
+      { name: "mine", action: "kept", path: json },
+    ]);
   });
 
   it("writes env references natively for Prime Agent and skips what a dialect cannot hold", () => {

@@ -170,7 +170,7 @@ export default class Kilo extends Harness {
       format: "jsonc",
       key: ["mcp"],
       dialect: "opencode",
-      note: "Kilo writes to the first of kilo.jsonc and kilo.json that exists, and so does sync. Both are merged, the jsonc one on top.",
+      note: "Kilo writes to the first of kilo.jsonc and kilo.json that exists, and so does sync. Both are merged, so sync clears its servers from the other.",
     },
     {
       path: "~/.config/kilo/kilo.json",

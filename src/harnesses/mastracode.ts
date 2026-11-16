@@ -270,6 +270,7 @@ export default class MastraCode extends Harness {
       format: "json",
       key: ["mcpServers"],
       dialect: "mastracode",
+      readOnly: true,
       note: "Claude Code's project file, read between the user file and .mastracode/mcp.json. Project writes go to .mastracode/mcp.json, this one is Claude's to edit.",
     },
   ];

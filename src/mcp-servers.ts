@@ -645,7 +645,7 @@ function writableConfig(
   options: ResolveOptions,
 ): { entry: McpConfigFile; path: string } {
   const configs = anchoredConfigs(harness, options);
-  const inScope = configs.filter(({ entry }) => entry.scope === scope);
+  const inScope = configs.filter(({ entry }) => entry.scope === scope && !entry.readOnly);
   const config = inScope.find(({ path }) => existsSync(path)) ?? inScope[0];
   if (!config) {
     throw new Error(`Harness ${harness.id} has no ${scope}-scope MCP config`);
@@ -1055,8 +1055,15 @@ function removeConfigServer(
   scope: "user" | "project",
   options: Readonly<EditOptions>,
 ): { path: string; removed: boolean } {
-  const { entry, path } = writableConfig(harness, scope, options);
+  return removeFromConfig(writableConfig(harness, scope, options), name, options);
+}
 
+function removeFromConfig(
+  config: Readonly<{ entry: McpConfigFile; path: string }>,
+  name: string,
+  options: Readonly<EditOptions>,
+): { path: string; removed: boolean } {
+  const { entry, path } = config;
   if (entry.format === "sqlite") {
     const removed = options.dryRun
       ? options.dryRun.removeRow(path, entry.key, name)
@@ -1107,6 +1114,8 @@ export interface SyncTargetResult {
     action: "added" | "replaced" | "removed" | "kept" | "unchanged" | "skipped";
     /** Why a master server could not be written to this harness. */
     reason?: string;
+    /** Another user file the harness merges, when the row happened there. */
+    path?: string;
   }>;
 }
 
@@ -1423,6 +1432,95 @@ function unwritableReason(
   return undefined;
 }
 
+function listingAt(
+  listings: readonly McpConfigListing[],
+  path: string,
+): McpConfigListing | undefined {
+  return listings.find((item) => item.path === path);
+}
+
+/**
+ * The first listing a sync can't write through, with the reason.
+ *
+ * @param listings - The target file first, then the files merged beside it.
+ * @returns {{ path: string, skipped: string } | undefined} The blocking file, or undefined.
+ */
+function firstUnwritable(
+  listings: ReadonlyArray<McpConfigListing | undefined>,
+): { path: string; skipped: string } | undefined {
+  for (const item of listings) {
+    const skipped = item && unwritableReason(item);
+    if (item && skipped) return { path: item.path, skipped };
+  }
+  return undefined;
+}
+
+/**
+ * The other writable user files the harness merges beside the one sync writes, like `kilo.json`.
+ *
+ * @param harness - Target harness.
+ * @param target - Path of the file sync writes.
+ * @param options - Path-resolution overrides.
+ * @returns {Array<{ entry: McpConfigFile, path: string }>} Files whose servers sync clears.
+ */
+function mergedUserConfigs(
+  harness: Harness,
+  target: string,
+  options: ResolveOptions,
+): Array<{ entry: McpConfigFile; path: string }> {
+  return anchoredConfigs(harness, options).filter(
+    ({ entry, path }) =>
+      entry.scope === "user" && !entry.readOnly && entry.format !== "sqlite" && path !== target,
+  );
+}
+
+/**
+ * Empties a merged sibling file of what sync owns, since the harness would still load it.
+ *
+ * @param config - The sibling file.
+ * @param listing - Its current listing.
+ * @param own - Why a server stays: named in `keep`, or the harness is excluded.
+ * @param options - Path overrides and the dry run of a check.
+ * @returns {SyncStep} Rows for this file, each carrying its path.
+ */
+function clearMergedConfig(
+  config: Readonly<{ entry: McpConfigFile; path: string }>,
+  listing: McpConfigListing | undefined,
+  own: (name: string) => "keep" | "excluded" | undefined,
+  options: Readonly<EditOptions>,
+): SyncStep {
+  const results: SyncTargetResult["results"] = [];
+  for (const { name } of listing?.servers ?? []) {
+    const reason = own(name);
+    if (reason === "keep") {
+      results.push({ name, action: "kept", path: config.path });
+    } else if (reason === undefined && removeFromConfig(config, name, options).removed) {
+      results.push({ name, action: "removed", path: config.path });
+    }
+  }
+  return { results };
+}
+
+/**
+ * Why a server off the master list stays: named in `keep`, or the harness is excluded.
+ *
+ * @param id - Target harness id.
+ * @param master - Master list to sync from.
+ * @param masterNames - Every server name on the master list.
+ * @returns {(name: string) => "keep" | "excluded" | undefined} The reason, undefined to remove.
+ */
+function ownServer(
+  id: string,
+  master: MasterSyncInput,
+  masterNames: ReadonlySet<string>,
+): (name: string) => "keep" | "excluded" | undefined {
+  return (name) => {
+    if (masterNames.has(name)) return undefined;
+    if (master.keep[id]?.includes(name) === true) return "keep";
+    return master.excludes.includes(id) ? "excluded" : undefined;
+  };
+}
+
 function syncMcpTarget(
   harness: Harness,
   master: MasterSyncInput,
@@ -1434,14 +1532,21 @@ function syncMcpTarget(
     return { id: harness.id, skipped: "no user-scope MCP config", results: [] };
   }
 
-  const target = writableConfig(harness, "user", options).path;
-  const listing = listMcpServers(harness, options).find((item) => item.path === target);
-  const skipped = listing && unwritableReason(listing);
-  if (listing && skipped) {
-    return { id: harness.id, path: listing.path, skipped, results: [] };
-  }
+  const target = writableConfig(harness, "user", options);
+  const userListings = listMcpServers(harness, options).filter((item) => item.scope === "user");
+  const listing = listingAt(userListings, target.path);
+  const merged = mergedUserConfigs(harness, target.path, options);
+  const blocked = firstUnwritable([
+    listing,
+    ...merged.map(({ path }) => listingAt(userListings, path)),
+  ]);
+  if (blocked) return { id: harness.id, ...blocked, results: [] };
 
   const steps = syncMasterServers(harness, master, existingServers(listing), masterNames, options);
+  const own = ownServer(harness.id, master, masterNames);
+  for (const config of merged) {
+    steps.push(clearMergedConfig(config, listingAt(userListings, config.path), own, options));
+  }
   const path = steps.findLast((step) => step.path !== undefined)?.path ?? listing?.path;
   return {
     id: harness.id,
