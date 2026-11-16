@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+import { existsSync } from "node:fs";
+import { sep } from "node:path";
+import { fileURLToPath } from "node:url";
 import { styleText } from "node:util";
 import { consola } from "consola";
 import { version, type AvailableModel, type InvokeResult } from "./types.ts";
@@ -15,6 +18,7 @@ import {
 } from "./tool-operations.ts";
 import { exitOnClosedPipe, sanitize } from "./commands/output.ts";
 import type { Harness } from "./harness.ts";
+import type McpCommand from "./commands/mcp.ts";
 
 /**
  * citty fixes its colors at load time and never asks the terminal, so `styleText` decides for it.
@@ -520,6 +524,51 @@ const run = defineCommand({
   },
 });
 
+/**
+ * Narrows a runtime URL import, which TypeScript types as `any`.
+ *
+ * @param value - The imported module namespace.
+ * @returns {boolean} Whether it exports a default command.
+ */
+function isMcpModule(value: unknown): value is { readonly default: typeof McpCommand } {
+  return typeof value === "object" && value !== null && "default" in value;
+}
+
+/**
+ * Whether `typebox`, a devDependency, resolves here.
+ *
+ * @returns {boolean} Whether `src/mcp.ts` could import it.
+ */
+function resolvesTypebox(): boolean {
+  try {
+    import.meta.resolve("typebox");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Inside a checkout, `mcp` runs from `src/`: a restart beats a rebuild.
+ *
+ * @returns {Promise<typeof McpCommand>} The command that starts the stdio server.
+ */
+async function loadMcpCommand(): Promise<typeof McpCommand> {
+  const source = new URL("../src/commands/mcp.ts", import.meta.url);
+  const sourcePath = fileURLToPath(source);
+  const fromSource =
+    !import.meta.url.endsWith(".ts") &&
+    process.env.HARNESSES_DIST !== "1" &&
+    process.features.typescript !== false &&
+    !sourcePath.includes(`${sep}node_modules${sep}`) &&
+    existsSync(sourcePath) &&
+    resolvesTypebox();
+  if (!fromSource) return (await import("./commands/mcp.ts")).default;
+  const module: unknown = await import(source.href);
+  if (!isMcpModule(module)) throw new TypeError(`${sourcePath} has no default command`);
+  return module.default;
+}
+
 process.stdout.on("error", exitOnClosedPipe);
 process.stderr.on("error", exitOnClosedPipe);
 
@@ -540,7 +589,7 @@ const main = defineCommand({
     agents: () => import("./commands/agents.ts").then((m) => m.default),
     prompts: () => import("./commands/prompts.ts").then((m) => m.default),
     skills: () => import("./commands/skills.ts").then((m) => m.default),
-    mcp: () => import("./commands/mcp.ts").then((m) => m.default),
+    mcp: loadMcpCommand,
   },
 });
 

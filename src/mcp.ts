@@ -8,6 +8,7 @@ import {
 import { IsObject, Type, type TSchema } from "typebox";
 import { Value } from "typebox/value";
 import type { McpServerParams, ToolResult } from "./tool-operations.ts";
+import { sourceChangeCheck } from "./source-change.ts";
 import { harnessToolSchemas } from "./tool-schemas.ts";
 import { version } from "./types.ts";
 
@@ -47,6 +48,13 @@ const CONFIG_WRITE: Tool["annotations"] = {
 
 const schemas = harnessToolSchemas<TSchema, TSchema>(Type);
 let operationsPromise: Promise<typeof import("./tool-operations.ts")> | undefined;
+
+const RESTART = "src/ changed under this server, restart it to load the new code";
+
+/** Counted from process start, so a pull during the first imports counts. */
+const sourceChanged = import.meta.url.endsWith(".ts")
+  ? sourceChangeCheck(import.meta.dirname, performance.timeOrigin)
+  : undefined;
 
 const tools: ToolDefinition[] = [
   {
@@ -186,6 +194,8 @@ const tools: ToolDefinition[] = [
   },
 ];
 
+const toolsByName = new Map(tools.map((tool) => [tool.name, tool]));
+
 /**
  * Formats the first TypeBox validation failure for an MCP client. A stray key is
  * named from the schema itself, since TypeBox reports it as `schema is false`.
@@ -238,6 +248,37 @@ function toCallToolResult(result: ToolResult<unknown>): CallToolResult {
 }
 
 /**
+ * Validates one call and runs its executor.
+ *
+ * @param name - Requested tool name.
+ * @param args - Unvalidated arguments.
+ * @param signal - Client cancellation.
+ * @returns {Promise<CallToolResult>} The answer or a sanitized error.
+ */
+async function callTool(
+  name: string,
+  args: Readonly<Record<string, unknown>>,
+  signal: AbortSignal,
+): Promise<CallToolResult> {
+  const tool = toolsByName.get(name);
+  if (!tool) return errorResult(`Unknown harnesses tool: ${JSON.stringify(name)}`);
+  if (!Value.Check(tool.inputSchema, args)) {
+    return errorResult(validationError(tool.inputSchema, args));
+  }
+
+  try {
+    operationsPromise ??= import("./tool-operations.ts");
+    const operations = await operationsPromise;
+    signal.throwIfAborted();
+    return toCallToolResult(await tool.execute(operations, args, signal));
+  } catch (error) {
+    return errorResult(
+      `${tool.name} failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+/**
  * Creates an unconnected MCP server exposing the harness registry tools.
  *
  * Built on the low-level `Server` even though the SDK marks it `@deprecated`,
@@ -249,7 +290,6 @@ function toCallToolResult(result: ToolResult<unknown>): CallToolResult {
  * @returns {Server} An unconnected MCP server.
  */
 export function createMcpServer(): Server {
-  const toolsByName = new Map(tools.map((tool) => [tool.name, tool]));
   const server = new Server({ name: "harnesses", version }, { capabilities: { tools: {} } });
 
   server.setRequestHandler(ListToolsRequestSchema, () => ({
@@ -263,26 +303,10 @@ export function createMcpServer(): Server {
   }));
 
   server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
-    const tool = toolsByName.get(request.params.name);
-    if (!tool) {
-      return errorResult(`Unknown harnesses tool: ${JSON.stringify(request.params.name)}`);
-    }
-
-    const args = request.params.arguments ?? {};
-    if (!Value.Check(tool.inputSchema, args)) {
-      return errorResult(validationError(tool.inputSchema, args));
-    }
-
-    try {
-      operationsPromise ??= import("./tool-operations.ts");
-      const operations = await operationsPromise;
-      extra.signal.throwIfAborted();
-      return toCallToolResult(await tool.execute(operations, args, extra.signal));
-    } catch (error) {
-      return errorResult(
-        `${tool.name} failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
+    if (sourceChanged?.()) return errorResult(RESTART);
+    const { name, arguments: args = {} } = request.params;
+    const result = await callTool(name, args, extra.signal);
+    return sourceChanged?.() ? errorResult(RESTART) : result;
   });
 
   return server;
