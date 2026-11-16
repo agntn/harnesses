@@ -138,6 +138,15 @@ export default class OpenCode extends Harness {
       format: "json",
       key: ["mcp"],
       dialect: "opencode",
+      note: "opencode mcp add writes to the first of opencode.json and opencode.jsonc that exists, and so does sync. It clears its servers from the other.",
+    },
+    {
+      path: "~/.config/opencode/opencode.jsonc",
+      scope: "user",
+      level: "official",
+      format: "jsonc",
+      key: ["mcp"],
+      dialect: "opencode",
     },
     {
       path: "opencode.json",

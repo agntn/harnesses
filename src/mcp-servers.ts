@@ -2,17 +2,18 @@
  * Normalized MCP server management across harness config dialects.
  *
  * Reads and writes work for every declared config file. JSON writes are a
- * parse/serialize round trip. TOML configs (codex, grok) carry user comments
- * that a round trip would destroy, so TOML writes are surgical line edits:
- * only the target server's section is removed or appended, the result is
- * re-parsed and checked against the intended state before anything is
- * written, and every write lands atomically via a temp file rename. OpenBot
+ * parse/serialize round trip. TOML (codex, grok) and JSONC (kilo, opencode)
+ * configs carry user comments that a round trip would destroy, so their
+ * writes are surgical edits: only the target server's entry changes, the
+ * result is re-parsed and checked against the intended state before anything
+ * is written, and every write lands atomically via a temp file rename. OpenBot
  * keeps its servers as rows of a SQLite table, which `mcp-sqlite.ts` edits
  * one row per server.
  */
 import { existsSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, normalize } from "node:path";
+import { applyEdits, format, modify, type Edit } from "jsonc-parser";
 import { parse as parseToml } from "smol-toml";
 import { readIfExists } from "./files.ts";
 import type { Harness } from "./harness.ts";
@@ -576,8 +577,38 @@ function listingBase(entry: McpConfigFile, path: string): McpConfigListing {
   });
 }
 
+function hasJsoncValue(raw: string): boolean {
+  return /\S/.test(raw.replaceAll(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ""));
+}
+
+/**
+ * A JSONC file that holds only comments reads as an empty object, like an empty one.
+ *
+ * @param raw - JSONC source text.
+ * @returns {unknown} The parsed value.
+ */
+function parseJsoncObject(raw: string): unknown {
+  return hasJsoncValue(raw) ? parseJsonc(raw) : {};
+}
+
+/**
+ * Appends an empty root object below the comments of a file that has no value yet.
+ *
+ * @param raw - JSONC source text without a value.
+ * @returns {string} The text with `{}` added.
+ */
+function withRoot(raw: string): string {
+  if (!/\S/.test(raw)) return "{}\n";
+  return `${raw.endsWith("\n") ? raw : `${raw}\n`}{}\n`;
+}
+
+function parseConfig(raw: string, kind: McpConfigFile["format"]): unknown {
+  if (kind === "toml") return parseToml(raw);
+  return kind === "jsonc" ? parseJsoncObject(raw) : (JSON.parse(raw) as unknown);
+}
+
 function configServerMap(raw: string, entry: McpConfigFile): Record<string, unknown> {
-  const parsed = entry.format === "toml" ? parseToml(raw) : (JSON.parse(raw) as unknown);
+  const parsed = parseConfig(raw, entry.format);
   return drill(isObjectRecord(parsed) ? parsed : {}, entry.key) ?? {};
 }
 
@@ -625,13 +656,22 @@ export function listMcpServers(harness: Harness, options: ResolveOptions = {}): 
   return resolveConfigs(harness, options).map(({ entry, path }) => listMcpConfig(entry, path));
 }
 
+/**
+ * The first existing file of the scope, the one the harness itself writes to.
+ *
+ * @param harness - Target harness.
+ * @param scope - User or project config scope.
+ * @param options - Path-resolution overrides.
+ * @returns {{ entry: McpConfigFile, path: string }} The config to edit.
+ */
 function writableConfig(
   harness: Harness,
   scope: "user" | "project",
   options: ResolveOptions,
 ): { entry: McpConfigFile; path: string } {
   const configs = anchoredConfigs(harness, options);
-  const config = configs.find(({ entry }) => entry.scope === scope);
+  const inScope = configs.filter(({ entry }) => entry.scope === scope && !entry.readOnly);
+  const config = inScope.find(({ path }) => existsSync(path)) ?? inScope[0];
   if (!config) {
     throw new Error(`Harness ${harness.id} has no ${scope}-scope MCP config`);
   }
@@ -790,45 +830,56 @@ function serverMapFromToml(raw: string, key: readonly string[]): Record<string, 
   return drill(parsed as Record<string, unknown>, key) ?? {};
 }
 
+/** The server a surgical edit targets, and whether it must exist afterwards. */
+type EditTarget = Readonly<{ name: string; shouldExist: boolean }>;
+
 /**
- * Verifies a surgical TOML edit before it is written: the result must still
- * parse, hold the expected state for the target server, and leave every other
- * server untouched.
+ * Verifies a surgical edit before it is written: the result must still parse,
+ * hold the expected state for the target server, and leave every other server
+ * untouched.
  *
+ * @param label - Format named in the refusal, TOML or JSONC.
  * @param beforeMap - Server map before the edit.
- * @param after - Candidate TOML text after the edit.
- * @param key - TOML path containing the server map.
- * @param name - Target server name.
- * @param shouldExist - Whether the target must remain after the edit.
+ * @param readAfter - Parses the server map out of the candidate text.
+ * @param target - Target server and whether it must remain.
  */
-function assertTomlEdit(
+function assertServerEdit(
+  label: string,
   beforeMap: Readonly<Record<string, unknown>>,
-  after: string,
-  key: readonly string[],
-  name: string,
-  shouldExist: boolean,
+  readAfter: () => Record<string, unknown>,
+  target: EditTarget,
 ): void {
+  const { name, shouldExist } = target;
   let afterMap: Record<string, unknown>;
   try {
-    afterMap = serverMapFromToml(after, key);
+    afterMap = readAfter();
   } catch (error) {
     throw new Error(
-      `TOML edit produced an unparsable file, aborting: ${error instanceof Error ? error.message : String(error)}`,
+      `${label} edit produced an unparsable file, aborting: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 
   if (Object.hasOwn(afterMap, name) !== shouldExist) {
     throw new Error(
-      `TOML edit did not leave server ${name} ${shouldExist ? "present" : "absent"}, aborting`,
+      `${label} edit did not leave server ${name} ${shouldExist ? "present" : "absent"}, aborting`,
     );
   }
 
   for (const other of new Set([...Object.keys(beforeMap), ...Object.keys(afterMap)])) {
     if (other === name) continue;
     if (JSON.stringify(beforeMap[other]) !== JSON.stringify(afterMap[other])) {
-      throw new Error(`TOML edit touched servers other than ${name}, aborting`);
+      throw new Error(`${label} edit touched servers other than ${name}, aborting`);
     }
   }
+}
+
+function assertTomlEdit(
+  beforeMap: Readonly<Record<string, unknown>>,
+  after: string,
+  key: readonly string[],
+  target: EditTarget,
+): void {
+  assertServerEdit("TOML", beforeMap, () => serverMapFromToml(after, key), target);
 }
 
 function addTomlServer(
@@ -847,7 +898,7 @@ function addTomlServer(
   const after = body
     ? `${body}\n\n${tomlSections(key, server, headersKey)}`
     : tomlSections(key, server, headersKey);
-  assertTomlEdit(beforeMap, after, key, server.name, true);
+  assertTomlEdit(beforeMap, after, key, { name: server.name, shouldExist: true });
   writeConfig(path, after, options);
   return replaced;
 }
@@ -863,15 +914,102 @@ function removeTomlServer(
   const beforeMap = serverMapFromToml(before, key);
   if (!Object.hasOwn(beforeMap, name)) return false;
   const after = stripTomlServer(before, key, name);
-  assertTomlEdit(beforeMap, after, key, name, false);
+  assertTomlEdit(beforeMap, after, key, { name, shouldExist: false });
   writeConfig(path, after, options);
   return true;
+}
+
+const JSONC_FORMAT = { insertSpaces: true, tabSize: 2, eol: "\n" };
+
+/**
+ * The inserted text, widened to the braces of an object that held nothing else.
+ *
+ * @param text - JSONC text after the edit.
+ * @param edit - The one insertion `modify` made.
+ * @returns {{ offset: number, length: number }} The range to format.
+ */
+function insertedRange(text: string, edit: Readonly<Edit>): { offset: number; length: number } {
+  let start = edit.offset;
+  let end = edit.offset + edit.content.length;
+  const before = /\{\s*$/.exec(text.slice(0, start));
+  const after = /^\s*(?:\}|\n)/.exec(text.slice(end));
+  if (before && after) {
+    start = before.index;
+    end += after[0].length;
+  }
+  return { offset: start, length: end - start };
+}
+
+/**
+ * Sets or deletes one value in JSONC text. Only the inserted text gets
+ * formatted: asking `modify` to format reflows the neighbouring entries too.
+ *
+ * @param raw - JSONC source text.
+ * @param path - Object path of the value.
+ * @param value - New value, `undefined` to delete it.
+ * @returns {string} The edited text.
+ */
+function setJsonc(raw: string, path: readonly string[], value: unknown): string {
+  const edits = modify(raw, [...path], value, {});
+  const after = applyEdits(raw, edits);
+  const [edit] = edits;
+  if (value === undefined || edits.length !== 1 || !edit) return after;
+  return applyEdits(after, format(after, insertedRange(after, edit), JSONC_FORMAT));
+}
+
+function serverMapFromJsonc(
+  raw: string,
+  key: readonly string[],
+  path: string,
+): Record<string, unknown> {
+  let node: unknown = parseJsoncObject(raw);
+  for (const part of key) {
+    if (!isObjectRecord(node) || Array.isArray(node)) break;
+    node = node[part];
+  }
+  if (node === undefined) return {};
+  if (!isObjectRecord(node) || Array.isArray(node)) {
+    throw new Error(`Config at ${path} has a non-object at ${key.join(".")}`);
+  }
+  return node;
+}
+
+/**
+ * Sets or deletes one server in a JSONC config through a text edit, so the
+ * comments and trailing commas around it survive.
+ *
+ * @param path - Config file path.
+ * @param entry - Declared config file.
+ * @param target - Server name and its new raw entry, `undefined` to delete it.
+ * @param options - Path overrides and the dry run of a check.
+ * @returns {boolean} Whether the server was there before the edit.
+ */
+function editJsoncServer(
+  path: string,
+  entry: McpConfigFile,
+  target: Readonly<{ name: string; value: ((previous: unknown) => unknown) | undefined }>,
+  options: Readonly<EditOptions>,
+): boolean {
+  const before = readConfig(path, options) ?? "";
+  const beforeMap = serverMapFromJsonc(before, entry.key, path);
+  const existed = Object.hasOwn(beforeMap, target.name);
+  if (!existed && target.value === undefined) return false;
+  const base =
+    Object.keys(beforeMap).length > 0 || hasJsoncValue(before) ? before : withRoot(before);
+  const value = target.value?.(beforeMap[target.name]);
+  const after = setJsonc(base, [...entry.key, target.name], value);
+  assertServerEdit("JSONC", beforeMap, () => serverMapFromJsonc(after, entry.key, path), {
+    name: target.name,
+    shouldExist: value !== undefined,
+  });
+  writeConfig(path, after, options);
+  return existed;
 }
 
 /**
  * Adds (or replaces) one MCP server in a harness's config. The rest of the
  * file is preserved: JSON through a parse/serialize round trip (formatting
- * normalizes to two-space indentation), TOML through a surgical line edit.
+ * normalizes to two-space indentation), TOML and JSONC through a surgical edit.
  *
  * @param harness - Target harness.
  * @param server - Normalized server configuration to write.
@@ -918,6 +1056,14 @@ function writeShapedServer(
     return { path, replaced: addTomlServer(path, entry, resolved, options) };
   }
 
+  if (entry.format === "jsonc") {
+    const value = (previous: unknown) => replacementEntry(previous, resolved, entry.dialect);
+    return {
+      path,
+      replaced: editJsoncServer(path, entry, { name: resolved.name, value }, options),
+    };
+  }
+
   const root = JSON.parse(readConfig(path, options) ?? "{}") as Record<string, unknown>;
   const map = drill(root, entry.key, "create");
   if (!map) throw new Error(`Config at ${path} has a non-object at ${entry.key.join(".")}`);
@@ -929,7 +1075,7 @@ function writeShapedServer(
 }
 
 /**
- * Removes one MCP server from a harness's config.
+ * Removes one MCP server from a harness's config, and from every user file merged beside it.
  *
  * @param harness - Target harness.
  * @param name - Server name to remove.
@@ -943,7 +1089,13 @@ export function removeMcpServer(
   scope: "user" | "project" = "user",
   options: ResolveOptions = {},
 ): { path: string; removed: boolean } {
-  return removeConfigServer(harness, name, scope, options);
+  const result = removeConfigServer(harness, name, scope, options);
+  if (scope !== "user") return result;
+  const siblings = mergedUserConfigs(harness, result.path, options).filter(
+    (config) => removeFromConfig(config, name, options).removed,
+  );
+  if (result.removed || siblings.length === 0) return result;
+  return { path: siblings[0]?.path ?? result.path, removed: true };
 }
 
 function removeConfigServer(
@@ -952,8 +1104,15 @@ function removeConfigServer(
   scope: "user" | "project",
   options: Readonly<EditOptions>,
 ): { path: string; removed: boolean } {
-  const { entry, path } = writableConfig(harness, scope, options);
+  return removeFromConfig(writableConfig(harness, scope, options), name, options);
+}
 
+function removeFromConfig(
+  config: Readonly<{ entry: McpConfigFile; path: string }>,
+  name: string,
+  options: Readonly<EditOptions>,
+): { path: string; removed: boolean } {
+  const { entry, path } = config;
   if (entry.format === "sqlite") {
     const removed = options.dryRun
       ? options.dryRun.removeRow(path, entry.key, name)
@@ -963,6 +1122,10 @@ function removeConfigServer(
 
   if (entry.format === "toml") {
     return { path, removed: removeTomlServer(path, entry.key, name, options) };
+  }
+
+  if (entry.format === "jsonc") {
+    return { path, removed: editJsoncServer(path, entry, { name, value: undefined }, options) };
   }
 
   const raw = readConfig(path, options);
@@ -1000,6 +1163,8 @@ export interface SyncTargetResult {
     action: "added" | "replaced" | "removed" | "kept" | "unchanged" | "skipped";
     /** Why a master server could not be written to this harness. */
     reason?: string;
+    /** Another user file the harness merges, when the row happened there. */
+    path?: string;
   }>;
 }
 
@@ -1316,6 +1481,98 @@ function unwritableReason(
   return undefined;
 }
 
+function listingAt(
+  listings: readonly McpConfigListing[],
+  path: string,
+): McpConfigListing | undefined {
+  return listings.find((item) => item.path === path);
+}
+
+/**
+ * The first listing a sync can't write through, with the reason.
+ *
+ * @param listings - The target file first, then the files merged beside it.
+ * @returns {{ path: string, skipped: string } | undefined} The blocking file, or undefined.
+ */
+function firstUnwritable(
+  listings: ReadonlyArray<McpConfigListing | undefined>,
+): { path: string; skipped: string } | undefined {
+  for (const item of listings) {
+    const skipped = item && unwritableReason(item);
+    if (item && skipped) return { path: item.path, skipped };
+  }
+  return undefined;
+}
+
+/**
+ * The other writable user files the harness merges beside the one sync writes, like `kilo.json`.
+ *
+ * @param harness - Target harness.
+ * @param target - Path of the file sync writes.
+ * @param options - Path-resolution overrides.
+ * @returns {Array<{ entry: McpConfigFile, path: string }>} Files whose servers sync clears.
+ */
+function mergedUserConfigs(
+  harness: Harness,
+  target: string,
+  options: ResolveOptions,
+): Array<{ entry: McpConfigFile; path: string }> {
+  return anchoredConfigs(harness, options).filter(
+    ({ entry, path }) =>
+      entry.scope === "user" && !entry.readOnly && entry.format !== "sqlite" && path !== target,
+  );
+}
+
+/**
+ * Empties a merged sibling file of what sync owns, since the harness would still load it.
+ *
+ * @param config - The sibling file.
+ * @param listing - Its current listing.
+ * @param own - Why a server stays: named in `keep`, or the harness is excluded.
+ * @param options - Path overrides and the dry run of a check.
+ * @returns {SyncStep} Rows for this file, each carrying its path.
+ */
+function clearMergedConfig(
+  config: Readonly<{ entry: McpConfigFile; path: string }>,
+  listing: McpConfigListing | undefined,
+  own: (name: string) => "keep" | "excluded" | "skipped" | undefined,
+  options: Readonly<EditOptions>,
+): SyncStep {
+  const results: SyncTargetResult["results"] = [];
+  for (const { name } of listing?.servers ?? []) {
+    const reason = own(name);
+    if (reason === "keep") {
+      results.push({ name, action: "kept", path: config.path });
+    } else if (reason === undefined && removeFromConfig(config, name, options).removed) {
+      results.push({ name, action: "removed", path: config.path });
+    }
+  }
+  return { results };
+}
+
+/**
+ * Why a sibling-file server stays: named in `keep`, an excluded harness, or a skipped write.
+ *
+ * @param id - Target harness id.
+ * @param master - Master list to sync from.
+ * @param masterNames - Every server name on the master list.
+ * @param skipped - Master servers the target could not take, left where they work.
+ * @returns {(name: string) => "keep" | "excluded" | "skipped" | undefined} Why, or undefined.
+ */
+function ownServer(
+  id: string,
+  master: MasterSyncInput,
+  masterNames: ReadonlySet<string>,
+  skipped: ReadonlySet<string>,
+): (name: string) => "keep" | "excluded" | "skipped" | undefined {
+  return (name) => {
+    if (skipped.has(name)) return "skipped";
+    if (masterNames.has(name)) return undefined;
+    if (master.keep[id]?.includes(name) === true) return "keep";
+    return master.excludes.includes(id) ? "excluded" : undefined;
+  };
+}
+
 function syncMcpTarget(
   harness: Harness,
   master: MasterSyncInput,
@@ -1327,13 +1584,26 @@ function syncMcpTarget(
     return { id: harness.id, skipped: "no user-scope MCP config", results: [] };
   }
 
-  const listing = listMcpServers(harness, options).find((item) => item.scope === "user");
-  const skipped = listing && unwritableReason(listing);
-  if (listing && skipped) {
-    return { id: harness.id, path: listing.path, skipped, results: [] };
-  }
+  const target = writableConfig(harness, "user", options);
+  const userListings = listMcpServers(harness, options).filter((item) => item.scope === "user");
+  const listing = listingAt(userListings, target.path);
+  const merged = mergedUserConfigs(harness, target.path, options);
+  const blocked = firstUnwritable([
+    listing,
+    ...merged.map(({ path }) => listingAt(userListings, path)),
+  ]);
+  if (blocked) return { id: harness.id, ...blocked, results: [] };
 
   const steps = syncMasterServers(harness, master, existingServers(listing), masterNames, options);
+  const skipped = new Set(
+    steps.flatMap(({ results }) =>
+      results.filter((r) => r.action === "skipped").map((r) => r.name),
+    ),
+  );
+  const own = ownServer(harness.id, master, masterNames, skipped);
+  for (const config of merged) {
+    steps.push(clearMergedConfig(config, listingAt(userListings, config.path), own, options));
+  }
   const path = steps.findLast((step) => step.path !== undefined)?.path ?? listing?.path;
   return {
     id: harness.id,

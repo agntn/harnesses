@@ -164,13 +164,21 @@ export default class Kilo extends Harness {
   };
   override readonly mcpConfigs: Harness["mcpConfigs"] = [
     {
+      path: "~/.config/kilo/kilo.jsonc",
+      scope: "user",
+      level: "official",
+      format: "jsonc",
+      key: ["mcp"],
+      dialect: "opencode",
+      note: "Kilo writes to the first of kilo.jsonc and kilo.json that exists, and so does sync. Both are merged, so sync clears its servers from the other.",
+    },
+    {
       path: "~/.config/kilo/kilo.json",
       scope: "user",
       level: "official",
       format: "json",
       key: ["mcp"],
       dialect: "opencode",
-      note: "kilo.jsonc is merged over it, so servers kept there stay out of this listing.",
     },
     {
       path: "kilo.json",

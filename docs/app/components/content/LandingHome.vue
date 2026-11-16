@@ -72,7 +72,7 @@ const toolWord = countWord(TOOLS.length);
       to="/guide/mcp-servers"
       link="Syncing MCP servers"
       :checks="[
-        'listMcpServers reads JSON and TOML, standard, OpenCode, VS Code and Antigravity shapes, into one McpServerConfig',
+        'listMcpServers reads JSON, JSONC and TOML, standard, OpenCode, VS Code and Antigravity shapes, into one McpServerConfig',
         'sync makes each user scope config exactly the master list; extras are removed, not merged around',
         'excludes keeps a harness\'s own servers and pulls master names out of it, unless a server opts back in with its own',
       ]"
