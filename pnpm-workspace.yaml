@@ -52,6 +52,7 @@ catalogs:
     citty: 0.2.2
     consola: 3.4.2
     docus: 5.15.0
+    jsonc-parser: 3.3.1
     nuxt: 4.6.4
     smol-toml: 1.8.0
     ufo: 1.6.4

@@ -236,7 +236,8 @@ export interface McpServerConfig {
 
 /** How one harness config file stores its MCP servers. */
 export interface McpConfigFile extends PathCandidate {
-  format: "json" | "toml" | "sqlite";
+  /** `jsonc` takes comments and trailing commas, and its edits keep them. */
+  format: "json" | "jsonc" | "toml" | "sqlite";
   /**
    * Object path to the server map inside the file, e.g. ["mcpServers"].
    * For SQLite, the one table that holds the servers.

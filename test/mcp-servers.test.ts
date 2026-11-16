@@ -741,6 +741,84 @@ describe("addMcpServer / removeMcpServer", () => {
     ]);
   });
 
+  it("edits a Kilo JSONC config in place, comments and trailing commas kept", () => {
+    const dirs = fixtureDirs();
+    const kilo = getHarness("kilo");
+    const path = join(dirs.homeDir, ".config", "kilo", "kilo.jsonc");
+    const original = `{
+  // shared by every project
+  "permission": { "bash": "ask" }, // keep
+  "mcp": {
+    "keep": { "type": "local", "command": ["npx", "-y", "srv"] },
+  },
+}
+`;
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, original);
+
+    const added = addMcpServer(
+      kilo,
+      { name: "probe", transport: "http", url: "https://example.com/mcp" },
+      "user",
+      dirs,
+    );
+    expect(added).toEqual({ path, replaced: false });
+
+    const afterAdd = readFileSync(path, "utf8");
+    expect(afterAdd).toContain("// shared by every project");
+    expect(afterAdd).toContain('"permission": { "bash": "ask" }, // keep');
+    const listing = listMcpServers(kilo, dirs).find((l) => l.path === path);
+    expect(listing?.format).toBe("jsonc");
+    expect(listing?.servers).toEqual([
+      { name: "keep", transport: "stdio", command: "npx", args: ["-y", "srv"] },
+      { name: "probe", transport: "http", url: "https://example.com/mcp" },
+    ]);
+
+    expect(removeMcpServer(kilo, "probe", "user", dirs)).toEqual({ path, removed: true });
+    expect(readFileSync(path, "utf8")).toBe(original);
+    expect(removeMcpServer(kilo, "probe", "user", dirs).removed).toBe(false);
+    expect(existsSync(join(dirs.homeDir, ".config", "kilo", "kilo.json"))).toBe(false);
+  });
+
+  it("writes to the user file the harness itself would pick", () => {
+    const dirs = fixtureDirs();
+    const server = { name: "probe", transport: "stdio" as const, command: "node" };
+    const kiloDir = join(dirs.homeDir, ".config", "kilo");
+    const opencodeDir = join(dirs.homeDir, ".config", "opencode");
+    mkdirSync(kiloDir, { recursive: true });
+    mkdirSync(opencodeDir, { recursive: true });
+
+    expect(addMcpServer(getHarness("kilo"), server, "user", dirs).path).toBe(
+      join(kiloDir, "kilo.jsonc"),
+    );
+
+    writeFileSync(join(opencodeDir, "opencode.jsonc"), "{ /* mine */ }\n");
+    expect(addMcpServer(getHarness("opencode"), server, "user", dirs).path).toBe(
+      join(opencodeDir, "opencode.jsonc"),
+    );
+    writeFileSync(join(opencodeDir, "opencode.json"), "{}\n");
+    expect(addMcpServer(getHarness("opencode"), server, "user", dirs).path).toBe(
+      join(opencodeDir, "opencode.json"),
+    );
+  });
+
+  it("refuses a JSONC edit when the server map is not an object", () => {
+    const dirs = fixtureDirs();
+    const path = join(dirs.homeDir, ".config", "kilo", "kilo.jsonc");
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, '{ "mcp": [] }\n');
+
+    expect(() =>
+      addMcpServer(
+        getHarness("kilo"),
+        { name: "x", transport: "stdio", command: "y" },
+        "user",
+        dirs,
+      ),
+    ).toThrow(/non-object at mcp/);
+    expect(readFileSync(path, "utf8")).toBe('{ "mcp": [] }\n');
+  });
+
   it("refuses a project-scope write that would land in the user config", () => {
     const { homeDir } = fixtureDirs();
     const dirs = { homeDir, projectRoot: homeDir };
@@ -937,6 +1015,33 @@ describe("syncMcpServers", () => {
     } finally {
       if (previousXdg !== undefined) process.env.XDG_CONFIG_HOME = previousXdg;
     }
+  });
+
+  it("syncs a commented Kilo JSONC config and is idempotent", () => {
+    const dirs = fixtureDirs();
+    vi.stubEnv("XDG_CONFIG_HOME", undefined);
+    writeMaster(dirs.homeDir, master);
+    const path = join(dirs.homeDir, ".config", "kilo", "kilo.jsonc");
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(
+      path,
+      '{\n  // my rules\n  "permission": { "*": "allow" },\n  "mcp": { "old": { "type": "remote", "url": "https://old" } },\n}\n',
+    );
+
+    const first = syncMcpServers([getHarness("kilo")], dirs);
+    expect(first.targets[0]).toEqual({
+      id: "kilo",
+      path,
+      results: [
+        { name: "probe", action: "added" },
+        { name: "cloud", action: "added" },
+        { name: "old", action: "removed" },
+      ],
+    });
+    expect(readFileSync(path, "utf8")).toContain("// my rules");
+
+    const second = syncMcpServers([getHarness("kilo")], dirs);
+    expect(second.targets[0]?.results.map((r) => r.action)).toEqual(["unchanged", "unchanged"]);
   });
 
   it("writes env references natively for Prime Agent and skips what a dialect cannot hold", () => {

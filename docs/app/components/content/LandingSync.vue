@@ -38,9 +38,10 @@ const active = computed(() => targets.find((target) => target.id === props.sampl
 const effect = computed(() => {
   const target = active.value;
   if (!target) return "no user MCP config mapped, sync skips it";
-  return target.format === "toml"
-    ? "surgical TOML edit, comments kept"
-    : `JSON rewritten under ${target.key.join(".")}`;
+  if (target.format === "toml" || target.format === "jsonc") {
+    return `surgical ${target.format.toUpperCase()} edit, comments kept`;
+  }
+  return `JSON rewritten under ${target.key.join(".")}`;
 });
 </script>
 
