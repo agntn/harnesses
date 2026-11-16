@@ -51,8 +51,7 @@ Forget step 4 or 6 and `test/docs.test.ts` tells you which one.
 - `resolveTemplate` and `buildCommand` in `docs/app/utils/harnesses.ts` are browser ports of `resolvePathTemplate` and `Harness.buildInvocation`. Change the library's expansion or argument order and change them too, or the explorer starts making things up.
 - Values render the same on server and client: no `Math.random`, no clock inside a computed.
 - Visitor input renders as text, never through `v-html`.
-- A page under `docs/app/pages/` calls `useSeo` and `defineOgImage` itself and goes into `PAGES` in `server/routes/sitemap.xml.ts`. Skip it and crawlers never see the page.
-- The landing OG image is named after its SEO description, so that description never ends with a period. Nitro won't prerender a path with `..` in it and the landing ships a dead `og:image` without a word.
+- A page under `docs/app/pages/` calls `useSeo` and `defineOgImage` itself. Its path goes into `PAGES` in `server/api/__sitemap__/pages.ts` and into `agentDiscovery.excludePrefixes` in `nuxt.config.ts`. Then it drops the markdown link `useSeo` adds, the way `explorer.vue` does. Skip a step and crawlers miss the page, or agents go hunting for a `.md` twin that never existed.
 - Every path, flag and error message quoted in `content/` has a line in `src/`. Check it there before writing it down.
 - The site makes no network request of its own and reads nothing from the visitor's machine. The footer promises that.
 - Instruments and their departures from the agntn family are in `docs/DESIGN.md`.
