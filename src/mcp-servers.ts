@@ -18,10 +18,12 @@ import { readIfExists } from "./files.ts";
 import type { Harness } from "./harness.ts";
 import { parseJsonc } from "./jsonc.ts";
 import {
+  checkRoom,
   McpLimitError,
   openBotServer,
   readSqliteServers,
   removeSqliteServer,
+  requireDatabase,
   upsertSqliteServer,
 } from "./mcp-sqlite.ts";
 import { agntnConfigDir } from "./resolve.ts";
@@ -648,6 +650,56 @@ function writeAtomically(path: string, content: string): void {
   renameSync(temp, path);
 }
 
+/** Edits a check runs in memory: each file's text and each SQLite table's names. */
+class DryRun {
+  readonly #files = new Map<string, string | null>();
+  readonly #tables = new Map<string, Set<string>>();
+
+  read(path: string): string | null {
+    if (!this.#files.has(path)) this.#files.set(path, readIfExists(path));
+    return this.#files.get(path) ?? null;
+  }
+
+  write(path: string, content: string): void {
+    this.#files.set(path, content);
+  }
+
+  upsertRow(path: string, key: readonly string[], name: string): boolean {
+    const names = this.#names(path, key);
+    const replaced = names.has(name);
+    if (!replaced) checkRoom(names.size, name);
+    names.add(name);
+    return replaced;
+  }
+
+  removeRow(path: string, key: readonly string[], name: string): boolean {
+    if (!existsSync(path)) return false;
+    return this.#names(path, key).delete(name);
+  }
+
+  #names(path: string, key: readonly string[]): Set<string> {
+    requireDatabase(path);
+    let names = this.#tables.get(path);
+    if (!names) {
+      names = new Set(readSqliteServers(path, key).map((server) => server.name));
+      this.#tables.set(path, names);
+    }
+    return names;
+  }
+}
+
+/** Path overrides, plus the dry run a check passes down to every edit. */
+type EditOptions = ResolveOptions & { dryRun?: DryRun };
+
+function readConfig(path: string, options: Readonly<EditOptions>): string | null {
+  return options.dryRun ? options.dryRun.read(path) : readIfExists(path);
+}
+
+function writeConfig(path: string, content: string, options: Readonly<EditOptions>): void {
+  if (options.dryRun) options.dryRun.write(path, content);
+  else writeAtomically(path, content);
+}
+
 function tomlValue(value: string): string {
   return JSON.stringify(value);
 }
@@ -781,12 +833,13 @@ function assertTomlEdit(
 
 function addTomlServer(
   path: string,
-  key: readonly string[],
+  entry: McpConfigFile,
   server: McpServerConfig,
-  dialect: McpConfigFile["dialect"],
+  options: Readonly<EditOptions>,
 ): boolean {
+  const { key, dialect } = entry;
   const headersKey = dialect === "codex" ? "http_headers" : "headers";
-  const before = readIfExists(path) ?? "";
+  const before = readConfig(path, options) ?? "";
   const beforeMap = serverMapFromToml(before, key);
   const replaced = Object.hasOwn(beforeMap, server.name);
   const stripped = replaced ? stripTomlServer(before, key, server.name) : before;
@@ -795,18 +848,23 @@ function addTomlServer(
     ? `${body}\n\n${tomlSections(key, server, headersKey)}`
     : tomlSections(key, server, headersKey);
   assertTomlEdit(beforeMap, after, key, server.name, true);
-  writeAtomically(path, after);
+  writeConfig(path, after, options);
   return replaced;
 }
 
-function removeTomlServer(path: string, key: readonly string[], name: string): boolean {
-  const before = readIfExists(path);
+function removeTomlServer(
+  path: string,
+  key: readonly string[],
+  name: string,
+  options: Readonly<EditOptions>,
+): boolean {
+  const before = readConfig(path, options);
   if (before === null) return false;
   const beforeMap = serverMapFromToml(before, key);
   if (!Object.hasOwn(beforeMap, name)) return false;
   const after = stripTomlServer(before, key, name);
   assertTomlEdit(beforeMap, after, key, name, false);
-  writeAtomically(path, after);
+  writeConfig(path, after, options);
   return true;
 }
 
@@ -845,25 +903,28 @@ function writeShapedServer(
   harness: Harness,
   resolved: McpServerConfig,
   scope: "user" | "project",
-  options: ResolveOptions,
+  options: Readonly<EditOptions>,
 ): { path: string; replaced: boolean } {
   const { entry, path } = writableConfig(harness, scope, options);
 
   if (entry.format === "sqlite") {
-    return { path, replaced: upsertSqliteServer(path, entry.key, resolved) };
+    const replaced = options.dryRun
+      ? options.dryRun.upsertRow(path, entry.key, resolved.name)
+      : upsertSqliteServer(path, entry.key, resolved);
+    return { path, replaced };
   }
 
   if (entry.format === "toml") {
-    return { path, replaced: addTomlServer(path, entry.key, resolved, entry.dialect) };
+    return { path, replaced: addTomlServer(path, entry, resolved, options) };
   }
 
-  const root = JSON.parse(readIfExists(path) ?? "{}") as Record<string, unknown>;
+  const root = JSON.parse(readConfig(path, options) ?? "{}") as Record<string, unknown>;
   const map = drill(root, entry.key, "create");
   if (!map) throw new Error(`Config at ${path} has a non-object at ${entry.key.join(".")}`);
 
   const replaced = Object.hasOwn(map, resolved.name);
   map[resolved.name] = replacementEntry(map[resolved.name], resolved, entry.dialect);
-  writeAtomically(path, `${JSON.stringify(root, null, 2)}\n`);
+  writeConfig(path, `${JSON.stringify(root, null, 2)}\n`, options);
   return { path, replaced };
 }
 
@@ -882,17 +943,29 @@ export function removeMcpServer(
   scope: "user" | "project" = "user",
   options: ResolveOptions = {},
 ): { path: string; removed: boolean } {
+  return removeConfigServer(harness, name, scope, options);
+}
+
+function removeConfigServer(
+  harness: Harness,
+  name: string,
+  scope: "user" | "project",
+  options: Readonly<EditOptions>,
+): { path: string; removed: boolean } {
   const { entry, path } = writableConfig(harness, scope, options);
 
   if (entry.format === "sqlite") {
-    return { path, removed: removeSqliteServer(path, entry.key, name) };
+    const removed = options.dryRun
+      ? options.dryRun.removeRow(path, entry.key, name)
+      : removeSqliteServer(path, entry.key, name);
+    return { path, removed };
   }
 
   if (entry.format === "toml") {
-    return { path, removed: removeTomlServer(path, entry.key, name) };
+    return { path, removed: removeTomlServer(path, entry.key, name, options) };
   }
 
-  const raw = readIfExists(path);
+  const raw = readConfig(path, options);
   if (raw === null) return { path, removed: false };
 
   const root = JSON.parse(raw) as Record<string, unknown>;
@@ -900,7 +973,7 @@ export function removeMcpServer(
   if (!map || !Object.hasOwn(map, name)) return { path, removed: false };
 
   delete map[name];
-  writeAtomically(path, `${JSON.stringify(root, null, 2)}\n`);
+  writeConfig(path, `${JSON.stringify(root, null, 2)}\n`, options);
   return { path, removed: true };
 }
 
@@ -933,8 +1006,15 @@ export interface SyncTargetResult {
 /** Outcome of resetting the harness configs to the master list. */
 export interface SyncReport {
   source: string;
+  /** True when nothing was written. */
+  check: boolean;
   servers: string[];
   targets: SyncTargetResult[];
+}
+
+/** Path overrides for a sync, and `check` to only report. */
+export interface McpSyncOptions extends ResolveOptions {
+  check?: boolean;
 }
 
 function canonical(server: McpServerConfig): string {
@@ -1106,13 +1186,13 @@ function withdrawMasterServers(
   harness: Harness,
   existing: ReadonlyMap<string, string>,
   withdrawn: ReadonlySet<string>,
-  options: ResolveOptions,
+  options: Readonly<EditOptions>,
 ): SyncStep {
   const results: SyncTargetResult["results"] = [];
   let path: string | undefined;
   for (const name of existing.keys()) {
     if (!withdrawn.has(name)) continue;
-    const removed = removeMcpServer(harness, name, "user", options);
+    const removed = removeConfigServer(harness, name, "user", options);
     if (removed.removed) {
       path = removed.path;
       results.push({ name, action: "removed" });
@@ -1140,7 +1220,7 @@ function removeExtraServers(
   existing: ReadonlyMap<string, string>,
   masterNames: ReadonlySet<string>,
   keep: Readonly<Record<string, readonly string[]>>,
-  options: ResolveOptions,
+  options: Readonly<EditOptions>,
 ): SyncStep {
   const kept = (Object.hasOwn(keep, harness.id) ? keep[harness.id] : undefined) ?? [];
   const results: SyncTargetResult["results"] = [];
@@ -1151,7 +1231,7 @@ function removeExtraServers(
       results.push({ name, action: "kept" });
       continue;
     }
-    const removed = removeMcpServer(harness, name, "user", options);
+    const removed = removeConfigServer(harness, name, "user", options);
     if (removed.removed) {
       path = removed.path;
       results.push({ name, action: "removed" });
@@ -1164,7 +1244,7 @@ function writeMasterServers(
   harness: Harness,
   servers: readonly McpServerConfig[],
   existing: ReadonlyMap<string, string>,
-  options: ResolveOptions,
+  options: Readonly<EditOptions>,
 ): SyncStep {
   const results: SyncTargetResult["results"] = [];
   let path: string | undefined;
@@ -1207,7 +1287,7 @@ function syncMasterServers(
   master: MasterSyncInput,
   existing: ReadonlyMap<string, string>,
   masterNames: ReadonlySet<string>,
-  options: ResolveOptions,
+  options: Readonly<EditOptions>,
 ): SyncStep[] {
   const allowed = master.servers.filter((server) => !excludedFrom(master, server.name, harness.id));
   const allowedNames = new Set(allowed.map((server) => server.name));
@@ -1240,7 +1320,7 @@ function syncMcpTarget(
   harness: Harness,
   master: MasterSyncInput,
   masterNames: ReadonlySet<string>,
-  options: ResolveOptions,
+  options: Readonly<EditOptions>,
 ): SyncTargetResult {
   const hasUserConfig = harness.mcpConfigs.some((candidate) => candidate.scope === "user");
   if (!hasUserConfig) {
@@ -1268,21 +1348,25 @@ function syncMcpTarget(
  * missing servers are added, drifted ones replaced, and servers absent from
  * the master are removed unless its `keep` names them for that harness. A
  * server's own `excludes` replaces the global one for that server. The
- * master file is the single source of truth, exceptions included.
+ * master file is the single source of truth, exceptions included. `check`
+ * runs every edit in memory and writes nothing.
  *
  * @param harnesses - Harnesses to synchronize.
- * @param options - Platform and path-resolution overrides.
+ * @param options - Path overrides, and `check` to only report.
  * @returns {SyncReport} Per-harness synchronization outcomes.
  */
 export function syncMcpServers(
   harnesses: readonly Harness[],
-  options: ResolveOptions = {},
+  options: Readonly<McpSyncOptions> = {},
 ): SyncReport {
   const master = readMasterMcpServers(options);
   const masterNames = new Set(master.servers.map((server) => server.name));
+  const check = options.check === true;
+  const edits: EditOptions = { ...options, dryRun: check ? new DryRun() : undefined };
   return {
     source: master.path,
+    check,
     servers: master.servers.map((server) => server.name),
-    targets: harnesses.map((harness) => syncMcpTarget(harness, master, masterNames, options)),
+    targets: harnesses.map((harness) => syncMcpTarget(harness, master, masterNames, edits)),
   };
 }

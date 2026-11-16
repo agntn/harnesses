@@ -307,9 +307,42 @@ describe("syncMcpServers into OpenBot", () => {
     }
     writeMaster(options.homeDir, { probe: { command: "node" } });
 
+    const check = syncMcpServers([openbot], { ...options, check: true });
     const report = syncMcpServers([openbot], options);
+    expect(report.targets[0]?.results).toEqual(check.targets[0]?.results);
     expect(report.targets[0]?.results[0]).toEqual({ name: "probe", action: "added" });
     expect(rows(options.database).map((row) => row.name)).toEqual(["probe"]);
+  });
+
+  it("counts a full table in check mode the way the write does", () => {
+    const options = fixture();
+    createDatabase(options.database);
+    for (let index = 0; index < 31; index++) {
+      insertRow(options.database, { name: `own-${index}`, position: index });
+    }
+    writeMaster(options.homeDir, {
+      ...Object.fromEntries(
+        Array.from({ length: 31 }, (_, index) => [`own-${index}`, { command: "node" }]),
+      ),
+      first: { command: "node" },
+      second: { command: "node" },
+    });
+    const before = rows(options.database);
+
+    const check = syncMcpServers([openbot], { ...options, check: true });
+
+    expect(check.targets[0]?.results.slice(-2)).toEqual([
+      { name: "first", action: "added" },
+      {
+        name: "second",
+        action: "skipped",
+        reason: "second: OpenBot holds 32 MCP servers at most",
+      },
+    ]);
+    expect(rows(options.database)).toEqual(before);
+    expect(syncMcpServers([openbot], options).targets[0]?.results).toEqual(
+      check.targets[0]?.results,
+    );
   });
 
   it("skips OpenBot until the app has created its database", () => {

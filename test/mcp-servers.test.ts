@@ -771,6 +771,83 @@ describe("syncMcpServers", () => {
     });
   });
 
+  it("reports in check mode what the sync then does, without writing", () => {
+    const dirs = fixtureDirs();
+    vi.stubEnv("XDG_CONFIG_HOME", undefined);
+    writeMaster(
+      dirs.homeDir,
+      JSON.stringify({
+        keep: { grok: ["mine"] },
+        mcpServers: { probe: { command: "node" }, cloud: { url: "https://example.com/mcp" } },
+      }),
+    );
+    const claudePath = join(dirs.homeDir, ".claude.json");
+    const grokPath = join(dirs.homeDir, ".grok", "config.toml");
+    writeFileSync(
+      claudePath,
+      JSON.stringify({ mcpServers: { probe: "old", stale: { command: "x" } } }),
+    );
+    mkdirSync(dirname(grokPath), { recursive: true });
+    writeFileSync(grokPath, '# grok\n[mcp_servers.mine]\ncommand = "own"\n');
+    const before = [readFileSync(claudePath, "utf8"), readFileSync(grokPath, "utf8")];
+    const targets = [getHarness("claude"), getHarness("grok"), getHarness("codex")];
+
+    const check = syncMcpServers(targets, { ...dirs, check: true });
+
+    expect(check.check).toBe(true);
+    expect(targetResults(check.targets, "claude")).toEqual([
+      { name: "probe", action: "replaced" },
+      { name: "cloud", action: "added" },
+      { name: "stale", action: "removed" },
+    ]);
+    expect(targetResults(check.targets, "grok")).toEqual([
+      { name: "probe", action: "added" },
+      { name: "cloud", action: "added" },
+      { name: "mine", action: "kept" },
+    ]);
+    expect([readFileSync(claudePath, "utf8"), readFileSync(grokPath, "utf8")]).toEqual(before);
+    expect(existsSync(join(dirs.homeDir, ".codex", "config.toml"))).toBe(false);
+
+    const sync = syncMcpServers(targets, dirs);
+    expect(sync.check).toBe(false);
+    expect(sync.targets.map((t) => t.results)).toEqual(check.targets.map((t) => t.results));
+  });
+
+  it.each([
+    [
+      "an inline table it would replace",
+      'mcp_servers = { probe = { command = "old" } }\n',
+      /redefine/,
+    ],
+    ["a quoted table it would remove", "[mcp_servers.'stale']\ncommand = \"x\"\n", /stale absent/],
+  ])("refuses in check mode the TOML edit sync refuses: %s", (_, toml, error) => {
+    const dirs = fixtureDirs();
+    vi.stubEnv("XDG_CONFIG_HOME", undefined);
+    writeMaster(dirs.homeDir, JSON.stringify({ mcpServers: { probe: { command: "node" } } }));
+    const path = join(dirs.homeDir, ".codex", "config.toml");
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, toml);
+    const codex = [getHarness("codex")];
+
+    expect(() => syncMcpServers(codex, { ...dirs, check: true })).toThrow(error);
+    expect(readFileSync(path, "utf8")).toBe(toml);
+    expect(() => syncMcpServers(codex, dirs)).toThrow(error);
+  });
+
+  it("refuses an unknown harness in check mode before reading any config", () => {
+    const dirs = fixtureDirs();
+    vi.stubEnv("HOME", dirs.homeDir);
+    vi.stubEnv("XDG_CONFIG_HOME", join(dirs.homeDir, ".config"));
+    writeMaster(dirs.homeDir, JSON.stringify({ excludes: ["codxe"], mcpServers: {} }));
+
+    const result = mcpSync("claude", true);
+
+    expect(result.isError).toBe(true);
+    expect(result.details).toMatchObject({
+      error: "Master MCP list names unknown harnesses: codxe (excludes)",
+    });
+  });
+
   it("resets JSON and TOML configs to the master list and is idempotent", () => {
     const dirs = fixtureDirs();
     const previousXdg = process.env.XDG_CONFIG_HOME;

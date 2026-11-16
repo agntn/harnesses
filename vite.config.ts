@@ -22,6 +22,7 @@ export default defineConfig({
               name: [
                 "AgentsConfig",
                 "AgentsSyncParams",
+                "DryRun",
                 "Harness",
                 "HarnessInfoResult",
                 "HarnessInvocation",

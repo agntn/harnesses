@@ -147,7 +147,9 @@ syncMcpServers([getHarness("codex")]).targets[0]?.results;
 // [{ name: "harnesses", action: "added" }, { name: "node_repl", action: "kept" }]
 ```
 
-Anything not on the list gets removed. That's the point. But what about a server only one harness can run? Name it under `keep` and it stays. And a server that has to get past the global `excludes`? Give it its own. The rest is in the [MCP servers guide](https://harnesses.agntn.dev/guide/mcp-servers).
+Anything not on the list gets removed. That's the point. So `--check` first: it shows the broom before sync swings it.
+
+But what about a server only one harness can run? Name it under `keep` and it stays. And a server that has to get past the global `excludes`? Give it its own. The rest is in the [MCP servers guide](https://harnesses.agntn.dev/guide/mcp-servers).
 
 ### Prompt templates
 

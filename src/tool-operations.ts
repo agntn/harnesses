@@ -841,9 +841,10 @@ export function mcpRemove(
  * A misspelled id in excludes or keep fails the run before the first write.
  *
  * @param id - Optional harness id; omission targets every harness.
+ * @param check - Report intended changes without writing them.
  * @returns {ToolResult<SyncReport | RunFailure>} The sync report or failure.
  */
-export function mcpSync(id?: string): ToolResult<SyncReport | RunFailure> {
+export function mcpSync(id?: string, check = false): ToolResult<SyncReport | RunFailure> {
   if (id !== undefined && !isHarnessId(id)) return unknownHarness(id);
 
   try {
@@ -870,6 +871,7 @@ export function mcpSync(id?: string): ToolResult<SyncReport | RunFailure> {
     }
     const details = syncMcpServers(
       id !== undefined && isHarnessId(id) ? [getHarness(id)] : getAllHarnesses(),
+      { check },
     );
     return { content: text(details), details };
   } catch (error) {

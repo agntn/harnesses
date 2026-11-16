@@ -71,11 +71,15 @@ export default defineCommand({
       },
       args: {
         id: { type: "positional" as const, description: "Harness id", required: false },
+        check: {
+          type: "boolean" as const,
+          description: "Report what would change without writing anything",
+        },
         ...formatArgs,
       },
       run({ args }) {
         const id = args.id === undefined ? undefined : requireHarnessId(args.id as string);
-        report(mcpSync(id), args);
+        report(mcpSync(id, args.check === true), args);
       },
     }),
     remove: defineCommand({
