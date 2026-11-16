@@ -5,20 +5,20 @@
 [![license](https://npmx.dev/api/registry/badge/license/@agntn/harnesses)](https://npmx.dev/package/@agntn/harnesses)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/agntn/harnesses)
 
-🧭 Fourteen coding CLIs, one map. You ask where Claude keeps skills, you get the path.
+🧭 Fifteen coding CLIs, one map. You ask where Claude keeps skills, you get the path.
 
 > [!WARNING]
 > **@agntn/harnesses is pre-1.0.** Paths follow upstream CLIs that still move. Building on it now means pinning the version.
 
 ## Why?
 
-Claude stores transcripts under a mangled copy of your cwd. Codex keeps TOML with comments you wanted to keep. Ask a model where Codex lives and it invents `.claude/`. So this is one registry: fourteen harnesses, same object, paths for your machine.
+Claude stores transcripts under a mangled copy of your cwd. Codex keeps TOML with comments you wanted to keep. Ask a model where Codex lives and it invents `.claude/`. So this is one registry: fifteen harnesses, same object, paths for your machine.
 
 The rest of it sits on [harnesses.agntn.dev](https://harnesses.agntn.dev).
 
 ## ✨ Features
 
-- 🧩 **Fourteen harnesses, one class.** Same fields on Claude, Codex, Pi and the rest.
+- 🧩 **Fifteen harnesses, one class.** Same fields on Claude, Codex, Pi and the rest.
 - 📂 **Every path has a receipt.** Scope, evidence level, and a platform tag when the OS actually differs.
 - 🔎 **Detects which CLI you're inside.** Environment variables first. Two project markers in one directory is `null`, not a guess.
 - ▶️ **Headless runs with real modes.** Advisor without tools, full agent, or a native read-only sandbox. A mode the CLI cannot enforce is rejected.
@@ -53,6 +53,7 @@ npx @agntn/harnesses detect
     ○ gemini          Google Gemini CLI
     ○ github-copilot  GitHub Copilot
     ● grok            xAI Grok CLI            v1.0.41   readOnly · agent
+    ● kilo            Kilo Code CLI           v7.4.15   agent
     ● mastracode      Mastra Code             v0.10.2   no headless mode
     ● omp             OMP (oh-my-pi)          v18.6.1   agent
     ● opencode        OpenCode CLI            v2.0.22   agent
@@ -218,6 +219,7 @@ target. Syncing Codex already links it.
 | `gemini`         | Google Gemini CLI      | `.gemini/skills/`      |
 | `github-copilot` | GitHub Copilot         | `.github/skills/`      |
 | `grok`           | xAI Grok CLI           | `.grok/skills/`        |
+| `kilo`           | Kilo Code CLI          | `.kilo/skills/`        |
 | `mastracode`     | Mastra Code            | `.mastracode/skills/`  |
 | `omp`            | OMP (oh-my-pi)         | `.omp/skills/`         |
 | `openbot`        | OpenBot                | none                   |
@@ -251,7 +253,7 @@ It does not install skills, drive a browser, or run a sandbox of its own. `invok
 
 ## 🧩 Adding a harness
 
-Want a fourteenth? One class extending `Harness`, then `registerHarness`. `getHarness`, the CLI and the tools pick it up. How to write that class: [Custom harnesses](https://harnesses.agntn.dev/guide/custom).
+Want a sixteenth? One class extending `Harness`, then `registerHarness`. `getHarness`, the CLI and the tools pick it up. How to write that class: [Custom harnesses](https://harnesses.agntn.dev/guide/custom).
 
 ## 🛠️ Development
 

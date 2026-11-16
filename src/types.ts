@@ -8,6 +8,7 @@ export type HarnessId =
   | "gemini"
   | "grok"
   | "claude"
+  | "kilo"
   | "opencode"
   | "cursor"
   | "freebuff"

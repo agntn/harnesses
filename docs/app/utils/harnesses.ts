@@ -51,6 +51,11 @@ const PRESENTATION: Record<string, { icon: string; short: string; blurb: string 
     blurb:
       "ACP session streams, TOML config, hooks and rules with Claude and Cursor compatibility.",
   },
+  kilo: {
+    icon: "i-lucide-weight",
+    short: "Kilo",
+    blurb: "OpenCode fork with its own XDG folder, OpenCode's MCP shape and a provider filter on models.",
+  },
   mastracode: {
     icon: "i-lucide-layers",
     short: "Mastra Code",

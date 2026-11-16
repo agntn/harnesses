@@ -63,7 +63,7 @@ Departures from the shared rules, recorded for the shared package:
 - The landing instruments walk the registry itself, not recorded samples: nothing is fetched, so there is no `recorded` or `live` in the meta.
 - The sync and aider files fold what their section doesn't talk about on screen and hand out the whole file on copy, so they stand about as tall as the text beside them.
 - Beside the text at 1024 px the sync and registry cells shed their second detail (format, id) through a container query instead of dropping to two columns.
-- Harness glyphs are `simple-icons` for the vendors that have one and Lucide for the rest (Freebuff, Mastra Code, OMP, OpenBot, OpenCode, Pi, Prime Agent): coding agents have no monochrome set of their own.
+- Harness glyphs are `simple-icons` for the vendors that have one and Lucide for the rest (Freebuff, Kilo, Mastra Code, OMP, OpenBot, OpenCode, Pi, Prime Agent): coding agents have no monochrome set of their own.
 - The share bar under the hero metrics splits checked paths (official and community) from inferred ones. The inferred side is small; that is the data, not a styling choice.
 - The version comes from the library's `version` export; no data version exists, so ID strips and footers carry none.
 - The OG images ship local Figtree and Fira Code TTFs, the keys mechanism.

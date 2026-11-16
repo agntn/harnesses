@@ -3,6 +3,7 @@ import { getAllHarnesses, getHarness, registerHarness } from "../src/index.ts";
 import Antigravity, { parseAntigravityModels } from "../src/harnesses/antigravity.ts";
 import Codex, { parseCodexModels } from "../src/harnesses/codex.ts";
 import Grok, { parseGrokModels } from "../src/harnesses/grok.ts";
+import { parseKiloModels } from "../src/harnesses/kilo.ts";
 import Omp, { parseOmpModels } from "../src/harnesses/omp.ts";
 import Pi, { parsePiModelTable } from "../src/harnesses/pi.ts";
 import PrimeAgent from "../src/harnesses/prime-agent.ts";
@@ -11,6 +12,11 @@ import { harnessInfo, listHarnessModels, runHarness } from "../src/tool-operatio
 const MODELS_OUTPUT = `provider      model                context  max-out  thinking  images
 openai-codex  gpt-5.4              272K     128K     yes       yes
 xai           grok-4.3             1M       30K      yes       no
+`;
+
+/** Two verbatim `kilo models` rows from Kilo 7.4.15, each with a slash inside the model id. */
+const KILO_MODELS_OUTPUT = `kilo/~anthropic/claude-opus-latest
+kilo/kilo-auto/free
 `;
 
 // Verbatim `grok models` output from grok 1.0.41.
@@ -277,6 +283,34 @@ describe("model listing", () => {
         { provider: "xai", id: "grok-4.7-build-fast" },
       ],
     });
+  });
+
+  it("lists Kilo models without passing the search as a provider", () => {
+    const kilo = getHarness("kilo");
+
+    expect(kilo.buildModelListInvocation()).toEqual({ command: "kilo", args: ["models"] });
+    expect(kilo.buildModelListInvocation("opus")).toEqual({ command: "kilo", args: ["models"] });
+  });
+
+  it("splits a Kilo model at the first slash and keeps the rest as the id", () => {
+    const kilo = getHarness("kilo");
+    const models = parseKiloModels(KILO_MODELS_OUTPUT);
+
+    expect(models).toEqual([
+      { provider: "kilo", id: "~anthropic/claude-opus-latest" },
+      { provider: "kilo", id: "kilo-auto/free" },
+    ]);
+    expect(models.map((model) => kilo.modelSelector(model))).toEqual(
+      KILO_MODELS_OUTPUT.trim().split("\n"),
+    );
+    expect(parseKiloModels("")).toEqual([]);
+  });
+
+  it("rejects Kilo output it does not recognize", () => {
+    expect(() => parseKiloModels("Error: Provider not found: x\n")).toThrow(
+      "Unexpected Kilo model-list row",
+    );
+    expect(() => parseKiloModels("kilo/\n")).toThrow("Unexpected Kilo model-list row");
   });
 
   it("rejects listing models for an unsupported harness", async () => {

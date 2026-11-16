@@ -43,6 +43,7 @@ describe("@agntn/harnesses", () => {
       "gemini",
       "github-copilot",
       "grok",
+      "kilo",
       "mastracode",
       "omp",
       "openbot",
@@ -363,6 +364,7 @@ describe("@agntn/harnesses", () => {
       gemini: { audio: true, video: false },
       "github-copilot": { audio: false, video: false },
       grok: { audio: false, video: false },
+      kilo: { audio: false, video: false },
       mastracode: { audio: false, video: false },
       omp: { audio: false, video: false },
       openbot: { audio: false, video: false },
@@ -408,6 +410,23 @@ describe("@agntn/harnesses", () => {
       [[expect.stringMatching(/OpenBot[\\/]openbot\.db$/), "sqlite", "openbot"]],
     ]);
     expect(openbot.invocation).toBeNull();
+  });
+
+  it("should list every config file Kilo merges, the OpenCode leftovers included", () => {
+    const paths = getHarness("kilo").config.map((entry) => entry.path);
+
+    expect(paths).toEqual(
+      expect.arrayContaining([
+        "~/.config/kilo/kilo.jsonc",
+        "~/.config/kilo/kilo.json",
+        "~/.config/kilo/config.json",
+        "~/.config/kilo/opencode.jsonc",
+        "~/.config/kilo/opencode.json",
+        "opencode.json",
+        ".kilo/kilo.jsonc",
+      ]),
+    );
+    expect(paths.some((path) => path.startsWith("~/.config/opencode/"))).toBe(false);
   });
 
   it("should check harness installation without throwing", () => {

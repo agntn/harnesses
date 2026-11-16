@@ -7,6 +7,7 @@ import Freebuff from "./freebuff.ts";
 import Gemini from "./gemini.ts";
 import GitHubCopilot from "./github-copilot.ts";
 import Grok from "./grok.ts";
+import Kilo from "./kilo.ts";
 import MastraCode from "./mastracode.ts";
 import Omp from "./omp.ts";
 import OpenBot from "./openbot.ts";
@@ -27,6 +28,7 @@ export const harnesses: HarnessConstructor[] = [
   Gemini,
   GitHubCopilot,
   Grok,
+  Kilo,
   MastraCode,
   Omp,
   OpenCode,
