@@ -412,6 +412,23 @@ describe("@agntn/harnesses", () => {
     expect(openbot.invocation).toBeNull();
   });
 
+  it("should list every config file Kilo merges, the OpenCode leftovers included", () => {
+    const paths = getHarness("kilo").config.map((entry) => entry.path);
+
+    expect(paths).toEqual(
+      expect.arrayContaining([
+        "~/.config/kilo/kilo.jsonc",
+        "~/.config/kilo/kilo.json",
+        "~/.config/kilo/config.json",
+        "~/.config/kilo/opencode.jsonc",
+        "~/.config/kilo/opencode.json",
+        "opencode.json",
+        ".kilo/kilo.jsonc",
+      ]),
+    );
+    expect(paths.some((path) => path.startsWith("~/.config/opencode/"))).toBe(false);
+  });
+
   it("should check harness installation without throwing", () => {
     const harness = getHarness("codex");
     expect(typeof harness.isInstalled()).toBe("boolean");
