@@ -13,7 +13,7 @@
 import { existsSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, normalize } from "node:path";
-import { applyEdits, format, modify } from "jsonc-parser";
+import { applyEdits, format, modify, type Edit } from "jsonc-parser";
 import { parse as parseToml } from "smol-toml";
 import { readIfExists } from "./files.ts";
 import type { Harness } from "./harness.ts";
@@ -577,9 +577,34 @@ function listingBase(entry: McpConfigFile, path: string): McpConfigListing {
   });
 }
 
+function hasJsoncValue(raw: string): boolean {
+  return /\S/.test(raw.replaceAll(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ""));
+}
+
+/**
+ * A JSONC file that holds only comments reads as an empty object, like an empty one.
+ *
+ * @param raw - JSONC source text.
+ * @returns {unknown} The parsed value.
+ */
+function parseJsoncObject(raw: string): unknown {
+  return hasJsoncValue(raw) ? parseJsonc(raw) : {};
+}
+
+/**
+ * Appends an empty root object below the comments of a file that has no value yet.
+ *
+ * @param raw - JSONC source text without a value.
+ * @returns {string} The text with `{}` added.
+ */
+function withRoot(raw: string): string {
+  if (!/\S/.test(raw)) return "{}\n";
+  return `${raw.endsWith("\n") ? raw : `${raw}\n`}{}\n`;
+}
+
 function parseConfig(raw: string, kind: McpConfigFile["format"]): unknown {
   if (kind === "toml") return parseToml(raw);
-  return kind === "jsonc" ? parseJsonc(raw) : (JSON.parse(raw) as unknown);
+  return kind === "jsonc" ? parseJsoncObject(raw) : (JSON.parse(raw) as unknown);
 }
 
 function configServerMap(raw: string, entry: McpConfigFile): Record<string, unknown> {
@@ -897,6 +922,25 @@ function removeTomlServer(
 const JSONC_FORMAT = { insertSpaces: true, tabSize: 2, eol: "\n" };
 
 /**
+ * The inserted text, widened to the braces of an object that held nothing else.
+ *
+ * @param text - JSONC text after the edit.
+ * @param edit - The one insertion `modify` made.
+ * @returns {{ offset: number, length: number }} The range to format.
+ */
+function insertedRange(text: string, edit: Readonly<Edit>): { offset: number; length: number } {
+  let start = edit.offset;
+  let end = edit.offset + edit.content.length;
+  const before = /\{\s*$/.exec(text.slice(0, start));
+  const after = /^\s*(?:\}|\n)/.exec(text.slice(end));
+  if (before && after) {
+    start = before.index;
+    end += after[0].length;
+  }
+  return { offset: start, length: end - start };
+}
+
+/**
  * Sets or deletes one value in JSONC text. Only the inserted text gets
  * formatted: asking `modify` to format reflows the neighbouring entries too.
  *
@@ -910,8 +954,7 @@ function setJsonc(raw: string, path: readonly string[], value: unknown): string 
   const after = applyEdits(raw, edits);
   const [edit] = edits;
   if (value === undefined || edits.length !== 1 || !edit) return after;
-  const range = { offset: edit.offset, length: edit.content.length };
-  return applyEdits(after, format(after, range, JSONC_FORMAT));
+  return applyEdits(after, format(after, insertedRange(after, edit), JSONC_FORMAT));
 }
 
 function serverMapFromJsonc(
@@ -919,8 +962,7 @@ function serverMapFromJsonc(
   key: readonly string[],
   path: string,
 ): Record<string, unknown> {
-  const parsed = raw.trim() === "" ? {} : parseJsonc(raw);
-  let node: unknown = parsed;
+  let node: unknown = parseJsoncObject(raw);
   for (const part of key) {
     if (!isObjectRecord(node) || Array.isArray(node)) break;
     node = node[part];
@@ -952,7 +994,8 @@ function editJsoncServer(
   const beforeMap = serverMapFromJsonc(before, entry.key, path);
   const existed = Object.hasOwn(beforeMap, target.name);
   if (!existed && target.value === undefined) return false;
-  const base = before.trim() === "" ? "{}\n" : before;
+  const base =
+    Object.keys(beforeMap).length > 0 || hasJsoncValue(before) ? before : withRoot(before);
   const value = target.value?.(beforeMap[target.name]);
   const after = setJsonc(base, [...entry.key, target.name], value);
   assertServerEdit("JSONC", beforeMap, () => serverMapFromJsonc(after, entry.key, path), {
@@ -1486,7 +1529,7 @@ function mergedUserConfigs(
 function clearMergedConfig(
   config: Readonly<{ entry: McpConfigFile; path: string }>,
   listing: McpConfigListing | undefined,
-  own: (name: string) => "keep" | "excluded" | undefined,
+  own: (name: string) => "keep" | "excluded" | "skipped" | undefined,
   options: Readonly<EditOptions>,
 ): SyncStep {
   const results: SyncTargetResult["results"] = [];
@@ -1502,19 +1545,22 @@ function clearMergedConfig(
 }
 
 /**
- * Why a server off the master list stays: named in `keep`, or the harness is excluded.
+ * Why a sibling-file server stays: named in `keep`, an excluded harness, or a skipped write.
  *
  * @param id - Target harness id.
  * @param master - Master list to sync from.
  * @param masterNames - Every server name on the master list.
- * @returns {(name: string) => "keep" | "excluded" | undefined} The reason, undefined to remove.
+ * @param skipped - Master servers the target could not take, left where they work.
+ * @returns {(name: string) => "keep" | "excluded" | "skipped" | undefined} Why, or undefined.
  */
 function ownServer(
   id: string,
   master: MasterSyncInput,
   masterNames: ReadonlySet<string>,
-): (name: string) => "keep" | "excluded" | undefined {
+  skipped: ReadonlySet<string>,
+): (name: string) => "keep" | "excluded" | "skipped" | undefined {
   return (name) => {
+    if (skipped.has(name)) return "skipped";
     if (masterNames.has(name)) return undefined;
     if (master.keep[id]?.includes(name) === true) return "keep";
     return master.excludes.includes(id) ? "excluded" : undefined;
@@ -1543,7 +1589,12 @@ function syncMcpTarget(
   if (blocked) return { id: harness.id, ...blocked, results: [] };
 
   const steps = syncMasterServers(harness, master, existingServers(listing), masterNames, options);
-  const own = ownServer(harness.id, master, masterNames);
+  const skipped = new Set(
+    steps.flatMap(({ results }) =>
+      results.filter((r) => r.action === "skipped").map((r) => r.name),
+    ),
+  );
+  const own = ownServer(harness.id, master, masterNames, skipped);
   for (const config of merged) {
     steps.push(clearMergedConfig(config, listingAt(userListings, config.path), own, options));
   }

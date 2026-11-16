@@ -1104,6 +1104,43 @@ describe("syncMcpServers", () => {
     ]);
   });
 
+  it("keeps a sibling entry whose replacement the target had to skip", () => {
+    const dirs = fixtureDirs();
+    vi.stubEnv("XDG_CONFIG_HOME", undefined);
+    vi.stubEnv("HARNESSES_TEST_UNSET", undefined);
+    writeMaster(
+      dirs.homeDir,
+      JSON.stringify({
+        mcpServers: { hub: { command: "node", env: { T: "${HARNESSES_TEST_UNSET}" } } },
+      }),
+    );
+    const dir = join(dirs.homeDir, ".config", "kilo");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "kilo.jsonc"), "// mine\n");
+    const json = join(dir, "kilo.json");
+    const working = { mcp: { hub: { type: "local", command: ["node"], environment: { T: "v" } } } };
+    writeFileSync(json, JSON.stringify(working));
+
+    const report = syncMcpServers([getHarness("kilo")], dirs);
+
+    expect(report.targets[0]?.results.map((r) => r.action)).toEqual(["skipped"]);
+    expect(parseJsonRecord(json)).toEqual(working);
+  });
+
+  it("writes into a JSONC config that holds only comments", () => {
+    const dirs = fixtureDirs();
+    const path = join(dirs.homeDir, ".config", "kilo", "kilo.jsonc");
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, "// nothing here yet\n");
+
+    addMcpServer(getHarness("kilo"), { name: "x", transport: "stdio", command: "n" }, "user", dirs);
+
+    expect(readFileSync(path, "utf8").startsWith("// nothing here yet\n{\n")).toBe(true);
+    expect(listMcpServers(getHarness("kilo"), dirs).find((l) => l.path === path)?.servers).toEqual([
+      { name: "x", transport: "stdio", command: "n" },
+    ]);
+  });
+
   it("writes env references natively for Prime Agent and skips what a dialect cannot hold", () => {
     const dirs = fixtureDirs();
     const previousXdg = process.env.XDG_CONFIG_HOME;
