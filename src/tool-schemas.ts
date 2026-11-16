@@ -157,6 +157,14 @@ export function harnessToolSchemas<I, S>(Type: McpSchemaBuilder<I, S>) {
     }),
     mcpList: closed({
       id: Type.Optional(harnessId("Harness id; omit to list every harness")),
+      name: Type.Optional(
+        Type.String({
+          minLength: 1,
+          maxLength: 100,
+          description:
+            "Server name; keeps only servers with exactly this name and drops configs and harnesses without one. Unreadable configs stay, since they might hold it",
+        }),
+      ),
     }),
     mcpSync: closed({
       id: Type.Optional(harnessId("Harness id; omit to sync every harness")),
@@ -254,6 +262,7 @@ export interface RunParams {
 
 export interface McpListParams {
   id?: string;
+  name?: string;
 }
 
 export interface McpSyncParams {

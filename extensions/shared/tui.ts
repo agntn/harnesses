@@ -141,6 +141,10 @@ function idDescription({ id, idCount }: CallDescriptionContext): string | undefi
   return idCount === undefined ? undefined : `${idCount} harnesses`;
 }
 
+function mcpListDescription(context: CallDescriptionContext): string | undefined {
+  return sanitizeJoined([idDescription(context), context.name]);
+}
+
 function runDescription({ id, record }: CallDescriptionContext): string | undefined {
   return sanitizeJoined([id, scalar(record, "prompt")]);
 }
@@ -159,7 +163,7 @@ const CALL_DESCRIPTIONS: Record<HarnessToolName, CallDescriptionRenderer> = {
   harnesses_info: idDescription,
   harnesses_models: idDescription,
   harnesses_run: runDescription,
-  harnesses_mcp_list: idDescription,
+  harnesses_mcp_list: mcpListDescription,
   harnesses_mcp_add: mutationDescription,
   harnesses_mcp_sync: agentsDescription,
   harnesses_agents_sync: agentsDescription,

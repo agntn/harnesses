@@ -150,7 +150,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
     name: "harnesses_mcp_list",
     label: HARNESS_TOOL_LABELS.harnesses_mcp_list,
     description:
-      "List the MCP servers configured in each harness's config files, normalized across dialects",
+      "List the MCP servers configured in each harness's config files, normalized across dialects; name keeps only that server",
     parameters: schemas.mcpList,
     approval: HARNESS_TOOL_APPROVALS.harnesses_mcp_list,
     async execute(
@@ -158,7 +158,7 @@ export default function harnessesExtension(pi: ExtensionAPI): void {
       params: HarnessSchemas.McpListParams,
     ): Promise<AgentToolResult<HarnessTools.McpListing | HarnessTools.UnknownHarness>> {
       const { mcpList } = await loadToolOperations();
-      return mcpList(params.id);
+      return mcpList(params.id, params.name);
     },
     ...statusRenderers("harnesses_mcp_list"),
   });

@@ -715,6 +715,16 @@ function redactMcpValues(values: Readonly<Record<string, string>>): Record<strin
   return Object.fromEntries(Object.keys(values).map((key) => [key, MCP_REDACTED_VALUE]));
 }
 
+/**
+ * Tells whether the name filter keeps a config: it holds the server, or failed to parse and might.
+ *
+ * @param listing - One config, already filtered by name.
+ * @returns {boolean} True when the config stays in the listing.
+ */
+function mayHoldServer(listing: McpConfigListing): boolean {
+  return listing.servers.length > 0 || listing.error !== undefined;
+}
+
 /** Result of one MCP config mutation. */
 export interface McpMutation {
   id: HarnessId;
@@ -756,9 +766,10 @@ export function toMcpServerConfig(params: McpServerParams): McpServerConfig {
  * Lists configured MCP servers, normalized across harness config dialects.
  *
  * @param id - Optional harness id; omission lists every harness.
+ * @param name - Optional server name; only servers with exactly this name stay.
  * @returns {ToolResult<McpListing | UnknownHarness>} The normalized listing or id error.
  */
-export function mcpList(id?: string): ToolResult<McpListing | UnknownHarness> {
+export function mcpList(id?: string, name?: string): ToolResult<McpListing | UnknownHarness> {
   if (id !== undefined && !isHarnessId(id)) return unknownHarness(id);
 
   const targets = id !== undefined && isHarnessId(id) ? [getHarness(id)] : getAllHarnesses();
@@ -766,15 +777,21 @@ export function mcpList(id?: string): ToolResult<McpListing | UnknownHarness> {
     harnesses: targets
       .map((harness) => ({
         id: harness.id,
-        configs: listMcpServers(harness).map((listing) => ({
-          ...listing,
-          ...(listing.error === undefined ? {} : { error: MCP_CONFIG_ERROR }),
-          servers: listing.servers.map((server) => ({
-            ...server,
-            ...(server.env === undefined ? {} : { env: redactMcpValues(server.env) }),
-            ...(server.headers === undefined ? {} : { headers: redactMcpValues(server.headers) }),
-          })),
-        })),
+        configs: listMcpServers(harness)
+          .map((listing) => ({
+            ...listing,
+            ...(listing.error === undefined ? {} : { error: MCP_CONFIG_ERROR }),
+            servers: listing.servers
+              .filter((server) => name === undefined || server.name === name)
+              .map((server) => ({
+                ...server,
+                ...(server.env === undefined ? {} : { env: redactMcpValues(server.env) }),
+                ...(server.headers === undefined
+                  ? {}
+                  : { headers: redactMcpValues(server.headers) }),
+              })),
+          }))
+          .filter((listing) => name === undefined || mayHoldServer(listing)),
       }))
       .filter((entry) => entry.configs.length > 0),
   };

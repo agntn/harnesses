@@ -111,10 +111,11 @@ const tools: ToolDefinition[] = [
     name: "harnesses_mcp_list",
     title: "Harnesses MCP List",
     description:
-      "List the MCP servers configured in each harness's config files, normalized across dialects. Omit id to scan every harness.",
+      "List the MCP servers configured in each harness's config files, normalized across dialects. Omit id to scan every harness. Pass name to find one server without reading every listing.",
     inputSchema: schemas.mcpList,
     annotations: READ_ONLY,
-    execute: ({ mcpList }, args) => mcpList(args.id as string | undefined),
+    execute: ({ mcpList }, args) =>
+      mcpList(args.id as string | undefined, args.name as string | undefined),
   },
   {
     name: "harnesses_mcp_add",

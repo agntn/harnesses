@@ -442,6 +442,57 @@ describe("mcpList", () => {
   });
 });
 
+describe("mcpList by name", () => {
+  it("keeps only the named server, still redacted", () => {
+    withMcpListFixture(() => {
+      writeFileSync(
+        mcpListFixturePath,
+        JSON.stringify({
+          mcpServers: {
+            probe: { command: "node", env: { API_TOKEN: "name-filter-secret" } },
+            other: { command: "other" },
+          },
+        }),
+      );
+
+      const result = mcpList("cursor", "probe");
+      if (!("harnesses" in result.details)) throw new Error("Expected an MCP listing");
+      expect(result.details.harnesses).toHaveLength(1);
+      expect(result.details.harnesses[0]?.configs).toHaveLength(1);
+      expect(result.details.harnesses[0]?.configs[0]?.servers).toEqual([
+        { name: "probe", transport: "stdio", command: "node", env: { API_TOKEN: "<redacted>" } },
+      ]);
+      expect(result.content[0]?.text).not.toContain("name-filter-secret");
+    });
+  });
+
+  it("returns an empty list, not an error, when nothing matches", () => {
+    withMcpListFixture(() => {
+      writeFileSync(
+        mcpListFixturePath,
+        JSON.stringify({ mcpServers: { other: { command: "x" } } }),
+      );
+
+      const result = mcpList("cursor", "probe");
+      expect(result.isError).toBeUndefined();
+      expect(result.details).toEqual({ harnesses: [] });
+    });
+  });
+
+  it("keeps a config it cannot parse, since the server might be in it", () => {
+    withMcpListFixture(() => {
+      writeFileSync(mcpListFixturePath, "{ not json");
+
+      const result = mcpList("cursor", "probe");
+      if (!("harnesses" in result.details)) throw new Error("Expected an MCP listing");
+      expect(result.details.harnesses[0]?.configs[0]).toMatchObject({
+        error: "Unable to read or parse MCP config",
+        servers: [],
+      });
+    });
+  });
+});
+
 describe("addMcpServer / removeMcpServer", () => {
   it("adds, replaces, and removes a server in a JSON config", () => {
     const dirs = fixtureDirs();

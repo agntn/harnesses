@@ -19,11 +19,16 @@ export default defineCommand({
       meta: { description: "List configured MCP servers, normalized" },
       args: {
         id: { type: "positional" as const, description: "Harness id", required: false },
+        name: { type: "string" as const, description: "Show only servers with this name" },
         ...formatArgs,
       },
       run({ args }) {
         const id = args.id === undefined ? undefined : requireHarnessId(args.id as string);
-        report(mcpList(id), args);
+        if (args.name === "") {
+          consola.error("--name needs a server name");
+          process.exit(1);
+        }
+        report(mcpList(id, args.name), args);
       },
     }),
     add: defineCommand({

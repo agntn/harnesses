@@ -158,6 +158,13 @@ describe("harnesses usage paths", () => {
     expect(result.stderr).toContain("Harness claude cannot run readOnly with tools: false");
   });
 
+  it("harnesses mcp-servers list refuses --name without a server name", () => {
+    const result = runCli(["mcp-servers", "list", "--name"]);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("--name needs a server name");
+  });
+
   it("harnesses models and info tell what claude --model takes", () => {
     const hint = "Pass model as an alias for the latest model (fable, opus or sonnet)";
     const models = runCli(["models", "claude"]);
