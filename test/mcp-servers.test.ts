@@ -813,6 +813,27 @@ describe("syncMcpServers", () => {
     expect(sync.targets.map((t) => t.results)).toEqual(check.targets.map((t) => t.results));
   });
 
+  it.each([
+    [
+      "an inline table it would replace",
+      'mcp_servers = { probe = { command = "old" } }\n',
+      /redefine/,
+    ],
+    ["a quoted table it would remove", "[mcp_servers.'stale']\ncommand = \"x\"\n", /stale absent/],
+  ])("refuses in check mode the TOML edit sync refuses: %s", (_, toml, error) => {
+    const dirs = fixtureDirs();
+    vi.stubEnv("XDG_CONFIG_HOME", undefined);
+    writeMaster(dirs.homeDir, JSON.stringify({ mcpServers: { probe: { command: "node" } } }));
+    const path = join(dirs.homeDir, ".codex", "config.toml");
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, toml);
+    const codex = [getHarness("codex")];
+
+    expect(() => syncMcpServers(codex, { ...dirs, check: true })).toThrow(error);
+    expect(readFileSync(path, "utf8")).toBe(toml);
+    expect(() => syncMcpServers(codex, dirs)).toThrow(error);
+  });
+
   it("refuses an unknown harness in check mode before reading any config", () => {
     const dirs = fixtureDirs();
     vi.stubEnv("HOME", dirs.homeDir);

@@ -60,6 +60,18 @@ export function checkRoom(rows: number, name: string): void {
   }
 }
 
+/**
+ * Refuses a database the app hasn't created yet.
+ *
+ * @param path - Path of the database file.
+ * @throws {Error} When there is no file.
+ */
+export function requireDatabase(path: string): void {
+  if (!existsSync(path)) {
+    throw new Error(`No database at ${path} yet: the app creates it on its first start`);
+  }
+}
+
 function httpServer(server: McpServerConfig, enabled: boolean): McpServerConfig {
   const http: McpServerConfig = { name: server.name, transport: "http", enabled };
   if (server.url) http.url = server.url;
@@ -261,9 +273,7 @@ export function upsertSqliteServer(
   key: readonly string[],
   server: McpServerConfig,
 ): boolean {
-  if (!existsSync(path)) {
-    throw new Error(`No database at ${path} yet: the app creates it on its first start`);
-  }
+  requireDatabase(path);
   const { db, table } = openTable(path, key, false);
   try {
     db.exec("BEGIN IMMEDIATE");
