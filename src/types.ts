@@ -17,7 +17,8 @@ export type HarnessId =
   | "omp"
   | "openbot"
   | "pi"
-  | "prime-agent";
+  | "prime-agent"
+  | "vibe";
 export type EvidenceLevel = "official" | "community" | "inferred";
 export type Platform = "linux" | "darwin" | "win32";
 
@@ -250,8 +251,9 @@ export interface McpConfigFile extends PathCandidate {
    * family, "prime" is that family with env values as {"env": "NAME"} references,
    * "mastracode" is that family read by its keys alone, type ignored, "pi"
    * is that family without sse that keeps the entry fields it doesn't manage,
-   * "openbot" is one table row per server, stdio or streamable HTTP, and "codex"
-   * is the standard family with HTTP headers under `http_headers`.
+   * "openbot" is one table row per server, stdio or streamable HTTP, "codex"
+   * is the standard family with HTTP headers under `http_headers`, and "vibe" is an
+   * array of tables that name themselves, headers under `auth`, no sse.
    */
   dialect:
     | "standard"
@@ -262,6 +264,7 @@ export interface McpConfigFile extends PathCandidate {
     | "openbot"
     | "pi"
     | "prime"
+    | "vibe"
     | "vscode";
 }
 

@@ -153,6 +153,7 @@ describe("normalized invocation", () => {
       kilo: ["--variant", "low"],
       pi: ["--thinking", "low"],
       omp: ["--thinking=low"],
+      vibe: ["--thinking", "low"],
     } as const;
 
     for (const [id, effortArgs] of Object.entries(runs)) {
@@ -397,6 +398,49 @@ describe("normalized invocation", () => {
       command: "grok",
       args: ["-p", "review this", "--sandbox", "read-only", "--output-format", "json"],
     });
+  });
+
+  /** An agent profile's enabled_tools replaces --enabled-tools, so the lock is a disabled list. */
+  it("keeps Vibe read-only runs on read_file through a disabled-tools filter", () => {
+    const vibe = getHarness("vibe");
+    const filter = "re:^(?!read_file$).*";
+
+    expect(vibe.buildInvocation("review this", { readOnly: true })).toEqual({
+      command: "vibe",
+      args: ["--prompt=review this", "--disabled-tools", filter],
+    });
+    expect(vibe.buildInvocation("review this", { readOnly: true, structured: true })?.args).toEqual(
+      ["--prompt=review this", "--disabled-tools", filter, "--output", "json"],
+    );
+    expect(vibe.readOnlyTools()).toEqual([
+      "read_file",
+      "run_typescript",
+      "search_tool_functions",
+      "wait",
+    ]);
+    expect(new RegExp(filter.slice(3)).test("read_file")).toBe(false);
+    for (const tool of [
+      "bash",
+      "write_file",
+      "edit",
+      "skill",
+      "task",
+      "read_file_x",
+      "hx_harnesses_run",
+    ]) {
+      expect(new RegExp(filter.slice(3)).test(tool), tool).toBe(true);
+    }
+  });
+
+  it("keeps a Vibe prompt that starts with a dash out of the flags", () => {
+    const vibe = getHarness("vibe");
+
+    expect(vibe.buildInvocation("-x marks the spot", { tools: true })?.args).toEqual([
+      "--prompt=-x marks the spot",
+    ]);
+    expect(vibe.invocationError({})).toBe(
+      "Harness vibe has no advisor without tools invocation; retry with tools: true to start its full agent",
+    );
   });
 
   it("says a read-only Grok run loses the network on Linux only", () => {

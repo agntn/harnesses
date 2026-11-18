@@ -50,6 +50,7 @@ describe("@agntn/harnesses", () => {
       "opencode",
       "pi",
       "prime-agent",
+      "vibe",
     ]);
     expect(listHarnesses().sort()).toEqual([...harnessIds].sort());
   });
@@ -370,6 +371,7 @@ describe("@agntn/harnesses", () => {
       openbot: { audio: false, video: false },
       opencode: { audio: false, video: false },
       pi: { audio: false, video: false },
+      vibe: { audio: false, video: false },
       "prime-agent": { audio: false, video: false },
     });
   });

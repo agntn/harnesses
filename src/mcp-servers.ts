@@ -2,7 +2,7 @@
  * Normalized MCP server management across harness config dialects.
  *
  * Reads and writes work for every declared config file. JSON writes are a
- * parse/serialize round trip. TOML (codex, grok) and JSONC (kilo, opencode)
+ * parse/serialize round trip. TOML (codex, grok, vibe) and JSONC (kilo, opencode)
  * configs carry user comments that a round trip would destroy, so their
  * writes are surgical edits: only the target server's entry changes, the
  * result is re-parsed and checked against the intended state before anything
@@ -298,6 +298,30 @@ function normalizeMastracode(
 }
 
 /**
+ * A Vibe table: `command` may be a list, headers sit under `auth`, the off switch is `disabled`.
+ *
+ * @param name - Server name the table gives itself.
+ * @param raw - Raw Vibe server table.
+ * @returns {McpServerConfig} The normalized server entry.
+ */
+function normalizeVibe(name: string, raw: Readonly<Record<string, unknown>>): McpServerConfig {
+  const list = asStringArray(raw.command) ?? [];
+  const args = [...list.slice(1), ...(asStringArray(raw.args) ?? [])];
+  const url = stringField(raw, "url");
+  const auth = isObjectRecord(raw.auth) ? raw.auth : raw;
+  return compact({
+    name,
+    transport: url ? ("http" as const) : ("stdio" as const),
+    command: list[0] ?? stringField(raw, "command"),
+    args: args.length > 0 ? args : undefined,
+    env: asStringRecord(raw.env),
+    url,
+    headers: asStringRecord(auth.headers),
+    enabled: negated(booleanField(raw, "disabled")),
+  });
+}
+
+/**
  * Maps one raw config entry to the normalized shape, per dialect.
  *
  * @param name - Server name from the containing map.
@@ -315,6 +339,7 @@ function normalizeEntry(
   if (dialect === "opencode") return normalizeOpenCode(name, raw);
   if (dialect === "prime") return normalizePrime(name, raw);
   if (dialect === "codex") return normalizeCodex(name, raw);
+  if (dialect === "vibe") return normalizeVibe(name, raw);
   return normalizeStandard(name, raw);
 }
 
@@ -484,7 +509,18 @@ const WITHOUT_SSE: Readonly<Partial<Record<McpConfigFile["dialect"], string>>> =
   antigravity: "Antigravity",
   openbot: "OpenBot",
   pi: "Pi",
+  vibe: "Mistral Vibe",
 };
+
+/** Vibe rewrites any other name on load. */
+const VIBE_NAME = /^[A-Za-z0-9](?:[A-Za-z0-9_-]{0,254}[A-Za-z0-9])?$/;
+
+function requireVibeName(name: string): void {
+  if (VIBE_NAME.test(name)) return;
+  throw new McpLimitError(
+    `${name}: Mistral Vibe takes letters, digits, _ and - in a server name, with a letter or digit at both ends`,
+  );
+}
 
 /**
  * Env references per {@link resolveEnvReferences}, minus `sse` and `enabled` for Mastra Code.
@@ -507,6 +543,7 @@ function shapeForDialect(
     );
   }
   if (dialect === "openbot") return openBotServer(shaped);
+  if (dialect === "vibe") requireVibeName(shaped.name);
   if (dialect !== "mastracode") return shaped;
   return compact({
     ...shaped,
@@ -607,9 +644,25 @@ function parseConfig(raw: string, kind: McpConfigFile["format"]): unknown {
   return kind === "jsonc" ? parseJsoncObject(raw) : (JSON.parse(raw) as unknown);
 }
 
+/**
+ * Reads the server map, or an array of tables keyed by the name each one gives itself.
+ *
+ * @param node - Value found at the config's server key.
+ * @returns {Record<string, unknown>} Raw entries by server name.
+ */
+function serversByName(node: unknown): Record<string, unknown> {
+  if (!Array.isArray(node)) return isObjectRecord(node) ? node : {};
+  const tables: readonly unknown[] = node;
+  return Object.fromEntries(
+    tables.flatMap((table): Array<[string, unknown]> =>
+      isObjectRecord(table) && typeof table.name === "string" ? [[table.name, table]] : [],
+    ),
+  );
+}
+
 function configServerMap(raw: string, entry: McpConfigFile): Record<string, unknown> {
   const parsed = parseConfig(raw, entry.format);
-  return drill(isObjectRecord(parsed) ? parsed : {}, entry.key) ?? {};
+  return serversByName(drill(isObjectRecord(parsed) ? parsed : {}, entry.key));
 }
 
 function normalizeServerMap(
@@ -827,7 +880,166 @@ function stripTomlServer(raw: string, key: readonly string[], name: string): str
 
 function serverMapFromToml(raw: string, key: readonly string[]): Record<string, unknown> {
   const parsed = parseToml(raw);
-  return drill(parsed as Record<string, unknown>, key) ?? {};
+  return serversByName(drill(parsed as Record<string, unknown>, key));
+}
+
+/**
+ * Renders one server as a `[[key]]` table, `command` as a list Vibe won't split.
+ *
+ * @param key - TOML path of the array.
+ * @param server - Server to serialize.
+ * @returns {string} The rendered TOML block.
+ */
+function tomlTableBlock(key: readonly string[], server: McpServerConfig): string {
+  const head = key.map(tomlKeyPart).join(".");
+  const lines = [
+    `[[${head}]]`,
+    `name = ${tomlValue(server.name)}`,
+    `transport = ${tomlValue(server.url ? "streamable-http" : "stdio")}`,
+  ];
+  if (server.command) lines.push(`command = [${tomlValue(server.command)}]`);
+  if (server.args?.length) lines.push(`args = [${server.args.map(tomlValue).join(", ")}]`);
+  if (server.url) lines.push(`url = ${tomlValue(server.url)}`);
+  if (server.enabled !== undefined) lines.push(`disabled = ${!server.enabled}`);
+  const auth = server.headers ? ["", `[${head}.auth]`, 'type = "static"'] : [];
+  lines.push(
+    ...tomlTable(`${head}.env`, server.env),
+    ...auth,
+    ...tomlTable(`${head}.auth.headers`, server.headers),
+  );
+  return `${lines.join("\n")}\n`;
+}
+
+/**
+ * Reads the name a `[[key]]` block gives itself by parsing the block alone.
+ *
+ * @param block - Lines of one block, header first.
+ * @param key - TOML path of the array.
+ * @returns {unknown} The name, or undefined when the block doesn't parse.
+ */
+function tomlTableName(block: readonly string[], key: readonly string[]): unknown {
+  try {
+    return Object.keys(serverMapFromToml(block.join("\n"), key))[0];
+  } catch {
+    return undefined;
+  }
+}
+
+/** The key path a TOML header names, and whether it opens an array of tables. */
+type TomlHeader = Readonly<{ path: readonly string[]; array: boolean }>;
+
+/**
+ * Reads a header the way TOML does, so `[[ a ]]` and `[["a"]]` both name `a`.
+ *
+ * @param line - One line of TOML.
+ * @returns {TomlHeader | undefined} The header, or undefined for any other line.
+ */
+function tomlHeader(line: string): TomlHeader | undefined {
+  if (!/^\s*\[/.test(line)) return undefined;
+  let node: unknown;
+  try {
+    node = parseToml(line);
+  } catch {
+    return undefined;
+  }
+  const path: string[] = [];
+  while (isObjectRecord(node) && !Array.isArray(node)) {
+    const [only, ...rest] = Object.keys(node);
+    if (only === undefined) return { path, array: false };
+    if (rest.length > 0) return undefined;
+    path.push(only);
+    node = node[only];
+  }
+  return Array.isArray(node) ? { path, array: true } : undefined;
+}
+
+function startsWithPath(path: readonly string[], key: readonly string[]): boolean {
+  return key.every((part, index) => path[index] === part);
+}
+
+/**
+ * Deletes one server from an array of tables, every other line kept as it was.
+ *
+ * @param raw - Original TOML text.
+ * @param key - TOML path of the array.
+ * @param name - Server name to remove.
+ * @returns {string} TOML text without that server's blocks.
+ */
+function stripTomlTable(raw: string, key: readonly string[], name: string): string {
+  const blocks: Array<{ header?: TomlHeader; lines: string[] }> = [{ lines: [] }];
+  for (const line of raw.split("\n")) {
+    const header = tomlHeader(line);
+    const nested = header && header.path.length > key.length && startsWithPath(header.path, key);
+    if (header && !nested) blocks.push({ header, lines: [] });
+    blocks.at(-1)?.lines.push(line);
+  }
+  return blocks
+    .flatMap(({ header, lines }) => {
+      const server = header?.array === true && header.path.length === key.length;
+      const own = server && startsWithPath(header.path, key);
+      return own && tomlTableName(lines, key) === name ? tailNotes(lines) : lines;
+    })
+    .join("\n");
+}
+
+/**
+ * Drops a top-level `key = []`, which `vibe mcp remove` leaves behind and no table may follow.
+ *
+ * @param raw - Original TOML text.
+ * @param key - TOML path of the array.
+ * @returns {string} The text without that assignment.
+ */
+function dropEmptyArray(raw: string, key: readonly string[]): string {
+  const lines = raw.split("\n");
+  const end = lines.findIndex((line) => tomlHeader(line) !== undefined);
+  const top = end === -1 ? lines.length : end;
+  const empty = lines.findIndex((line, index) => index < top && isEmptyArrayAt(line, key));
+  return empty === -1 ? raw : lines.toSpliced(empty, 1).join("\n");
+}
+
+function isEmptyArrayAt(line: string, key: readonly string[]): boolean {
+  if (!/^\s*[^\s#[]/.test(line)) return false;
+  try {
+    const value = drill(parseToml(line), key.slice(0, -1));
+    const last = key.at(-1);
+    const found = value && last !== undefined ? value[last] : undefined;
+    return Array.isArray(found) && found.length === 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The comments a block ends with, which belong to the next header.
+ *
+ * @param block - Lines of one block.
+ * @returns {string[]} Those comments, with the blank lines between them.
+ */
+function tailNotes(block: readonly string[]): string[] {
+  const body = block.findLastIndex((line) => !/^\s*(?:#.*)?$/.test(line));
+  const tail = block.slice(body + 1);
+  const first = tail.findIndex((line) => /\S/.test(line));
+  return first === -1 ? [] : tail.slice(first);
+}
+
+/** How one TOML config lays its servers out: a map of sections, or Vibe's array of tables. */
+type TomlLayout = Readonly<{
+  strip: (raw: string, key: readonly string[], name: string) => string;
+  render: (key: readonly string[], server: McpServerConfig) => string;
+}>;
+
+function tomlLayout(dialect: McpConfigFile["dialect"]): TomlLayout {
+  if (dialect === "vibe") {
+    return {
+      strip: (raw, key, name) => stripTomlTable(dropEmptyArray(raw, key), key, name),
+      render: tomlTableBlock,
+    };
+  }
+  const headersKey = dialect === "codex" ? "http_headers" : "headers";
+  return {
+    strip: stripTomlServer,
+    render: (key, server) => tomlSections(key, server, headersKey),
+  };
 }
 
 /** The server a surgical edit targets, and whether it must exist afterwards. */
@@ -888,16 +1100,16 @@ function addTomlServer(
   server: McpServerConfig,
   options: Readonly<EditOptions>,
 ): boolean {
-  const { key, dialect } = entry;
-  const headersKey = dialect === "codex" ? "http_headers" : "headers";
+  const { key } = entry;
+  const layout = tomlLayout(entry.dialect);
   const before = readConfig(path, options) ?? "";
   const beforeMap = serverMapFromToml(before, key);
   const replaced = Object.hasOwn(beforeMap, server.name);
-  const stripped = replaced ? stripTomlServer(before, key, server.name) : before;
+  const stripped =
+    replaced || entry.dialect === "vibe" ? layout.strip(before, key, server.name) : before;
   const body = stripped.replace(/\s+$/, "");
-  const after = body
-    ? `${body}\n\n${tomlSections(key, server, headersKey)}`
-    : tomlSections(key, server, headersKey);
+  const block = layout.render(key, server);
+  const after = body ? `${body}\n\n${block}` : block;
   assertTomlEdit(beforeMap, after, key, { name: server.name, shouldExist: true });
   writeConfig(path, after, options);
   return replaced;
@@ -905,15 +1117,16 @@ function addTomlServer(
 
 function removeTomlServer(
   path: string,
-  key: readonly string[],
+  entry: McpConfigFile,
   name: string,
   options: Readonly<EditOptions>,
 ): boolean {
+  const { key } = entry;
   const before = readConfig(path, options);
   if (before === null) return false;
   const beforeMap = serverMapFromToml(before, key);
   if (!Object.hasOwn(beforeMap, name)) return false;
-  const after = stripTomlServer(before, key, name);
+  const after = tomlLayout(entry.dialect).strip(before, key, name);
   assertTomlEdit(beforeMap, after, key, { name, shouldExist: false });
   writeConfig(path, after, options);
   return true;
@@ -1121,7 +1334,7 @@ function removeFromConfig(
   }
 
   if (entry.format === "toml") {
-    return { path, removed: removeTomlServer(path, entry.key, name, options) };
+    return { path, removed: removeTomlServer(path, entry, name, options) };
   }
 
   if (entry.format === "jsonc") {

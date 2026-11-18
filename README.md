@@ -5,20 +5,20 @@
 [![license](https://npmx.dev/api/registry/badge/license/@agntn/harnesses)](https://npmx.dev/package/@agntn/harnesses)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/agntn/harnesses)
 
-🧭 Fifteen coding CLIs, one map. You ask where Claude keeps skills, you get the path.
+🧭 Sixteen coding CLIs, one map. You ask where Claude keeps skills, you get the path.
 
 > [!WARNING]
 > **@agntn/harnesses is pre-1.0.** Paths follow upstream CLIs that still move. Building on it now means pinning the version.
 
 ## Why?
 
-Claude stores transcripts under a mangled copy of your cwd. Codex keeps TOML with comments you wanted to keep. Ask a model where Codex lives and it invents `.claude/`. So this is one registry: fifteen harnesses, same object, paths for your machine.
+Claude stores transcripts under a mangled copy of your cwd. Codex keeps TOML with comments you wanted to keep. Ask a model where Codex lives and it invents `.claude/`. So this is one registry: sixteen harnesses, same object, paths for your machine.
 
 The rest of it sits on [harnesses.agntn.dev](https://harnesses.agntn.dev).
 
 ## ✨ Features
 
-- 🧩 **Fifteen harnesses, one class.** Same fields on Claude, Codex, Pi and the rest.
+- 🧩 **Sixteen harnesses, one class.** Same fields on Claude, Codex, Pi and the rest.
 - 📂 **Every path has a receipt.** Scope, evidence level, and a platform tag when the OS actually differs.
 - 🔎 **Detects which CLI you're inside.** Environment variables first. Two project markers in one directory is `null`, not a guess.
 - ▶️ **Headless runs with real modes.** Advisor without tools, full agent, or a native read-only sandbox. A mode the CLI cannot enforce is rejected.
@@ -59,6 +59,7 @@ npx @agntn/harnesses detect
     ● opencode        OpenCode CLI            v2.0.22   agent
     ● prime-agent     Prime Agent             v0.9.5    advisor · agent
     ● pi              Pi Coding Agent         v1.0.2    advisor · readOnly · agent
+    ● vibe            Mistral Vibe            v3.1.3    readOnly · agent
     ○ openbot         OpenBot
 ```
 
@@ -226,6 +227,7 @@ target. Syncing Codex already links it.
 | `opencode`       | OpenCode CLI           | `.opencode/skills/`    |
 | `prime-agent`    | Prime Agent            | `.prime/agent/skills/` |
 | `pi`             | Pi Coding Agent        | `.pi/skills/`          |
+| `vibe`           | Mistral Vibe           | `.vibe/skills/`        |
 
 That's the project directory. Most of them also keep a copy under your home directory, and a few read someone else's skills folder on purpose. Sessions, hooks, audio, video, the whole sheet: [Harnesses](https://harnesses.agntn.dev/harnesses).
 
@@ -253,7 +255,7 @@ It does not install skills, drive a browser, or run a sandbox of its own. `invok
 
 ## 🧩 Adding a harness
 
-Want a sixteenth? One class extending `Harness`, then `registerHarness`. `getHarness`, the CLI and the tools pick it up. How to write that class: [Custom harnesses](https://harnesses.agntn.dev/guide/custom).
+Want a seventeenth? One class extending `Harness`, then `registerHarness`. `getHarness`, the CLI and the tools pick it up. How to write that class: [Custom harnesses](https://harnesses.agntn.dev/guide/custom).
 
 ## 🛠️ Development
 

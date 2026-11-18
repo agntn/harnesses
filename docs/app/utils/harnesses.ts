@@ -87,6 +87,11 @@ const PRESENTATION: Record<string, { icon: string; short: string; blurb: string 
     blurb:
       "Pi fork with one Python REPL tool, flat JSONL sessions and model listing. No read-only mode.",
   },
+  vibe: {
+    icon: "i-simple-icons-mistralai",
+    short: "Vibe",
+    blurb: "Mistral's CLI. MCP servers as TOML tables, trust per folder, read-only down to read_file.",
+  },
 };
 
 export interface HarnessEntry extends HarnessRecord {
