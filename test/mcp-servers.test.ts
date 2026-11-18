@@ -1,4 +1,13 @@
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it, onTestFinished, vi } from "vite-plus/test";
@@ -720,6 +729,26 @@ describe("addMcpServer / removeMcpServer", () => {
     expect(final).toContain("[mcp_servers.keep]");
     expect(final).not.toContain("probe");
     expect(removeMcpServer(grok, "probe", "user", dirs).removed).toBe(false);
+  });
+
+  /** Umask 022 trims 660, so that case fails without the chmod. */
+  it.each([
+    ["600", 0o600],
+    ["660", 0o660],
+  ])("keeps a %s config at that mode through add and remove", (_, want) => {
+    const dirs = fixtureDirs();
+    const codex = getHarness("codex");
+    const configPath = join(dirs.homeDir, ".codex", "config.toml");
+    mkdirSync(dirname(configPath), { recursive: true });
+    writeFileSync(configPath, '[mcp_servers.keep]\ncommand = "x"\n');
+    chmodSync(configPath, want);
+    const mode = (): number => statSync(configPath).mode & 0o777;
+
+    addMcpServer(codex, { name: "hub", transport: "http", url: "http://h/mcp" }, "user", dirs);
+    expect(mode()).toBe(want);
+
+    removeMcpServer(codex, "hub", "user", dirs);
+    expect(mode()).toBe(want);
   });
 
   it("creates a fresh TOML config for codex when none exists", () => {

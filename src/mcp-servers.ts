@@ -10,7 +10,7 @@
  * keeps its servers as rows of a SQLite table, which `mcp-sqlite.ts` edits
  * one row per server.
  */
-import { existsSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, normalize } from "node:path";
 import { applyEdits, format, modify, type Edit } from "jsonc-parser";
@@ -736,10 +736,23 @@ function writableConfig(
   return config;
 }
 
+/**
+ * Swaps the file in whole and keeps its old mode, so a 600 config full of tokens stays 600.
+ *
+ * @param path - Config file to replace.
+ * @param content - Its new text.
+ */
 function writeAtomically(path: string, content: string): void {
   mkdirSync(dirname(path), { recursive: true });
   const temp = join(dirname(path), `.${Date.now()}-${process.pid}.mcp.tmp`);
-  writeFileSync(temp, content);
+  const old = statSync(path, { throwIfNoEntry: false });
+  if (old === undefined) {
+    writeFileSync(temp, content);
+  } else {
+    const mode = old.mode & 0o7777;
+    writeFileSync(temp, content, { mode });
+    chmodSync(temp, mode);
+  }
   renameSync(temp, path);
 }
 
