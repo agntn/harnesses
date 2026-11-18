@@ -1910,3 +1910,195 @@ describe("header references for Prime Agent", () => {
     expect(servers?.[0]?.headers).toEqual({ Authorization: "Bearer s3cret" });
   });
 });
+
+describe("Mistral Vibe [[mcp_servers]]", () => {
+  /** What `vibe mcp add` 3.1.3 writes, plus a comment and a key of the user's own. */
+  const VIBE_CONFIG = `# my vibe
+theme = "auto" # keep
+
+[[mcp_servers]]
+name = "fetch_server"
+transport = "stdio"
+command = "/opt/my tools/uvx"
+args = [
+    "mcp-server-fetch",
+]
+
+[mcp_servers.env]
+K = "v"
+
+# the hosted one
+[[mcp_servers]]
+url = "https://mcp.example.org/mcp"
+name = "oauth1"
+transport = "streamable-http"
+
+[mcp_servers.auth]
+type = "oauth"
+scopes = []
+
+[tools.bash]
+permission = "ask"
+`;
+
+  /* Writes the config into a fresh home and returns its path. */
+  function vibeConfig(homeDir: string, body: string): string {
+    const path = join(homeDir, ".vibe", "config.toml");
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, body);
+    return path;
+  }
+
+  it("reads the tables Vibe writes, a list command and auth headers included", () => {
+    const dirs = fixtureDirs();
+    vibeConfig(
+      dirs.homeDir,
+      `${VIBE_CONFIG}
+[[mcp_servers]]
+name = "argv"
+transport = "stdio"
+command = ["node", "srv.mjs"]
+args = ["mcp"]
+disabled = true
+
+[[mcp_servers]]
+name = "legacy"
+transport = "http"
+url = "https://example.com/mcp"
+headers = { "X-Client" = "vibe" }
+`,
+    );
+
+    expect(listMcpServers(getHarness("vibe"), dirs)[0]?.servers).toEqual([
+      {
+        name: "fetch_server",
+        transport: "stdio",
+        command: "/opt/my tools/uvx",
+        args: ["mcp-server-fetch"],
+        env: { K: "v" },
+      },
+      { name: "oauth1", transport: "http", url: "https://mcp.example.org/mcp" },
+      {
+        name: "argv",
+        transport: "stdio",
+        command: "node",
+        args: ["srv.mjs", "mcp"],
+        enabled: false,
+      },
+      {
+        name: "legacy",
+        transport: "http",
+        url: "https://example.com/mcp",
+        headers: { "X-Client": "vibe" },
+      },
+    ]);
+  });
+
+  it("replaces and removes one table, every other line kept", () => {
+    const dirs = fixtureDirs();
+    const vibe = getHarness("vibe");
+    const path = vibeConfig(dirs.homeDir, VIBE_CONFIG);
+
+    expect(
+      addMcpServer(
+        vibe,
+        {
+          name: "fetch_server",
+          transport: "stdio",
+          command: "/opt/dir with space/srv",
+          args: ["a b"],
+        },
+        "user",
+        dirs,
+      ),
+    ).toEqual({ path, replaced: true });
+    addMcpServer(
+      vibe,
+      {
+        name: "remote",
+        transport: "http",
+        url: "https://example.com/mcp",
+        headers: { Authorization: "Bearer t" },
+        enabled: false,
+      },
+      "user",
+      dirs,
+    );
+
+    const written = readFileSync(path, "utf8");
+    expect(written).toContain(
+      '# my vibe\ntheme = "auto" # keep\n\n# the hosted one\n[[mcp_servers]]',
+    );
+    expect(written).toContain('[tools.bash]\npermission = "ask"');
+    expect(written).toContain('command = ["/opt/dir with space/srv"]');
+    expect(written).toContain(
+      '[[mcp_servers]]\nname = "remote"\ntransport = "streamable-http"\nurl = "https://example.com/mcp"\ndisabled = true\n\n[mcp_servers.auth]\ntype = "static"\n\n[mcp_servers.auth.headers]\nAuthorization = "Bearer t"\n',
+    );
+    expect(listMcpServers(vibe, dirs)[0]?.servers.map((server) => server.name)).toEqual([
+      "oauth1",
+      "fetch_server",
+      "remote",
+    ]);
+
+    expect(removeMcpServer(vibe, "oauth1", "user", dirs)).toEqual({ path, removed: true });
+    const after = readFileSync(path, "utf8");
+    expect(after).not.toContain("oauth1");
+    expect(after).toContain("# the hosted one");
+    expect(after).toContain('[tools.bash]\npermission = "ask"');
+    expect(listMcpServers(vibe, dirs)[0]?.servers.find((s) => s.name === "remote")).toEqual({
+      name: "remote",
+      transport: "http",
+      url: "https://example.com/mcp",
+      headers: { Authorization: "Bearer t" },
+      enabled: false,
+    });
+  });
+
+  it("refuses names Vibe would rewrite and sse before writing anything", () => {
+    const dirs = fixtureDirs();
+    const vibe = getHarness("vibe");
+    const path = vibeConfig(dirs.homeDir, VIBE_CONFIG);
+
+    for (const name of ["two words", "_x", "a.b", "x-"]) {
+      expect(() =>
+        addMcpServer(vibe, { name, transport: "stdio", command: "n" }, "user", dirs),
+      ).toThrow(/Mistral Vibe takes letters, digits, _ and -/);
+    }
+    expect(() =>
+      addMcpServer(vibe, { name: "ev", transport: "sse", url: "https://e/sse" }, "user", dirs),
+    ).toThrow(McpTransportError);
+    expect(readFileSync(path, "utf8")).toBe(VIBE_CONFIG);
+  });
+
+  it("syncs into a commented config and is idempotent", () => {
+    const dirs = fixtureDirs();
+    vi.stubEnv("XDG_CONFIG_HOME", "");
+    const master = join(dirs.homeDir, ".config", "agntn", "mcp.jsonc");
+    mkdirSync(dirname(master), { recursive: true });
+    writeFileSync(
+      master,
+      JSON.stringify({
+        mcpServers: {
+          probe: { command: "node", args: ["srv.mjs"] },
+          events: { type: "sse", url: "https://example.com/sse" },
+        },
+      }),
+    );
+    const path = vibeConfig(dirs.homeDir, VIBE_CONFIG);
+
+    const first = syncMcpServers([getHarness("vibe")], dirs);
+    expect(first.targets[0]?.results).toEqual([
+      { name: "probe", action: "added" },
+      { name: "events", action: "skipped", reason: expect.stringContaining("not sse") as string },
+      { name: "fetch_server", action: "removed" },
+      { name: "oauth1", action: "removed" },
+    ]);
+    const written = readFileSync(path, "utf8");
+    expect(written).toContain('# my vibe\ntheme = "auto" # keep');
+    expect(written).toContain('[tools.bash]\npermission = "ask"');
+
+    const second = syncMcpServers([getHarness("vibe")], dirs);
+    expect(second.targets[0]?.results.map((row) => row.action)).toEqual(["unchanged", "skipped"]);
+    expect(readFileSync(path, "utf8")).toBe(written);
+  });
+});

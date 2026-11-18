@@ -14,6 +14,7 @@ import OpenBot from "./openbot.ts";
 import OpenCode from "./opencode.ts";
 import Pi from "./pi.ts";
 import PrimeAgent from "./prime-agent.ts";
+import Vibe from "./vibe.ts";
 
 /**
  * Env detection walks this list in order, so a fork that keeps its parent's marker goes first,
@@ -36,5 +37,6 @@ export const harnesses: HarnessConstructor[] = [
   // env marker must be checked before Pi's.
   PrimeAgent,
   Pi,
+  Vibe,
   OpenBot,
 ];
