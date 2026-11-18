@@ -925,6 +925,38 @@ function tomlTableName(block: readonly string[], key: readonly string[]): unknow
   }
 }
 
+/** The key path a TOML header names, and whether it opens an array of tables. */
+type TomlHeader = Readonly<{ path: readonly string[]; array: boolean }>;
+
+/**
+ * Reads a header the way TOML does, so `[[ a ]]` and `[["a"]]` both name `a`.
+ *
+ * @param line - One line of TOML.
+ * @returns {TomlHeader | undefined} The header, or undefined for any other line.
+ */
+function tomlHeader(line: string): TomlHeader | undefined {
+  if (!/^\s*\[/.test(line)) return undefined;
+  let node: unknown;
+  try {
+    node = parseToml(line);
+  } catch {
+    return undefined;
+  }
+  const path: string[] = [];
+  while (isObjectRecord(node) && !Array.isArray(node)) {
+    const [only, ...rest] = Object.keys(node);
+    if (only === undefined) return { path, array: false };
+    if (rest.length > 0) return undefined;
+    path.push(only);
+    node = node[only];
+  }
+  return Array.isArray(node) ? { path, array: true } : undefined;
+}
+
+function startsWithPath(path: readonly string[], key: readonly string[]): boolean {
+  return key.every((part, index) => path[index] === part);
+}
+
 /**
  * Deletes one server from an array of tables, every other line kept as it was.
  *
@@ -934,19 +966,47 @@ function tomlTableName(block: readonly string[], key: readonly string[]): unknow
  * @returns {string} TOML text without that server's blocks.
  */
 function stripTomlTable(raw: string, key: readonly string[], name: string): string {
-  const head = RegExp.escape(key.map(tomlKeyPart).join("."));
-  const start = new RegExp(`^\\s*\\[\\[${head}\\]\\]\\s*(#.*)?$`);
-  const own = new RegExp(`^\\s*\\[\\[?${head}\\.`);
-  const blocks: string[][] = [[]];
+  const blocks: Array<{ header?: TomlHeader; lines: string[] }> = [{ lines: [] }];
   for (const line of raw.split("\n")) {
-    if (/^\s*\[/.test(line) && !own.test(line)) blocks.push([]);
-    blocks.at(-1)?.push(line);
+    const header = tomlHeader(line);
+    const nested = header && header.path.length > key.length && startsWithPath(header.path, key);
+    if (header && !nested) blocks.push({ header, lines: [] });
+    blocks.at(-1)?.lines.push(line);
   }
   return blocks
-    .flatMap((block) =>
-      start.test(block[0] ?? "") && tomlTableName(block, key) === name ? tailNotes(block) : block,
-    )
+    .flatMap(({ header, lines }) => {
+      const server = header?.array === true && header.path.length === key.length;
+      const own = server && startsWithPath(header.path, key);
+      return own && tomlTableName(lines, key) === name ? tailNotes(lines) : lines;
+    })
     .join("\n");
+}
+
+/**
+ * Drops a top-level `key = []`, which `vibe mcp remove` leaves behind and no table may follow.
+ *
+ * @param raw - Original TOML text.
+ * @param key - TOML path of the array.
+ * @returns {string} The text without that assignment.
+ */
+function dropEmptyArray(raw: string, key: readonly string[]): string {
+  const lines = raw.split("\n");
+  const end = lines.findIndex((line) => tomlHeader(line) !== undefined);
+  const top = end === -1 ? lines.length : end;
+  const empty = lines.findIndex((line, index) => index < top && isEmptyArrayAt(line, key));
+  return empty === -1 ? raw : lines.toSpliced(empty, 1).join("\n");
+}
+
+function isEmptyArrayAt(line: string, key: readonly string[]): boolean {
+  if (!/^\s*[^\s#[]/.test(line)) return false;
+  try {
+    const value = drill(parseToml(line), key.slice(0, -1));
+    const last = key.at(-1);
+    const found = value && last !== undefined ? value[last] : undefined;
+    return Array.isArray(found) && found.length === 0;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -969,7 +1029,12 @@ type TomlLayout = Readonly<{
 }>;
 
 function tomlLayout(dialect: McpConfigFile["dialect"]): TomlLayout {
-  if (dialect === "vibe") return { strip: stripTomlTable, render: tomlTableBlock };
+  if (dialect === "vibe") {
+    return {
+      strip: (raw, key, name) => stripTomlTable(dropEmptyArray(raw, key), key, name),
+      render: tomlTableBlock,
+    };
+  }
   const headersKey = dialect === "codex" ? "http_headers" : "headers";
   return {
     strip: stripTomlServer,
@@ -1040,7 +1105,8 @@ function addTomlServer(
   const before = readConfig(path, options) ?? "";
   const beforeMap = serverMapFromToml(before, key);
   const replaced = Object.hasOwn(beforeMap, server.name);
-  const stripped = replaced ? layout.strip(before, key, server.name) : before;
+  const stripped =
+    replaced || entry.dialect === "vibe" ? layout.strip(before, key, server.name) : before;
   const body = stripped.replace(/\s+$/, "");
   const block = layout.render(key, server);
   const after = body ? `${body}\n\n${block}` : block;

@@ -2070,6 +2070,36 @@ headers = { "X-Client" = "vibe" }
     expect(readFileSync(path, "utf8")).toBe(VIBE_CONFIG);
   });
 
+  it("adds the first server after vibe mcp remove left an empty array behind", () => {
+    const dirs = fixtureDirs();
+    const path = vibeConfig(dirs.homeDir, 'theme = "auto"\nmcp_servers = []\n');
+
+    addMcpServer(getHarness("vibe"), { name: "x", transport: "stdio", command: "n" }, "user", dirs);
+
+    expect(readFileSync(path, "utf8")).toBe(
+      'theme = "auto"\n\n[[mcp_servers]]\nname = "x"\ntransport = "stdio"\ncommand = ["n"]\n',
+    );
+  });
+
+  it("finds a table whatever spacing or quoting its header uses", () => {
+    const vibe = getHarness("vibe");
+    for (const head of ["[[ mcp_servers ]]", '[["mcp_servers"]]']) {
+      const dirs = fixtureDirs();
+      const path = vibeConfig(
+        dirs.homeDir,
+        `${head}\nname = "x"\ntransport = "stdio"\ncommand = "old"\n\n[ mcp_servers.env ]\nK = "v"\n`,
+      );
+
+      addMcpServer(vibe, { name: "x", transport: "stdio", command: "new" }, "user", dirs);
+      expect(listMcpServers(vibe, dirs)[0]?.servers, head).toEqual([
+        { name: "x", transport: "stdio", command: "new" },
+      ]);
+      expect(readFileSync(path, "utf8"), head).not.toContain("old");
+      expect(removeMcpServer(vibe, "x", "user", dirs), head).toEqual({ path, removed: true });
+      expect(readFileSync(path, "utf8"), head).toBe("");
+    }
+  });
+
   it("syncs into a commented config and is idempotent", () => {
     const dirs = fixtureDirs();
     vi.stubEnv("XDG_CONFIG_HOME", "");
