@@ -73,7 +73,48 @@ function statusRenderers(tool: HarnessToolName) {
   };
 }
 
+const modelSection = "active_session_model";
+
+type SessionModel = Readonly<{ provider: string; id: string }>;
+
+function modelGuidance(model: SessionModel | undefined): string {
+  const selection = model
+    ? JSON.stringify(`${model.provider}/${model.id}`).replaceAll("<", "\\u003c")
+    : "unknown";
+  return [
+    `Pi's selected model for this request: ${selection}.`,
+    "No need to check environment variables or list models to find it.",
+    "For independent advice via harnesses_run, pick a known different model explicitly.",
+    "A different harness or alias for the same model doesn't count. Skip the consultation if no alternative is known.",
+  ].join("\n");
+}
+
 export default function harnessesExtension(pi: ExtensionAPI): void {
+  pi.on("before_agent_start", (event, ctx) => {
+    const guidance = modelGuidance(ctx.model);
+    if (event.systemPromptOptions?.sections) {
+      event.systemPromptOptions.sections[modelSection] = guidance;
+      return undefined;
+    }
+    return { systemPrompt: `${event.systemPrompt}\n\n${guidance}` };
+  });
+
+  pi.on("context_with_system", (event, ctx) => {
+    for (let index = event.messages.length - 1; index >= 0; index--) {
+      const message = event.messages[index];
+      if (message?.role !== "system" || !Object.hasOwn(message.sections ?? {}, modelSection)) {
+        continue;
+      }
+      const section = `<${modelSection}>\n${modelGuidance(ctx.model)}\n</${modelSection}>`;
+      if (message.sections?.[modelSection] === section) return undefined;
+
+      const messages = event.messages.slice();
+      messages[index] = { ...message, sections: { ...message.sections, [modelSection]: section } };
+      return { messages };
+    }
+    return undefined;
+  });
+
   const schemas = harnessToolSchemas<TSchema, TSchema>(Type);
 
   pi.registerTool({
