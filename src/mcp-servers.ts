@@ -858,8 +858,9 @@ function tomlTable(head: string, record: Readonly<Record<string, string>> | unde
 
 /**
  * Deletes the lines that define one server in a TOML config: its
- * `[key.name]` section (with sub-tables) and any `name = {...}` inline
- * assignment inside the bare `[key]` table. Every other line survives
+ * `[key.name]` section (with sub-tables), matched by key path so spacing
+ * and quotes don't matter, and any `name = {...}` inline assignment inside
+ * the bare `[key]` table. Every other line survives
  * byte-for-byte, comments included.
  *
  * @param raw - Original TOML text.
@@ -868,20 +869,19 @@ function tomlTable(head: string, record: Readonly<Record<string, string>> | unde
  * @returns {string} TOML text without the target server.
  */
 function stripTomlServer(raw: string, key: readonly string[], name: string): string {
-  const prefix = RegExp.escape(key.map(tomlKeyPart).join("."));
   const namePart = `(?:${RegExp.escape(tomlKeyPart(name))}|${RegExp.escape(JSON.stringify(name))})`;
-  const sectionRe = new RegExp(`^\\s*\\[${prefix}\\.${namePart}(\\.[^\\]]+)?\\]`);
-  const bareTableRe = new RegExp(`^\\s*\\[${prefix}\\]\\s*(#.*)?$`);
-  const anyHeaderRe = /^\s*\[/;
   const inlineRe = new RegExp(`^\\s*${namePart}\\s*=`);
+  const server = [...key, name];
 
   const kept: string[] = [];
   let inTargetSection = false;
   let inBareTable = false;
   for (const line of raw.split("\n")) {
-    if (anyHeaderRe.test(line)) {
-      inTargetSection = sectionRe.test(line);
-      inBareTable = bareTableRe.test(line);
+    const header = tomlHeader(line);
+    if (header) {
+      inTargetSection = startsWithPath(header.path, server);
+      inBareTable =
+        !header.array && header.path.length === key.length && startsWithPath(header.path, key);
     } else if (inBareTable && inlineRe.test(line)) {
       continue;
     }
