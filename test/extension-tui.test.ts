@@ -39,6 +39,7 @@ function registeredTools(
 ): unknown[] {
   const tools: unknown[] = [];
   const api = {
+    on() {},
     registerTool(tool: unknown) {
       tools.push(tool);
     },
