@@ -238,6 +238,29 @@ describe("skillsSyncTarget", () => {
     expect(new Set(paths).size).toBe(paths.length);
   });
 
+  /** Without it, hermes update fills the shared source with its catalog. */
+  it("writes the Hermes opt-out marker once, and only outside check mode", () => {
+    withoutXdgData(() => {
+      const { homeDir, sourceDir } = fixture();
+      const marker = join(homeDir, ".hermes", ".no-bundled-skills");
+      const hermes = getHarness("hermes");
+
+      const check = syncSkills([hermes], true, { homeDir, platform: "linux" });
+      expect(check.targets[0]).toMatchObject({ action: "linked", marker });
+      expect(existsSync(marker)).toBe(false);
+
+      const first = syncSkills([hermes], false, { homeDir, platform: "linux" });
+      expect(first.targets[0]).toMatchObject({ action: "linked", marker });
+      expect(readFileSync(marker, "utf8")).toBe("");
+      expect(readlinkSync(join(homeDir, ".hermes", "skills"))).toBe(sourceDir);
+
+      const second = syncSkills([hermes], false, { homeDir, platform: "linux" });
+      expect(second.targets).toEqual([
+        { id: "hermes", path: join(homeDir, ".hermes", "skills"), action: "unchanged" },
+      ]);
+    });
+  });
+
   it("resolves the destination with the other paths", () => {
     const paths = getHarness("opencode").resolve({ homeDir: "/home/fixture", platform: "linux" });
     expect(paths.skillsSyncTarget?.path).toBe("/home/fixture/.config/opencode/skills/");

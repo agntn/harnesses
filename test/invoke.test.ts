@@ -154,6 +154,7 @@ describe("normalized invocation", () => {
       pi: ["--thinking", "low"],
       omp: ["--thinking=low"],
       vibe: ["--thinking", "low"],
+      hermes: ["--reasoning", "low"],
     } as const;
 
     for (const [id, effortArgs] of Object.entries(runs)) {
@@ -440,6 +441,30 @@ describe("normalized invocation", () => {
     ]);
     expect(vibe.invocationError({})).toBe(
       "Harness vibe has no advisor without tools invocation; retry with tools: true to start its full agent",
+    );
+  });
+
+  /** A prompt glued to --oneshot= or --query= can start with a dash. */
+  it("runs Hermes one-shot with the prompt glued to its flag and the rules left out", () => {
+    const hermes = getHarness("hermes");
+
+    expect(hermes.buildInvocation("-x marks the spot", { tools: true, model: "m" })).toEqual({
+      command: "hermes",
+      args: ["--oneshot=-x marks the spot", "--ignore-rules", "-m", "m"],
+    });
+    expect(hermes.buildInvocation("-x", { tools: true, structured: true })?.args).toEqual([
+      "chat",
+      "--query=-x",
+      "--oneshot",
+      "--format",
+      "stream-json",
+      "--ignore-rules",
+    ]);
+    expect(hermes.invocationError({})).toBe(
+      "Harness hermes has no advisor without tools invocation; retry with tools: true to start its full agent",
+    );
+    expect(hermes.invocationError({ readOnly: true })).toBe(
+      "Harness hermes has no read-only full agent invocation",
     );
   });
 

@@ -6,7 +6,7 @@ export default defineAppConfig({
   seo: {
     title: "@agntn/harnesses",
     description:
-      "Metadata registry for sixteen AI coding harnesses: config, session, instruction, skill and hook paths per platform with evidence levels, detection, headless invocation, MCP and AGENTS.md sync. Library, CLI and agent tools.",
+      "Metadata registry for seventeen AI coding harnesses: config, session, instruction, skill and hook paths per platform with evidence levels, detection, headless invocation, MCP and AGENTS.md sync. Library, CLI and agent tools.",
     schema: {
       type: "SoftwareApplication",
       applicationCategory: "DeveloperApplication",

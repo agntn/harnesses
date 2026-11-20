@@ -9,6 +9,7 @@ const WALK = [
   "opencode",
   "kilo",
   "vibe",
+  "hermes",
   "grok",
   "omp",
   "cursor",

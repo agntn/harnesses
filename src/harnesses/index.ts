@@ -7,6 +7,7 @@ import Freebuff from "./freebuff.ts";
 import Gemini from "./gemini.ts";
 import GitHubCopilot from "./github-copilot.ts";
 import Grok from "./grok.ts";
+import Hermes from "./hermes.ts";
 import Kilo from "./kilo.ts";
 import MastraCode from "./mastracode.ts";
 import Omp from "./omp.ts";
@@ -18,7 +19,7 @@ import Vibe from "./vibe.ts";
 
 /**
  * Env detection walks this list in order, so a fork that keeps its parent's marker goes first,
- * and OpenBot, whose marker every CLI it hosts inherits, goes last.
+ * and Hermes and OpenBot, whose markers every CLI they start inherits, go last.
  */
 export const harnesses: HarnessConstructor[] = [
   Antigravity,
@@ -38,5 +39,6 @@ export const harnesses: HarnessConstructor[] = [
   PrimeAgent,
   Pi,
   Vibe,
+  Hermes,
   OpenBot,
 ];

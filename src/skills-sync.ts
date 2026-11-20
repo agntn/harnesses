@@ -1,9 +1,9 @@
-import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { syncDirectoryLink } from "./directory-link.ts";
 import type { DirectoryLinkAction } from "./directory-link.ts";
 import type { Harness } from "./harness.ts";
-import { agntnDataDir } from "./resolve.ts";
+import { agntnDataDir, resolvePathTemplate } from "./resolve.ts";
 import type { ResolveOptions } from "./types.ts";
 
 export type SkillsSyncAction = DirectoryLinkAction;
@@ -15,6 +15,8 @@ export interface SkillsSyncTargetResult {
   readonly action: SkillsSyncAction;
   /** Backup path, skip reason, or a check-mode note. */
   readonly detail?: string;
+  /** Opt-out file this run wrote, or a check would write. */
+  readonly marker?: string;
 }
 
 /** Outcome of one skill sync run. */
@@ -73,11 +75,33 @@ function syncTarget(
   }
   // Registry paths end in a separator, which a directory symlink cannot carry.
   const targetDir = resolve(resolved.path);
-  return {
-    id: harness.id,
-    path: targetDir,
-    ...syncDirectoryLink("skills", harness.id, targetDir, sourceDir, check, options),
-  };
+  const outcome = syncDirectoryLink("skills", harness.id, targetDir, sourceDir, check, options);
+  const marker =
+    outcome.action === "skipped" ? undefined : writeMarker(target.marker, check, options);
+  return { id: harness.id, path: targetDir, ...outcome, ...(marker ? { marker } : {}) };
+}
+
+/**
+ * Writes a missing opt-out file.
+ *
+ * @param template - Marker path template, if the target has one.
+ * @param check - Only report the file.
+ * @param options - Path-resolution overrides.
+ * @returns {string | undefined} The marker path when it was missing.
+ */
+function writeMarker(
+  template: string | undefined,
+  check: boolean,
+  options: ResolveOptions,
+): string | undefined {
+  if (template === undefined) return undefined;
+  const path = resolvePathTemplate(template, options);
+  if (existsSync(path)) return undefined;
+  if (!check) {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, "");
+  }
+  return path;
 }
 
 /**

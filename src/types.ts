@@ -8,6 +8,7 @@ export type HarnessId =
   | "gemini"
   | "grok"
   | "claude"
+  | "hermes"
   | "kilo"
   | "opencode"
   | "cursor"
@@ -54,6 +55,8 @@ export interface EnvOverride extends PathCandidate {
 /** The user-scope skills directory that skill synchronization links to the source. */
 export interface SkillsSyncTarget extends PathCandidate {
   scope: "user";
+  /** Opt-out file sync writes, so the harness seeds nothing into the source. */
+  marker?: string;
 }
 
 /** One stable user-scope destination used by prompt template synchronization. */
