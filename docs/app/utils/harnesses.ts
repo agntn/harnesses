@@ -51,6 +51,11 @@ const PRESENTATION: Record<string, { icon: string; short: string; blurb: string 
     blurb:
       "ACP session streams, TOML config, hooks and rules with Claude and Cursor compatibility.",
   },
+  hermes: {
+    icon: "i-lucide-feather",
+    short: "Hermes",
+    blurb: "Nous Research's agent. YAML config, SOUL.md up front and a gateway behind every one-shot.",
+  },
   kilo: {
     icon: "i-lucide-weight",
     short: "Kilo",

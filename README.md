@@ -5,20 +5,20 @@
 [![license](https://npmx.dev/api/registry/badge/license/@agntn/harnesses)](https://npmx.dev/package/@agntn/harnesses)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/agntn/harnesses)
 
-🧭 Sixteen coding CLIs, one map. You ask where Claude keeps skills, you get the path.
+🧭 Seventeen coding CLIs, one map. You ask where Claude keeps skills, you get the path.
 
 > [!WARNING]
 > **@agntn/harnesses is pre-1.0.** Paths follow upstream CLIs that still move. Building on it now means pinning the version.
 
 ## Why?
 
-Claude stores transcripts under a mangled copy of your cwd. Codex keeps TOML with comments you wanted to keep. Ask a model where Codex lives and it invents `.claude/`. So this is one registry: sixteen harnesses, same object, paths for your machine.
+Claude stores transcripts under a mangled copy of your cwd. Codex keeps TOML with comments you wanted to keep. Ask a model where Codex lives and it invents `.claude/`. So this is one registry: seventeen harnesses, same object, paths for your machine.
 
 The rest of it sits on [harnesses.agntn.dev](https://harnesses.agntn.dev).
 
 ## ✨ Features
 
-- 🧩 **Sixteen harnesses, one class.** Same fields on Claude, Codex, Pi and the rest.
+- 🧩 **Seventeen harnesses, one class.** Same fields on Claude, Codex, Pi and the rest.
 - 📂 **Every path has a receipt.** Scope, evidence level, and a platform tag when the OS actually differs.
 - 🔎 **Detects which CLI you're inside.** Environment variables first. Two project markers in one directory is `null`, not a guess.
 - ▶️ **Headless runs with real modes.** Advisor without tools, full agent, or a native read-only sandbox. A mode the CLI cannot enforce is rejected.
@@ -60,6 +60,7 @@ npx @agntn/harnesses detect
     ● prime-agent     Prime Agent             v0.9.5    advisor · agent
     ● pi              Pi Coding Agent         v1.0.2    advisor · readOnly · agent
     ● vibe            Mistral Vibe            v3.1.3    readOnly · agent
+    ● hermes          Hermes Agent            v0.23.3   agent
     ○ openbot         OpenBot
 ```
 
@@ -208,6 +209,9 @@ Neither has a user skills directory in the registry. It's also `null` for
 OpenBot, but for another reason. OpenBot reads only `~/.agents/skills/`, Codex's
 target. Syncing Codex already links it.
 
+Hermes would happily unpack its whole catalog into your shared folder. So its
+target has a `marker`, and sync drops an empty `~/.hermes/.no-bundled-skills`.
+
 ## 🗺️ Harnesses
 
 | ID               | Name                   | Project skills         |
@@ -220,6 +224,7 @@ target. Syncing Codex already links it.
 | `gemini`         | Google Gemini CLI      | `.gemini/skills/`      |
 | `github-copilot` | GitHub Copilot         | `.github/skills/`      |
 | `grok`           | xAI Grok CLI           | `.grok/skills/`        |
+| `hermes`         | Hermes Agent           | `.hermes/skills/`      |
 | `kilo`           | Kilo Code CLI          | `.kilo/skills/`        |
 | `mastracode`     | Mastra Code            | `.mastracode/skills/`  |
 | `omp`            | OMP (oh-my-pi)         | `.omp/skills/`         |
@@ -255,7 +260,7 @@ It does not install skills, drive a browser, or run a sandbox of its own. `invok
 
 ## 🧩 Adding a harness
 
-Want a seventeenth? One class extending `Harness`, then `registerHarness`. `getHarness`, the CLI and the tools pick it up. How to write that class: [Custom harnesses](https://harnesses.agntn.dev/guide/custom).
+Want an eighteenth? One class extending `Harness`, then `registerHarness`. `getHarness`, the CLI and the tools pick it up. How to write that class: [Custom harnesses](https://harnesses.agntn.dev/guide/custom).
 
 ## 🛠️ Development
 
