@@ -751,6 +751,27 @@ describe("addMcpServer / removeMcpServer", () => {
     expect(mode()).toBe(want);
   });
 
+  it.each([
+    ["codex", ".codex"],
+    ["grok", ".grok"],
+  ] as const)("finds a %s server whatever spacing or quoting its header uses", (id, dir) => {
+    const harness = getHarness(id);
+    for (const head of ["[ mcp_servers.x ]", '["mcp_servers".x]', "[mcp_servers . 'x']"]) {
+      const dirs = fixtureDirs();
+      const path = join(dirs.homeDir, dir, "config.toml");
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(
+        path,
+        `[mcp_servers.keep]\ncommand = "k"\n\n${head}\ncommand = "old"\n\n[ mcp_servers.x.env ]\nK = "v"\n`,
+      );
+
+      addMcpServer(harness, { name: "x", transport: "stdio", command: "new" }, "user", dirs);
+      expect(readFileSync(path, "utf8"), head).not.toMatch(/old|K = /);
+      expect(removeMcpServer(harness, "x", "user", dirs), head).toEqual({ path, removed: true });
+      expect(readFileSync(path, "utf8"), head).toBe('[mcp_servers.keep]\ncommand = "k"\n');
+    }
+  });
+
   it("creates a fresh TOML config for codex when none exists", () => {
     const dirs = fixtureDirs();
 
@@ -1015,7 +1036,7 @@ describe("syncMcpServers", () => {
       'mcp_servers = { probe = { command = "old" } }\n',
       /redefine/,
     ],
-    ["a quoted table it would remove", "[mcp_servers.'stale']\ncommand = \"x\"\n", /stale absent/],
+    ["a dotted key it would remove", '[mcp_servers]\nstale.command = "x"\n', /stale absent/],
   ])("refuses in check mode the TOML edit sync refuses: %s", (_, toml, error) => {
     const dirs = fixtureDirs();
     vi.stubEnv("XDG_CONFIG_HOME", undefined);
