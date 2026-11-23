@@ -12,8 +12,8 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { Client } from "@modelcontextprotocol/client";
+import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 
 const root = resolve(import.meta.dirname, "..");
@@ -87,19 +87,32 @@ function serve(
   return { code: child.status, from: loaded.includes(source) ? "source" : "bundle", name };
 }
 
-/* A client connected to `mcp` from the built bin of `checkout`. */
-async function connect(checkout: string) {
-  const client = new Client({ name: "harnesses-test", version: "1.0.0" });
+type Era = "legacy" | Readonly<{ pin: string }>;
+
+/* A client of one protocol era connected to `mcp` from the built bin of `checkout`. */
+async function connect(
+  checkout: string,
+  session: Readonly<{ env?: Readonly<Record<string, string>>; mode?: Era }> = {},
+) {
+  const client = new Client(
+    { name: "harnesses-test", version: "1.0.0" },
+    { versionNegotiation: { mode: session.mode ?? "legacy" } },
+  );
   await client.connect(
     new StdioClientTransport({
       command: process.execPath,
       args: [join(checkout, "dist/cli.mjs"), "mcp"],
-      env,
+      env: { ...env, ...session.env },
       stderr: "ignore",
     }),
   );
   return client;
 }
+
+const builds = [
+  { from: "source", env: {} },
+  { from: "bundle", env: { HARNESSES_DIST: "1" } },
+] as const;
 
 /* A checkout copy whose `src/` a test may pull into. */
 function writableCheckout() {
@@ -157,7 +170,7 @@ describe.skipIf(!existsSync(join(root, "dist/cli.mjs")))("harnesses mcp from the
     expect(serve(packaged)).toMatchObject({ code: 0, from: "bundle", name: "harnesses" });
   });
 
-  it("keeps the bundle when typebox, a devDependency, is not installed", () => {
+  it("serves the source with production dependencies alone", () => {
     const production = copyCheckout(tmpdir());
     const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
       dependencies: Record<string, string>;
@@ -166,7 +179,29 @@ describe.skipIf(!existsSync(join(root, "dist/cli.mjs")))("harnesses mcp from the
       mkdirSync(join(production, "node_modules", name, ".."), { recursive: true });
       symlinkSync(join(root, "node_modules", name), join(production, "node_modules", name));
     }
-    expect(serve(production)).toMatchObject({ code: 0, from: "bundle", name: "harnesses" });
+    expect(serve(production)).toMatchObject({ code: 0, from: "source", name: "harnesses" });
+  });
+
+  it.each(builds)("lets a client pinned to 2026 listen, from the $from", async (build) => {
+    const client = await connect(root, { env: build.env, mode: { pin: "2026-07-28" } });
+    try {
+      expect(client.getNegotiatedProtocolVersion()).toBe("2026-07-28");
+      const subscription = await client.listen({ toolsListChanged: true });
+      expect((await client.listTools()).tools).toHaveLength(11);
+      await subscription.close();
+    } finally {
+      await client.close();
+    }
+  });
+
+  it.each(builds)("still opens a 2025 client with initialize, from the $from", async (build) => {
+    const client = await connect(root, { env: build.env });
+    try {
+      expect(client.getNegotiatedProtocolVersion()).toMatch(/^2025-/u);
+      expect((await client.listTools()).tools).toHaveLength(11);
+    } finally {
+      await client.close();
+    }
   });
 
   it("refuses a call after a pull before the executor starts", async () => {

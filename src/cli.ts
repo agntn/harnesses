@@ -535,20 +535,6 @@ function isMcpModule(value: unknown): value is { readonly default: typeof McpCom
 }
 
 /**
- * Whether `typebox`, a devDependency, resolves here.
- *
- * @returns {boolean} Whether `src/mcp.ts` could import it.
- */
-function resolvesTypebox(): boolean {
-  try {
-    import.meta.resolve("typebox");
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Inside a checkout, `mcp` runs from `src/`: a restart beats a rebuild.
  *
  * @returns {Promise<typeof McpCommand>} The command that starts the stdio server.
@@ -561,8 +547,7 @@ async function loadMcpCommand(): Promise<typeof McpCommand> {
     process.env.HARNESSES_DIST !== "1" &&
     process.features.typescript !== false &&
     !sourcePath.includes(`${sep}node_modules${sep}`) &&
-    existsSync(sourcePath) &&
-    resolvesTypebox();
+    existsSync(sourcePath);
   if (!fromSource) return (await import("./commands/mcp.ts")).default;
   const module: unknown = await import(source.href);
   if (!isMcpModule(module)) throw new TypeError(`${sourcePath} has no default command`);

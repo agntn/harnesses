@@ -15,30 +15,18 @@ export default defineCommand({
    * environment raises the level on import, so one stray line would corrupt
    * the stream. Warnings and errors still reach stderr.
    *
-   * The SDK's stdio transport never watches for the end of stdin, so a client
-   * that exits would leave an in-flight `harnesses_run` going until its own
-   * deadline. Closing the server aborts every pending request signal, which
-   * stops each run's process group the same way a cancellation does, and the
-   * process then exits once that cleanup has nothing left to wait for. A
-   * write to a stdout the client already closed means the same, so it closes
-   * the server too instead of exiting past that cleanup. Every listener goes,
-   * since a bin serving `src/` registered the bundle's `exitOnClosedPipe`.
+   * `serveStdio` answers 2025 and 2026 clients alike. A closed stdin or stdout
+   * closes the server, which aborts each pending run. `exitOnClosedPipe` would
+   * exit first, so it goes.
    */
   async run() {
     consola.level = LogLevels.warn;
 
-    const [{ createMcpServer }, { StdioServerTransport }] = await Promise.all([
+    const [{ createMcpServer }, { serveStdio }] = await Promise.all([
       import("../mcp.ts"),
-      import("@modelcontextprotocol/sdk/server/stdio.js"),
+      import("@modelcontextprotocol/server/stdio"),
     ]);
-    const server = createMcpServer();
-    await server.connect(new StdioServerTransport());
-    process.stdin.once("end", () => void server.close());
-    process.stdout
-      .removeAllListeners("error")
-      .on("error", (error: Readonly<NodeJS.ErrnoException>) => {
-        if (error.code !== "EPIPE") throw error;
-        void server.close();
-      });
+    process.stdout.removeAllListeners("error");
+    serveStdio(() => createMcpServer());
   },
 });

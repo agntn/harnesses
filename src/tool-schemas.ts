@@ -19,7 +19,7 @@ export interface McpSchemaBuilder<I, S> {
   Array(item: I, options?: object): I;
   Record(key: I, value: I, options?: object): I;
   Union(schemas: readonly I[], options?: object): I;
-  Literal(value: string, options?: object): I;
+  Enum(values: readonly string[], options?: object): I;
   Optional(schema: I): I;
 }
 
@@ -51,7 +51,7 @@ export function harnessToolSchemas<I, S>(Type: McpSchemaBuilder<I, S>) {
     Type.Object(properties, { additionalProperties: false });
 
   const scope = Type.Optional(
-    Type.Union([Type.Literal("user"), Type.Literal("project")], {
+    Type.Enum(["user", "project"], {
       description: "Which config file to target (default user)",
     }),
   );
@@ -212,7 +212,7 @@ export function harnessToolSchemas<I, S>(Type: McpSchemaBuilder<I, S>) {
         Type.String({ description: "URL for an http/sse server", minLength: 1, maxLength: 4096 }),
       ),
       transport: Type.Optional(
-        Type.Union([Type.Literal("stdio"), Type.Literal("http"), Type.Literal("sse")], {
+        Type.Enum(["stdio", "http", "sse"], {
           description: "Transport; inferred from url/command when omitted",
         }),
       ),

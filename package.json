@@ -48,7 +48,8 @@
     "prepack": "pnpm run build"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "catalog:deps",
+    "@agntn/tools": "catalog:deps",
+    "@modelcontextprotocol/server": "catalog:deps",
     "citty": "catalog:deps",
     "consola": "catalog:deps",
     "jsonc-parser": "catalog:deps",
@@ -59,6 +60,7 @@
     "@agntn/ox": "catalog:dev",
     "@earendil-works/pi-coding-agent": "catalog:dev",
     "@earendil-works/pi-tui": "catalog:dev",
+    "@modelcontextprotocol/client": "catalog:dev",
     "@oh-my-pi/omptype": "catalog:dev",
     "@oh-my-pi/pi-ai": "catalog:dev",
     "@oh-my-pi/pi-coding-agent": "catalog:dev",

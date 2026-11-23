@@ -21,8 +21,7 @@ registerHooks({ load(url, context, nextLoad) {
   loaded.push(url);
   return nextLoad(url, context);
 }});
-const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
-const { InMemoryTransport } = await import('@modelcontextprotocol/sdk/inMemory.js');
+const { Client, InMemoryTransport } = await import('@modelcontextprotocol/client');
 const { createMcpServer } = await import(${JSON.stringify(`../${entry}`)});
 const client = new Client({ name: 'loading-test', version: '1.0.0' });
 const server = createMcpServer();
