@@ -113,6 +113,12 @@ export const harnessesTools: readonly ToolDefinition[] = [
       "List the MCP servers configured in each harness's config files, normalized across dialects. Omit id to scan every harness. Pass name to find one server without reading every listing.",
     effect: "read",
     input: schemas.mcpList,
+    cli: {
+      command: "mcp-servers list",
+      description: "List configured MCP servers, normalized",
+      positional: ["id"],
+      plain: ["id"],
+    },
     async execute(input, { signal }) {
       const { id, name } = input;
       return (await loadOperations(signal)).mcpList(id, name);
@@ -126,6 +132,7 @@ export const harnessesTools: readonly ToolDefinition[] = [
     effect: "destructive",
     idempotent: true,
     input: schemas.mcpAdd,
+    cli: { command: "mcp-servers add" },
     async execute(input, { signal }) {
       const { id, scope, ...server } = input;
       return (await loadOperations(signal)).mcpAdd(id, server as McpServerParams, scope);
@@ -139,6 +146,12 @@ export const harnessesTools: readonly ToolDefinition[] = [
     effect: "destructive",
     idempotent: true,
     input: schemas.mcpSync,
+    cli: {
+      command: "mcp-servers sync",
+      description: "Reset harness configs to the master list from ~/.config/agntn/mcp.jsonc",
+      positional: ["id"],
+      plain: ["id"],
+    },
     async execute(input, { signal }) {
       const { id, check } = input;
       return (await loadOperations(signal)).mcpSync(id, check === true);
@@ -152,6 +165,12 @@ export const harnessesTools: readonly ToolDefinition[] = [
     effect: "destructive",
     idempotent: true,
     input: schemas.agentsSync,
+    cli: {
+      command: "agents sync",
+      description: "Link global instructions and declared companions (agents.jsonc)",
+      positional: ["id"],
+      plain: ["id"],
+    },
     async execute(input, { signal }) {
       const { id, check } = input;
       return (await loadOperations(signal)).agentsSync(id, check === true);
@@ -165,6 +184,12 @@ export const harnessesTools: readonly ToolDefinition[] = [
     effect: "destructive",
     idempotent: true,
     input: schemas.promptsSync,
+    cli: {
+      command: "prompts sync",
+      description: "Sync Markdown templates from the agntn XDG data directory into harnesses",
+      positional: ["id"],
+      plain: ["id"],
+    },
     async execute(input, { signal }) {
       const { id, check } = input;
       return (await loadOperations(signal)).promptsSync(id, check === true);
@@ -178,6 +203,12 @@ export const harnessesTools: readonly ToolDefinition[] = [
     effect: "destructive",
     idempotent: true,
     input: schemas.skillsSync,
+    cli: {
+      command: "skills sync",
+      description: "Link harness skills directories to the agntn XDG data skills folder",
+      positional: ["id"],
+      plain: ["id"],
+    },
     async execute(input, { signal }) {
       const { id, check } = input;
       return (await loadOperations(signal)).skillsSync(id, check === true);
@@ -191,6 +222,12 @@ export const harnessesTools: readonly ToolDefinition[] = [
     effect: "destructive",
     idempotent: true,
     input: schemas.mcpRemove,
+    cli: {
+      command: "mcp-servers remove",
+      description: "Remove one MCP server from a harness config",
+      positional: ["id", "name"],
+      plain: ["id", "name"],
+    },
     async execute(input, { signal }) {
       const { id, name, scope } = input;
       return (await loadOperations(signal)).mcpRemove(id, name, scope);

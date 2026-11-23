@@ -3,541 +3,23 @@
 import { existsSync } from "node:fs";
 import { sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { styleText } from "node:util";
-import { consola } from "consola";
-import { version, type AvailableModel, type InvokeResult } from "./types.ts";
-import { getAllHarnesses, getHarness, isHarnessId, listHarnesses } from "./registry.ts";
-import {
-  detectHarnesses,
-  listHarnessModels,
-  EXTENSION_RETRY_HINT,
-  TOOL_CALL_TEXT_WARNING,
-  type HarnessStatus,
-  type ModelsOutcome,
-  type RunFailure,
-} from "./tool-operations.ts";
-import { exitOnClosedPipe, sanitize } from "./commands/output.ts";
-import type { Harness } from "./harness.ts";
-import type McpCommand from "./commands/mcp.ts";
-
-/**
- * citty fixes its colors at load time and never asks the terminal, so `styleText` decides for it.
- * The variable goes back after, since `run` hands this env to the harness it starts.
- *
- * @returns {Promise<typeof import("citty")>} citty, colored only where the listings are too.
- */
-async function loadCitty() {
-  const inherited = process.env.NO_COLOR;
-  const streams = [process.stdout, process.stderr];
-  if (streams.some((stream) => styleText("red", "x", { stream }) === "x")) {
-    process.env.NO_COLOR = "1";
-  }
-  const citty = await import("citty");
-  if (inherited === undefined) delete process.env.NO_COLOR;
-  else process.env.NO_COLOR = inherited;
-  return citty;
-}
-
-const { defineCommand, runMain } = await loadCitty();
-
-/** `styleText` checks stdout, `NO_COLOR` and `FORCE_COLOR`, so pipes and log files stay plain. */
-const s = {
-  cyan: (t: string) => styleText("cyan", t),
-  hi: (t: string) => styleText("cyanBright", t),
-  green: (t: string) => styleText("green", t),
-  red: (t: string) => styleText("red", t),
-  dim: (t: string) => styleText("gray", t),
-  bold: (t: string) => styleText("bold", t),
-  white: (t: string) => styleText("whiteBright", t),
-};
-
-function header(title: string) {
-  return `\n  ${s.bold(s.cyan(title))}`;
-}
-
-function section(title: string) {
-  return `\n  ${s.cyan("▸")} ${s.white(title)}`;
-}
-
-function entry(content: string) {
-  return `    ${content}`;
-}
-
-/**
- * Read-only Grok loses the network on Linux, so info says it right under the modes.
- *
- * @param network - The harness's answer for this platform.
- * @returns {string} One coloured line, dim when nobody checked.
- */
-function readOnlyNetworkLine(network: boolean | null): string {
-  if (network === null) return s.dim("readOnly network: unknown");
-  return network
-    ? s.green("readOnly network: kept")
-    : s.red("readOnly network: cut, MCP servers included");
-}
-
-/**
- * Read-only Pi keeps four tools and nothing else, so info names them before a run asks for more.
- *
- * @param tools - The harness's read-only allowlist.
- * @returns {string} One line, dim when a sandbox decides instead of a list.
- */
-function readOnlyToolsLine(tools: readonly string[] | null): string {
-  if (tools === null) return s.dim("readOnly tools: no allowlist");
-  return s.white(`readOnly tools: only ${sanitize(tools.join(", "))}, no extension or MCP tools`);
-}
-
-/** The model part of `harnesses info`: three switches and the hint, when the recipe has one. */
-interface ModelSummary {
-  features: Record<"listing" | "selection" | "effort", boolean>;
-  hint: string | null;
-}
-
-/**
- * Reads what info says about models in one place, so the command body stays flat.
- *
- * @param harness - The harness to describe.
- * @returns {ModelSummary} Its model switches and hint.
- */
-function modelSummary(harness: Harness): ModelSummary {
-  return {
-    features: {
-      listing: harness.modelListing !== null,
-      selection: harness.invocation?.modelArgs !== undefined,
-      effort: harness.invocation?.effortArgs !== undefined,
-    },
-    hint: harness.invocation?.modelHint ?? null,
-  };
-}
-
-/**
- * Whether a run can skip extension discovery, as `--no-extensions` asks.
- *
- * @param harness - The harness to ask.
- * @returns {boolean} True when its recipe carries `noExtensionsArgs`.
- */
-function extensionsOptional(harness: Harness): boolean {
-  return harness.invocation?.noExtensionsArgs !== undefined;
-}
-
-function renderPathSection(
-  title: string,
-  entries: readonly {
-    readonly path: string;
-    readonly scope: string;
-    readonly platforms?: readonly string[];
-    readonly note?: string;
-  }[],
-) {
-  if (!entries.length) return;
-  consola.log(section(title));
-  for (const e of entries) {
-    const tags = [s.dim(e.scope)];
-    if (e.platforms) tags.push(s.dim(e.platforms.join(", ")));
-    consola.log(entry(`${s.hi(e.path)}  ${tags.join(s.dim(" · "))}`));
-    if (e.note) consola.log(entry(`${s.dim(`  ${e.note}`)}`));
-  }
-}
-
-const formatArgs = {
-  json: { type: "boolean" as const, description: "Output as JSON" },
-};
-
-const harnessArg = {
-  type: "positional" as const,
-  description: "Harness id",
-  required: true,
-};
-
-function emit(data: unknown, args: Readonly<{ json?: boolean }>) {
-  if (!args.json) return false;
-  console.log(JSON.stringify(data, null, 2));
-  return true;
-}
-
-function resolveHarness(id: string): ReturnType<typeof getHarness> {
-  if (!isHarnessId(id)) {
-    consola.error(`Unknown harness: ${id}\nKnown: ${listHarnesses().join(", ")}`);
-    process.exit(1);
-  }
-  return getHarness(id);
-}
-
-function renderResolvedPathSection(
-  title: string,
-  entries: readonly { readonly path: string }[],
-): void {
-  if (entries.length === 0) return;
-  consola.log(section(title));
-  for (const item of entries) consola.log(entry(s.hi(item.path)));
-}
-
-function parsePositiveTimeout(raw: string | undefined): number | null | undefined {
-  if (!raw) return undefined;
-  const value = Number(raw);
-  return Number.isFinite(value) && value > 0 ? value : null;
-}
-
-function modelFailureMessage(details: ModelsOutcome | RunFailure): string {
-  return "error" in details ? sanitize(details.error) : "Failed to list models";
-}
-
-function modelDescription(model: Readonly<AvailableModel>): string {
-  const parts: string[] = [];
-  if (model.name !== undefined) parts.push(model.name);
-  if (model.default) parts.push("default");
-  if (model.contextWindow !== undefined) parts.push(`${model.contextWindow} context`);
-  if (model.maxOutputTokens !== undefined) parts.push(`${model.maxOutputTokens} max-out`);
-  const features: string[] = [];
-  if (model.thinking) features.push("thinking");
-  if (model.images) features.push("images");
-  if (features.length > 0) parts.push(features.join(", "));
-  return parts.join(" · ");
-}
-
-function runModes(status: Readonly<HarnessStatus>): string[] {
-  return (["advisor", "readOnly", "agent"] as const).filter((mode) => status[mode]);
-}
-
-function renderModels(details: ModelsOutcome): void {
-  const harness = getHarness(details.id);
-  consola.log(header(`${details.id} models`));
-  consola.log("");
-  for (const model of details.models) {
-    consola.log(
-      entry(
-        `${s.hi(sanitize(harness.modelSelector(model)))}  ${s.dim(sanitize(modelDescription(model)))}`,
-      ),
-    );
-  }
-  if (details.models.length === 0) consola.log(entry(s.dim("No models found")));
-  consola.log("");
-}
-
-function finishInvocation(result: InvokeResult, timeoutSeconds: number | undefined): never {
-  if (result.stdout) process.stdout.write(result.stdout);
-  if (result.stderr) process.stderr.write(result.stderr);
-  if (result.toolCallsAsText) consola.warn(TOOL_CALL_TEXT_WARNING);
-  if (result.extensionLoadFailed) consola.warn(EXTENSION_RETRY_HINT);
-  if (result.timedOut) {
-    const idle =
-      result.idleMs === undefined
-        ? ""
-        : `; last output ${Math.round(result.idleMs / 1000)}s before`;
-    consola.error(`Timed out after ${timeoutSeconds}s${idle}`);
-    process.exit(124);
-  }
-  process.exit(result.exitCode ?? 1);
-}
-
-const list = defineCommand({
-  meta: { description: "List all known harnesses" },
-  args: { ...formatArgs },
-  run({ args }) {
-    const harnesses = getAllHarnesses();
-    const data = harnesses.map((harness) => ({ id: harness.id, name: harness.name }));
-
-    if (emit(data, args)) return;
-
-    consola.log(header("Harnesses"));
-    consola.log("");
-    const maxId = Math.max(...data.map((r) => r.id.length));
-    for (const { id, name } of data) {
-      consola.log(entry(`${s.hi(id.padEnd(maxId))}  ${name}`));
-    }
-    consola.log("");
-  },
-});
-
-const detect = defineCommand({
-  meta: { description: "Detect installed harnesses, versions and run modes" },
-  args: { ...formatArgs },
-  async run({ args }) {
-    const results = (await detectHarnesses()).details.harnesses;
-
-    if (emit(results, args)) return;
-
-    consola.log(header("System Scan"));
-    consola.log("");
-    const maxId = Math.max(...results.map((r) => r.id.length));
-    const installed = results.filter((r) => r.installed);
-    const maxName = Math.max(...installed.map((r) => r.name.length));
-    const maxVersion = Math.max(...installed.map((r) => (r.version ? r.version.length + 1 : 0)));
-    for (const r of results) {
-      if (r.installed) {
-        const ver = (r.version ? `v${r.version}` : "").padEnd(maxVersion);
-        const modes = runModes(r).join(" · ") || "no headless mode";
-        consola.log(
-          entry(
-            `${s.green("●")} ${s.hi(r.id.padEnd(maxId))}  ${r.name.padEnd(maxName)}  ${s.dim(ver)}  ${s.dim(modes)}`,
-          ),
-        );
-      } else {
-        consola.log(entry(`${s.dim("○")} ${s.dim(r.id.padEnd(maxId))}  ${s.dim(r.name)}`));
-      }
-    }
-    consola.log("");
-  },
-});
-
-const info = defineCommand({
-  meta: { description: "Show metadata for a harness" },
-  args: { id: harnessArg, ...formatArgs },
-  run({ args }) {
-    const harness = resolveHarness(args.id as string);
-    const models = modelSummary(harness);
-
-    if (
-      emit(
-        {
-          id: harness.id,
-          name: harness.name,
-          binaries: harness.binaries,
-          capabilities: harness.capabilities,
-          invocationModes: harness.invocationModes,
-          readOnlyNetwork: harness.readOnlyNetwork(),
-          readOnlyTools: harness.readOnlyTools(),
-          modelListing: models.features.listing,
-          modelHint: models.hint,
-          modelSelection: models.features.selection,
-          effortSelection: models.features.effort,
-          extensionsOptional: extensionsOptional(harness),
-          config: harness.config,
-          sessions: harness.sessions,
-          instructions: harness.instructions,
-          skills: harness.skills,
-          commands: harness.commands,
-          promptTemplates: harness.promptTemplates,
-          hooks: harness.hooks,
-          temp: harness.temp,
-          envOverrides: harness.envOverrides,
-          persistence: harness.persistence,
-          detection: harness.detection,
-        },
-        args,
-      )
-    )
-      return;
-
-    consola.log(header(`${harness.name}  ${s.dim(harness.id)}`));
-
-    consola.log(section("Binaries"));
-    for (const b of harness.binaries) consola.log(entry(s.white(b)));
-
-    consola.log(section("Capabilities"));
-    const caps = Object.entries(harness.capabilities)
-      .map(([k, v]) => (v ? s.green(k) : s.dim(k)))
-      .join(s.dim("  ·  "));
-    consola.log(entry(caps));
-
-    consola.log(section("Invocation modes"));
-    const modes = Object.entries(harness.invocationModes)
-      .map(([k, v]) => (v ? s.green(k) : s.dim(k)))
-      .join(s.dim("  ·  "));
-    consola.log(entry(modes));
-    consola.log(entry(readOnlyNetworkLine(harness.readOnlyNetwork())));
-    consola.log(entry(readOnlyToolsLine(harness.readOnlyTools())));
-    if (extensionsOptional(harness)) {
-      consola.log(entry(s.white("extensions: optional, --no-extensions skips them")));
-    }
-
-    consola.log(section("Models"));
-    consola.log(
-      entry(
-        Object.entries(models.features)
-          .map(([k, v]) => (v ? s.green(k) : s.dim(k)))
-          .join(s.dim("  ·  ")),
-      ),
-    );
-    if (models.hint !== null) consola.log(entry(s.dim(sanitize(models.hint))));
-
-    renderPathSection("Config", harness.config);
-    renderPathSection("Sessions", harness.sessions);
-    renderPathSection("Instructions", harness.instructions);
-    renderPathSection("Skills", harness.skills);
-    renderPathSection("Commands", harness.commands);
-    renderPathSection("Prompt templates", harness.promptTemplates);
-    renderPathSection("Hooks", harness.hooks);
-    renderPathSection("Temp", harness.temp);
-    renderPathSection(
-      "Env overrides",
-      harness.envOverrides.map((e) => ({
-        ...e,
-        path: `${e.variable}  ${s.dim(`${e.path} → ${e.relocates.join(", ")}`)}`,
-      })),
-    );
-
-    if (harness.persistence.length) {
-      consola.log(section("Persistence"));
-      for (const e of harness.persistence) {
-        const note = e.note ? `  ${s.dim(e.note)}` : "";
-        consola.log(entry(`${s.white(e.format)}${note}`));
-      }
-    }
-
-    consola.log("");
-  },
-});
-
-const paths = defineCommand({
-  meta: { description: "Show resolved paths for current platform" },
-  args: { id: harnessArg, ...formatArgs },
-  run({ args }) {
-    const harness = resolveHarness(args.id as string);
-    const resolved = harness.resolve();
-
-    if (emit(resolved, args)) return;
-
-    consola.log(header(`${harness.name}  ${s.dim(process.platform)}`));
-
-    renderResolvedPathSection("Config", resolved.config);
-    renderResolvedPathSection("Sessions", resolved.sessions);
-    renderResolvedPathSection("Instructions", resolved.instructions);
-    renderResolvedPathSection("Skills", resolved.skills);
-    renderResolvedPathSection("Commands", resolved.commands);
-    renderResolvedPathSection("Prompt templates", resolved.promptTemplates);
-    renderResolvedPathSection("Hooks", resolved.hooks);
-    renderResolvedPathSection("Temp", resolved.temp);
-
-    consola.log("");
-  },
-});
-
-const models = defineCommand({
-  meta: { description: "List models available to a harness" },
-  args: {
-    id: harnessArg,
-    search: {
-      type: "positional" as const,
-      description: "Optional native model search filter",
-      required: false,
-    },
-    cwd: {
-      type: "string" as const,
-      description: "Working directory used while loading harness configuration",
-    },
-    timeout: { type: "string" as const, description: "Wall-clock budget in seconds" },
-    ...formatArgs,
-  },
-  async run({ args }) {
-    const timeoutSeconds = parsePositiveTimeout(args.timeout);
-    if (timeoutSeconds === null) {
-      consola.error(`Invalid timeout: ${args.timeout}`);
-      process.exitCode = 1;
-      return;
-    }
-
-    const result = await listHarnessModels(args.id as string, {
-      search: args.search as string | undefined,
-      cwd: args.cwd,
-      timeoutSeconds,
-    });
-    if (emit(result.details, args)) {
-      if (result.isError) process.exitCode = 1;
-      return;
-    }
-    if (result.isError || !("models" in result.details)) {
-      consola.error(modelFailureMessage(result.details));
-      process.exitCode = 1;
-      return;
-    }
-
-    renderModels(result.details);
-  },
-});
-
-const run = defineCommand({
-  meta: { description: "Run one prompt through a harness's non-interactive mode" },
-  args: {
-    id: harnessArg,
-    prompt: {
-      type: "positional" as const,
-      description: "Prompt to send to the harness",
-      required: true,
-    },
-    cwd: { type: "string" as const, description: "Working directory for the run" },
-    model: { type: "string" as const, description: "Harness-native model id or selector" },
-    effort: {
-      type: "string" as const,
-      description: "Reasoning effort in the harness's own words (low, high, max)",
-    },
-    timeout: { type: "string" as const, description: "Wall-clock budget in seconds" },
-    json: {
-      type: "boolean" as const,
-      description: "Use the harness's structured (JSON) output mode",
-    },
-    tools: {
-      type: "boolean" as const,
-      description: "Enable tools; default false uses native advisor without tools mode",
-    },
-    "read-only": {
-      type: "boolean" as const,
-      description:
-        "Require native read-only tool enforcement; implies --tools, rejected with --no-tools",
-    },
-    extensions: {
-      type: "boolean" as const,
-      default: true,
-      negativeDescription:
-        "Start Pi or OMP without extension discovery, so a broken one can't stop it",
-      description: "Load Pi or OMP extensions, as the harness does on its own",
-    },
-  },
-  async run({ args }) {
-    const harness = resolveHarness(args.id as string);
-    const structured = args.json === true;
-    const readOnly = args["read-only"] === true;
-    const tools = args.tools ?? readOnly;
-
-    const extensions = args.extensions !== false;
-    const invocationOptions = {
-      model: args.model,
-      effort: args.effort,
-      extensions,
-      structured,
-      tools,
-      readOnly,
-    };
-    if (!harness.buildInvocation("", invocationOptions)) {
-      consola.error(harness.invocationError(invocationOptions) ?? "Invalid invocation");
-      process.exit(1);
-    }
-
-    const timeoutSeconds = parsePositiveTimeout(args.timeout);
-    if (timeoutSeconds === null) {
-      consola.error(`Invalid timeout: ${args.timeout}`);
-      process.exit(1);
-    }
-
-    const result = await harness.invoke(args.prompt as string, {
-      cwd: args.cwd,
-      model: args.model,
-      effort: args.effort,
-      extensions,
-      timeoutMs: timeoutSeconds === undefined ? undefined : timeoutSeconds * 1000,
-      structured,
-      tools,
-      readOnly,
-    });
-
-    finishInvocation(result, timeoutSeconds);
-  },
-});
+import type * as McpCommand from "./commands/mcp.ts";
+import { version } from "./types.ts";
 
 /**
  * Narrows a runtime URL import, which TypeScript types as `any`.
  *
  * @param value - The imported module namespace.
- * @returns {boolean} Whether it exports a default command.
+ * @returns {boolean} Whether it exports `serveMcp`.
  */
-function isMcpModule(value: unknown): value is { readonly default: typeof McpCommand } {
-  return typeof value === "object" && value !== null && "default" in value;
+function isMcpModule(value: unknown): value is typeof McpCommand {
+  return typeof value === "object" && value !== null && "serveMcp" in value;
 }
 
 /**
  * Inside a checkout, `mcp` runs from `src/`: a restart beats a rebuild.
  *
- * @returns {Promise<typeof McpCommand>} The command that starts the stdio server.
+ * @returns {Promise<typeof McpCommand>} The module that starts the stdio server.
  */
 async function loadMcpCommand(): Promise<typeof McpCommand> {
   const source = new URL("../src/commands/mcp.ts", import.meta.url);
@@ -548,34 +30,38 @@ async function loadMcpCommand(): Promise<typeof McpCommand> {
     process.features.typescript !== false &&
     !sourcePath.includes(`${sep}node_modules${sep}`) &&
     existsSync(sourcePath);
-  if (!fromSource) return (await import("./commands/mcp.ts")).default;
+  if (!fromSource) return import("./commands/mcp.ts");
   const module: unknown = await import(source.href);
-  if (!isMcpModule(module)) throw new TypeError(`${sourcePath} has no default command`);
-  return module.default;
+  if (!isMcpModule(module)) throw new TypeError(`${sourcePath} has no serveMcp`);
+  return module;
 }
 
-process.stdout.on("error", exitOnClosedPipe);
-process.stderr.on("error", exitOnClosedPipe);
+const argv = process.argv.slice(2);
 
-const main = defineCommand({
-  meta: {
-    name: "harnesses",
-    version,
-    description: "Metadata toolkit for AI coding harnesses",
-  },
-  subCommands: {
-    list,
-    detect,
-    info,
-    paths,
-    models,
-    run,
-    "mcp-servers": () => import("./commands/mcp-servers.ts").then((m) => m.default),
-    agents: () => import("./commands/agents.ts").then((m) => m.default),
-    prompts: () => import("./commands/prompts.ts").then((m) => m.default),
-    skills: () => import("./commands/skills.ts").then((m) => m.default),
-    mcp: loadMcpCommand,
-  },
-});
-
-await runMain(main);
+/** A stray flag in an MCP client's config must not kill the server, so `mcp` takes any but help. */
+if (argv[0] === "mcp" && !argv.includes("--help") && !argv.includes("-h")) {
+  await (await loadMcpCommand()).serveMcp();
+} else {
+  const [{ runCli }, { harnessesTools }, { cliCommands }] = await Promise.all([
+    import("@agntn/tools/cli"),
+    import("./tools.ts"),
+    import("./commands/index.ts"),
+  ]);
+  await runCli(
+    {
+      name: "harnesses",
+      version,
+      description: "Metadata toolkit for AI coding harnesses",
+      tools: harnessesTools,
+      commands: cliCommands,
+      groups: {
+        "mcp-servers": { description: "Manage MCP servers across harness configs" },
+        agents: { description: "Manage the shared global instructions file across harnesses" },
+        prompts: { description: "Manage shared prompt templates across harnesses" },
+        skills: { description: "Manage shared skills across harnesses" },
+      },
+      mcp: true,
+    },
+    argv,
+  );
+}

@@ -108,7 +108,7 @@ const cliLines = computed(() => {
   const flags: string[] = [];
   if (mode.value === "readOnly" || mode.value === "readOnlyStructured") flags.push("--read-only");
   else if (mode.value === "agent" || mode.value === "agentStructured") flags.push("--tools");
-  if (mode.value.endsWith("Structured")) flags.push("--json");
+  if (mode.value.endsWith("Structured")) flags.push("--structured");
   if (model.value) flags.push(`--model ${model.value}`);
   if (effort.value) flags.push(`--effort ${effort.value}`);
   if (!extensions.value) flags.push("--no-extensions");

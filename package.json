@@ -50,8 +50,6 @@
   "dependencies": {
     "@agntn/tools": "catalog:deps",
     "@modelcontextprotocol/server": "catalog:deps",
-    "citty": "catalog:deps",
-    "consola": "catalog:deps",
     "jsonc-parser": "catalog:deps",
     "smol-toml": "catalog:deps",
     "yaml": "catalog:deps"
