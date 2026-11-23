@@ -27,7 +27,7 @@ Forget step 4 or 6 and `test/docs.test.ts` tells you which one.
 - `sideEffects: false` holds because `src/harnesses/index.ts` imports every harness by name. A module that registers itself on import would quietly vanish from a consumer's bundle.
 - The public API goes through `src/index.ts`. Anything a harness formats its own way gets parsed in its `src/harnesses/<id>.ts`, so no provider shape leaks into the top level.
 - A public API change brings its tests and a README example along.
-- The library, the CLI, the tool operations and the MCP server move together. Commands in `src/commands/` only parse input; the behavior lives in `src/tool-operations.ts`, `src/mcp-servers.ts` or the sync modules. Machine output goes through `src/commands/output.ts`, and human text gets sanitized before it's written.
+- The library, the CLI, the tool operations and the MCP server move together. Commands in `src/commands/` only parse input; the behavior lives in `src/tool-operations.ts`, `src/mcp-servers.ts` or the sync modules. `runCli` from `@agntn/tools/cli` owns `--json`, and human text gets sanitized before it's written.
 - A capability a harness doesn't have fails out loud. An empty result that looks like success is a lie the agent believes.
 - `src/schemas/` is type-only. Fields with an upstream shape that keeps moving stay `unknown` on purpose, so no Zod and no tighter types until that format settles down.
 - The tsconfig is strict and stays that way. No `as any`, `@ts-ignore` or `@ts-expect-error`; fix the code instead.

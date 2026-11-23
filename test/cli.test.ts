@@ -57,16 +57,16 @@ function loadedFrom(loaded: readonly string[], directory: string): string[] {
 
 describe("harnesses usage paths", () => {
   it.each([
-    { args: ["--help"], status: 0 },
-    { args: ["-h"], status: 0 },
-    { args: ["mcp", "--help"], status: 0 },
-    { args: ["no-such-command"], status: 1 },
-  ])("harnesses $args prints the usage without the server", ({ args, status }) => {
+    { args: ["--help"], status: 0, usage: /^\s+mcp\s+Run the harnesses MCP server/mu },
+    { args: ["-h"], status: 0, usage: /^\s+mcp\s+Run the harnesses MCP server/mu },
+    { args: ["mcp", "--help"], status: 0, usage: /USAGE harnesses mcp\b/u },
+    { args: ["mcp-servers"], status: 1, usage: /USAGE harnesses mcp-servers <command>/u },
+  ])("harnesses $args prints the usage without the server", ({ args, status, usage }) => {
     const result = runCli(args);
 
     expect(result.status).toBe(status);
-    expect(stripVTControlCharacters(result.stdout)).toMatch(/USAGE harnesses (?:.*\|)?mcp\b/u);
-    expect(result.loaded.some((url) => url.endsWith("/src/commands/mcp.ts"))).toBe(true);
+    expect(`${result.stdout}${result.stderr}`).toMatch(usage);
+    expect(result.loaded.filter((url) => url.endsWith("/src/commands/mcp.ts"))).toEqual([]);
     expect(loadedFrom(result.loaded, "/node_modules/@modelcontextprotocol/")).toEqual([]);
     expect(loadedFrom(result.loaded, "/node_modules/typebox/")).toEqual([]);
     expect(loadedFrom(result.loaded, "/node_modules/yaml/")).toEqual([]);
@@ -129,9 +129,27 @@ describe("harnesses usage paths", () => {
 
   it("harnesses prompts sync formats failures as JSON", () => {
     const result = runCli(["prompts", "sync", "unknown", "--json"]);
+    const failure = result.stderr.replace(/\n@loaded .*$/su, "");
 
     expect(result.status).toBe(1);
-    expect(JSON.parse(result.stdout)).toMatchObject({ error: "Unknown harness: unknown" });
+    expect(result.stdout).toBe("");
+    expect(JSON.parse(failure)).toMatchObject({ error: "Unknown harness: unknown" });
+  });
+
+  /** citty parked every word past the first id in `args._`, read the first and exited 0. */
+  it.each([
+    "mcp-servers sync kilo opencode --check",
+    "mcp-servers list kilo opencode",
+    "agents sync kilo opencode --check",
+    "prompts sync kilo opencode --check",
+    "skills sync kilo opencode --check",
+    "info kilo opencode",
+  ])("harnesses %s refuses the second id", (command) => {
+    const result = runCli(command.split(" "));
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("Invalid arguments: 1 unexpected positional argument");
   });
 
   it("harnesses detect --json lists the run modes harnesses run takes", () => {
@@ -158,11 +176,18 @@ describe("harnesses usage paths", () => {
     expect(result.stderr).toContain("Harness claude cannot run readOnly with tools: false");
   });
 
-  it("harnesses mcp-servers list refuses --name without a server name", () => {
-    const result = runCli(["mcp-servers", "list", "--name"]);
+  it.each([
+    { args: ["--name"], error: "Invalid arguments: --name needs a value" },
+    {
+      args: ["--name="],
+      error: "Invalid arguments at --name: must not have fewer than 1 characters",
+    },
+  ])("harnesses mcp-servers list refuses $args without a server name", ({ args, error }) => {
+    const result = runCli(["mcp-servers", "list", ...args]);
 
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain("--name needs a server name");
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain(error);
   });
 
   it("harnesses models and info tell what claude --model takes", () => {
@@ -310,26 +335,21 @@ describe("harnesses usage paths", () => {
     expect(result.stdout.includes("\u001B[")).toBe(escapes);
   });
 
-  /** citty also goes quiet under CI or TEST, so the base would pass with them still set. */
-  it.each([
-    { command: "--help", forceColor: undefined, escapes: false },
-    { command: "info --help", forceColor: undefined, escapes: false },
-    { command: "no-such-command", forceColor: undefined, escapes: false },
-    { command: "--help", forceColor: "1", escapes: true },
-  ])(
-    "harnesses $command through a pipe with FORCE_COLOR=$forceColor colors citty: $escapes",
-    ({ command, forceColor, escapes }) => {
+  /** Help and refusals stay plain, even where FORCE_COLOR paints the listings. */
+  it.each(["--help", "info --help", "no-such-command"])(
+    "harnesses %s writes no ANSI escapes under FORCE_COLOR=1",
+    (command) => {
       const result = runCli(command.split(" "), "", {
         CI: undefined,
         TEST: undefined,
         NO_COLOR: undefined,
-        FORCE_COLOR: forceColor,
+        FORCE_COLOR: "1",
         NODE_DISABLE_COLORS: undefined,
         TERM: "xterm-256color",
       });
 
-      expect(stripVTControlCharacters(result.stdout)).toMatch(/USAGE harnesses/u);
-      expect(result.stdout.includes("\u001B[")).toBe(escapes);
+      expect(`${result.stdout}${result.stderr}`).toMatch(/USAGE harnesses|Unknown command/u);
+      expect(result.stdout).not.toContain("\u001B[");
       expect(result.stderr).not.toContain("\u001B[");
     },
   );
@@ -359,9 +379,9 @@ describe("harnesses usage paths", () => {
     }
   });
 
-  it("harnesses prompts sync sanitizes Unicode formatting in human errors", () => {
+  it("harnesses info sanitizes Unicode formatting in human errors", () => {
     const bidiOverride = String.fromCodePoint(0x202e);
-    const result = runCli(["prompts", "sync", `bad${bidiOverride}id`]);
+    const result = runCli(["info", `bad${bidiOverride}id`]);
 
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("Unknown harness: bad id");

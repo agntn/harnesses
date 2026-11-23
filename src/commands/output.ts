@@ -1,25 +1,16 @@
-import { stripVTControlCharacters } from "node:util";
-import { consola } from "consola";
-import type { ToolResult } from "../tool-operations.ts";
+import { stripVTControlCharacters, styleText } from "node:util";
+import type { ToolResult } from "@agntn/tools";
 
-export const formatArgs = {
-  json: { type: "boolean" as const, description: "Output as JSON" },
+/** `styleText` checks stdout, `NO_COLOR` and `FORCE_COLOR`, so pipes and log files stay plain. */
+export const s = {
+  cyan: (t: string) => styleText("cyan", t),
+  hi: (t: string) => styleText("cyanBright", t),
+  green: (t: string) => styleText("green", t),
+  red: (t: string) => styleText("red", t),
+  dim: (t: string) => styleText("gray", t),
+  bold: (t: string) => styleText("bold", t),
+  white: (t: string) => styleText("whiteBright", t),
 };
-
-/**
- * Ends the process once the reader of stdout or stderr is gone, as after
- * `| head -1` or a pager that quits early. Node ignores SIGPIPE, so without a
- * listener the next write throws `EPIPE` with a stack trace. The exit code
- * stays whatever the command set.
- *
- * @param error - The error the stream emitted.
- */
-export function exitOnClosedPipe(error: Readonly<NodeJS.ErrnoException>): void {
-  if (error.code !== "EPIPE") throw error;
-  process.exit();
-}
-
-type OutputFormat = Readonly<{ json?: boolean }>;
 
 /** Control bytes removed from reports because they can echo untrusted configuration values. */
 /* oxlint-disable-next-line no-control-regex */
@@ -39,15 +30,68 @@ export function sanitize(text: string | undefined): string {
 }
 
 /**
- * Emits one tool result in the selected machine or human format.
+ * Writes one line of a listing to stdout.
  *
- * @param result - Shared executor result to emit.
- * @param args - Selected output format.
+ * @param line - The line, already styled.
  */
-export function report(result: ToolResult<unknown>, args: OutputFormat): void {
-  if (args.json) console.log(JSON.stringify(result.details, null, 2));
-  else if (result.isError) consola.error(sanitize(result.content[0]?.text));
-  else console.log(sanitize(result.content[0]?.text));
+export function print(line = ""): void {
+  process.stdout.write(`${line}\n`);
+}
 
-  if (result.isError) process.exitCode = 1;
+/**
+ * @param title - Listing title.
+ * @returns {string} The title line.
+ */
+export function header(title: string): string {
+  return `\n  ${s.bold(s.cyan(title))}`;
+}
+
+/**
+ * @param title - Section title.
+ * @returns {string} The section line.
+ */
+export function section(title: string): string {
+  return `\n  ${s.cyan("▸")} ${s.white(title)}`;
+}
+
+/**
+ * @param content - Entry text.
+ * @returns {string} The entry, indented under its section.
+ */
+export function entry(content: string): string {
+  return `    ${content}`;
+}
+
+/**
+ * Whether `--json` came with the command, so the details are the whole answer.
+ *
+ * @param host - The host `runCli` hands to `execute`.
+ * @returns {boolean} True when stdout belongs to the JSON.
+ */
+export function wantsJson(host: unknown): boolean {
+  return typeof host === "object" && host !== null && "json" in host && host.json === true;
+}
+
+/**
+ * A listing that already went out line by line, or goes out as JSON.
+ *
+ * @param details - The data behind the listing.
+ * @returns {ToolResult} An answer `runCli` prints only under `--json`.
+ */
+export function printed(details: unknown): ToolResult {
+  return { content: [], details };
+}
+
+/**
+ * A refusal `runCli` writes to stderr with exit code 1.
+ *
+ * @param message - What went wrong.
+ * @returns {ToolResult} The error answer.
+ */
+export function refusal(message: string): ToolResult {
+  return {
+    content: [{ type: "text", text: sanitize(message) }],
+    details: { error: message },
+    isError: true,
+  };
 }
