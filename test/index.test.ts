@@ -571,6 +571,23 @@ describe("@agntn/harnesses", () => {
     expect(detectHarnessFromEnv()?.id).toBe("pi");
   });
 
+  it("should detect OpenCode from its shell env, and Kilo despite its own OPENCODE=1", () => {
+    for (const harness of getAllHarnesses()) {
+      for (const v of harness.detection.envVars) {
+        vi.stubEnv(v, "");
+      }
+    }
+    vi.stubEnv("OPENCODE", "1");
+    vi.stubEnv("OPENCODE_SESSION_ID", "ses_test");
+    expect(detectHarnessFromEnv()?.id).toBe("opencode");
+
+    vi.stubEnv("OPENCODE_SESSION_ID", "");
+    expect(detectHarnessFromEnv()?.id).toBe("opencode");
+
+    vi.stubEnv("KILO_PID", "4242");
+    expect(detectHarnessFromEnv()?.id).toBe("kilo");
+  });
+
   it("should name the CLI OpenBot hosts ahead of OpenBot itself", () => {
     for (const harness of getAllHarnesses()) {
       for (const v of harness.detection.envVars) {
