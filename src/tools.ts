@@ -30,13 +30,16 @@ const schemas = harnessToolSchemas<TSchema, TObject>(Type);
 let operationsPromise: Promise<ToolOperations> | undefined;
 
 /**
- * Loads the executors on the first call.
+ * Loads the executors on the first call, then refuses a call cancelled meanwhile.
  *
+ * @param signal - The call's cancellation.
  * @returns {Promise<ToolOperations>} The shared executor module.
  */
-function loadOperations(): Promise<ToolOperations> {
+async function loadOperations(signal?: AbortSignal): Promise<ToolOperations> {
   operationsPromise ??= import("./tool-operations.ts");
-  return operationsPromise;
+  const operations = await operationsPromise;
+  signal?.throwIfAborted();
+  return operations;
 }
 
 /** A tool typed by its params interface, since the schema factory erases the static type. */
@@ -66,7 +69,7 @@ export const harnessesTools: readonly ToolDefinition[] = [
       "List every known AI coding harness with its install state, version and the harnesses_run modes it takes: advisor (tools=false), readOnly (tools=true with readOnly=true) and agent (tools=true).",
     effect: "read",
     input: schemas.detect,
-    execute: async () => (await loadOperations()).detectHarnesses(),
+    execute: async (_input, { signal }) => (await loadOperations(signal)).detectHarnesses(),
   }),
   harnessTool<InfoParams>({
     name: "harnesses_info",
@@ -75,7 +78,7 @@ export const harnessesTools: readonly ToolDefinition[] = [
       "Full metadata for one or more AI coding harnesses, including supported invocation and model operations, whether a read-only run keeps its network and which tools, configuration, sessions, instructions, skills, commands, prompt templates, hooks, temp directories, the env variables that move them, and resolved paths.",
     effect: "read",
     input: schemas.info,
-    execute: async (input) => (await loadOperations()).harnessInfo(input.id),
+    execute: async (input, { signal }) => (await loadOperations(signal)).harnessInfo(input.id),
   }),
   harnessTool<ModelsParams>({
     name: "harnesses_models",
@@ -87,7 +90,7 @@ export const harnessesTools: readonly ToolDefinition[] = [
     input: schemas.models,
     async execute(input, { signal }) {
       const { id, ...options } = input;
-      return (await loadOperations()).listHarnessModels(id, { ...options, signal });
+      return (await loadOperations(signal)).listHarnessModels(id, { ...options, signal });
     },
   }),
   harnessTool<RunParams>({
@@ -100,7 +103,7 @@ export const harnessesTools: readonly ToolDefinition[] = [
     input: schemas.run,
     async execute(input, { signal }) {
       const { id, prompt, ...options } = input;
-      return (await loadOperations()).runHarness(id, prompt, { ...options, signal });
+      return (await loadOperations(signal)).runHarness(id, prompt, { ...options, signal });
     },
   }),
   harnessTool<McpListParams>({
@@ -110,9 +113,9 @@ export const harnessesTools: readonly ToolDefinition[] = [
       "List the MCP servers configured in each harness's config files, normalized across dialects. Omit id to scan every harness. Pass name to find one server without reading every listing.",
     effect: "read",
     input: schemas.mcpList,
-    async execute(input) {
+    async execute(input, { signal }) {
       const { id, name } = input;
-      return (await loadOperations()).mcpList(id, name);
+      return (await loadOperations(signal)).mcpList(id, name);
     },
   }),
   harnessTool<McpAddParams>({
@@ -123,9 +126,9 @@ export const harnessesTools: readonly ToolDefinition[] = [
     effect: "destructive",
     idempotent: true,
     input: schemas.mcpAdd,
-    async execute(input) {
+    async execute(input, { signal }) {
       const { id, scope, ...server } = input;
-      return (await loadOperations()).mcpAdd(id, server as McpServerParams, scope);
+      return (await loadOperations(signal)).mcpAdd(id, server as McpServerParams, scope);
     },
   }),
   harnessTool<McpSyncParams>({
@@ -136,9 +139,9 @@ export const harnessesTools: readonly ToolDefinition[] = [
     effect: "destructive",
     idempotent: true,
     input: schemas.mcpSync,
-    async execute(input) {
+    async execute(input, { signal }) {
       const { id, check } = input;
-      return (await loadOperations()).mcpSync(id, check === true);
+      return (await loadOperations(signal)).mcpSync(id, check === true);
     },
   }),
   harnessTool<AgentsSyncParams>({
@@ -149,9 +152,9 @@ export const harnessesTools: readonly ToolDefinition[] = [
     effect: "destructive",
     idempotent: true,
     input: schemas.agentsSync,
-    async execute(input) {
+    async execute(input, { signal }) {
       const { id, check } = input;
-      return (await loadOperations()).agentsSync(id, check === true);
+      return (await loadOperations(signal)).agentsSync(id, check === true);
     },
   }),
   harnessTool<PromptsSyncParams>({
@@ -162,9 +165,9 @@ export const harnessesTools: readonly ToolDefinition[] = [
     effect: "destructive",
     idempotent: true,
     input: schemas.promptsSync,
-    async execute(input) {
+    async execute(input, { signal }) {
       const { id, check } = input;
-      return (await loadOperations()).promptsSync(id, check === true);
+      return (await loadOperations(signal)).promptsSync(id, check === true);
     },
   }),
   harnessTool<SkillsSyncParams>({
@@ -175,9 +178,9 @@ export const harnessesTools: readonly ToolDefinition[] = [
     effect: "destructive",
     idempotent: true,
     input: schemas.skillsSync,
-    async execute(input) {
+    async execute(input, { signal }) {
       const { id, check } = input;
-      return (await loadOperations()).skillsSync(id, check === true);
+      return (await loadOperations(signal)).skillsSync(id, check === true);
     },
   }),
   harnessTool<McpRemoveParams>({
@@ -188,9 +191,9 @@ export const harnessesTools: readonly ToolDefinition[] = [
     effect: "destructive",
     idempotent: true,
     input: schemas.mcpRemove,
-    async execute(input) {
+    async execute(input, { signal }) {
       const { id, name, scope } = input;
-      return (await loadOperations()).mcpRemove(id, name, scope);
+      return (await loadOperations(signal)).mcpRemove(id, name, scope);
     },
   }),
 ];
