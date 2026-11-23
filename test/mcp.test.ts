@@ -1,5 +1,4 @@
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { createMcpServer } from "../src/mcp.ts";
 import { getHarness, listHarnesses, registerHarness } from "../src/index.ts";
@@ -80,9 +79,7 @@ describe("harnesses MCP server", () => {
       try {
         const client = await connectTestClient();
         const request = client
-          .callTool({ name, arguments: CANCEL_ARGUMENTS[name] }, undefined, {
-            signal: controller.signal,
-          })
+          .callTool({ name, arguments: CANCEL_ARGUMENTS[name] }, { signal: controller.signal })
           .then(
             () => "completed",
             (error: unknown) => String(error),
@@ -130,7 +127,7 @@ describe("harnesses MCP server", () => {
       const readOnly = readOnlyTools.has(tool.name);
       expect(tool.annotations).toMatchObject({
         readOnlyHint: readOnly,
-        destructiveHint: tool.name === "harnesses_models" ? false : !readOnly,
+        destructiveHint: !readOnly,
         openWorldHint: tool.name === "harnesses_run" || tool.name === "harnesses_models",
       });
     }
@@ -294,7 +291,7 @@ describe("harnesses MCP server", () => {
 
     expect(response.isError).toBe(true);
     expect(onlyTextContent(response.content)).toBe(
-      "Invalid arguments at /: unknown property read_only",
+      'Invalid arguments: unknown property "read_only"; takes id, prompt, cwd, model, effort, extensions, timeoutSeconds, structured, tools, readOnly',
     );
   });
 });

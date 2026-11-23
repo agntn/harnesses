@@ -1,5 +1,7 @@
 import { spawnSync } from "node:child_process";
-import { resolve } from "node:path";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vite-plus/test";
 
 const root = resolve(import.meta.dirname, "..");
@@ -21,8 +23,7 @@ registerHooks({ load(url, context, nextLoad) {
   loaded.push(url);
   return nextLoad(url, context);
 }});
-const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
-const { InMemoryTransport } = await import('@modelcontextprotocol/sdk/inMemory.js');
+const { Client, InMemoryTransport } = await import('@modelcontextprotocol/client');
 const { createMcpServer } = await import(${JSON.stringify(`../${entry}`)});
 const client = new Client({ name: 'loading-test', version: '1.0.0' });
 const server = createMcpServer();
@@ -50,4 +51,36 @@ try {
       expect(result.status, result.stderr).toBe(0);
     },
   );
+
+  it("drops a write cancelled while the executors still load", () => {
+    const home = mkdtempSync(join(tmpdir(), "harnesses-cancel-"));
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [
+          "--input-type=module",
+          "-e",
+          String.raw`
+const { harnessesTools } = await import('../src/tools.ts');
+const tool = harnessesTools.find(t => t.name === 'harnesses_mcp_add');
+const controller = new AbortController();
+const call = tool.execute({ id: 'codex', name: 'late', command: 'x' }, { signal: controller.signal });
+controller.abort(new Error('cancelled'));
+await call.then(() => process.exit(3), (error) => console.log(String(error)));
+`,
+        ],
+        {
+          cwd: resolve(root, "test"),
+          encoding: "utf8",
+          env: { ...process.env, HOME: home, XDG_CONFIG_HOME: "" },
+          timeout: 20_000,
+        },
+      );
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain("cancelled");
+      expect(existsSync(join(home, ".codex/config.toml"))).toBe(false);
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
 });

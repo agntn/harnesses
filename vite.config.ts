@@ -26,6 +26,7 @@ export default defineConfig({
                 "Harness",
                 "HarnessInfoResult",
                 "HarnessInvocation",
+                "HarnessTool",
                 "InfoParams",
                 "InvokeOptions",
                 "InvokeResult",
@@ -53,6 +54,11 @@ export default defineConfig({
               ],
             },
             { from: "lib", name: ["AbortSignal", "ReadonlyMap", "ReadonlySet"] },
+            {
+              from: "package",
+              name: ["ToolCallContext", "ToolDefinition"],
+              package: "@agntn/tools",
+            },
             {
               from: "package",
               name: "ExtensionAPI",

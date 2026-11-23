@@ -1,53 +1,12 @@
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-  type CallToolResult,
-  type Tool,
-} from "@modelcontextprotocol/sdk/types.js";
-import { IsObject, Type, type TSchema } from "typebox";
-import { Value } from "typebox/value";
-import type { McpServerParams, ToolResult } from "./tool-operations.ts";
+import { callTool, createMcpServer as createToolServer, errorResult } from "@agntn/tools/mcp";
+import type { Server } from "@modelcontextprotocol/server";
 import { sourceChangeCheck } from "./source-change.ts";
-import { harnessToolSchemas } from "./tool-schemas.ts";
+import { harnessesTools } from "./tools.ts";
 import { version } from "./types.ts";
 
-interface ToolDefinition {
-  name: string;
-  title: string;
-  description: string;
-  inputSchema: TSchema;
-  annotations: Tool["annotations"];
-  execute(
-    operations: Readonly<typeof import("./tool-operations.ts")>,
-    args: Readonly<Record<string, unknown>>,
-    signal: AbortSignal,
-  ): ToolResult<unknown> | Promise<ToolResult<unknown>>;
-}
+export { harnessesTools } from "./tools.ts";
 
-const READ_ONLY: Tool["annotations"] = {
-  readOnlyHint: true,
-  destructiveHint: false,
-  idempotentHint: true,
-  openWorldHint: false,
-};
-
-const EXEC_READ: Tool["annotations"] = {
-  readOnlyHint: false,
-  destructiveHint: false,
-  idempotentHint: false,
-  openWorldHint: true,
-};
-
-const CONFIG_WRITE: Tool["annotations"] = {
-  readOnlyHint: false,
-  destructiveHint: true,
-  idempotentHint: true,
-  openWorldHint: false,
-};
-
-const schemas = harnessToolSchemas<TSchema, TSchema>(Type);
-let operationsPromise: Promise<typeof import("./tool-operations.ts")> | undefined;
+const serverInfo = { name: "harnesses", version } as const;
 
 const RESTART = "src/ changed under this server, restart it to load the new code";
 const RAN =
@@ -58,258 +17,24 @@ const sourceChanged = import.meta.url.endsWith(".ts")
   ? sourceChangeCheck(import.meta.dirname, performance.timeOrigin)
   : undefined;
 
-const tools: ToolDefinition[] = [
-  {
-    name: "harnesses_detect",
-    title: "Harnesses Detect",
-    description:
-      "List every known AI coding harness with its install state, version and the harnesses_run modes it takes: advisor (tools=false), readOnly (tools=true with readOnly=true) and agent (tools=true).",
-    inputSchema: schemas.detect,
-    annotations: READ_ONLY,
-    execute: ({ detectHarnesses }) => detectHarnesses(),
-  },
-  {
-    name: "harnesses_info",
-    title: "Harnesses Info",
-    description:
-      "Full metadata for one or more AI coding harnesses, including supported invocation and model operations, whether a read-only run keeps its network and which tools, configuration, sessions, instructions, skills, commands, prompt templates, hooks, temp directories, the env variables that move them, and resolved paths.",
-    inputSchema: schemas.info,
-    annotations: READ_ONLY,
-    execute: ({ harnessInfo }, args) => harnessInfo(args.id as string | string[]),
-  },
-  {
-    name: "harnesses_models",
-    title: "Harnesses Models",
-    description:
-      "List the models currently available to one AI coding harness through its native CLI, normalized across providers. An optional search filter is passed to harnesses that support it. The command may load project configuration and extensions.",
-    inputSchema: schemas.models,
-    annotations: EXEC_READ,
-    execute: ({ listHarnessModels }, args, signal) =>
-      listHarnessModels(args.id as string, {
-        search: args.search as string | undefined,
-        cwd: args.cwd as string | undefined,
-        timeoutSeconds: args.timeoutSeconds as number | undefined,
-        signal,
-      }),
-  },
-  {
-    name: "harnesses_run",
-    title: "Harnesses Run",
-    description:
-      "Run one prompt through an AI coding harness's normalized non-interactive invocation and return its output. Pass tools=true whenever the task needs harness tools, including Grok native X search. Add readOnly=true to require native read-only tool enforcement. Pass tools=false only for an advisor without tools. Unsupported modes never widen access; harnesses_detect shows which modes each harness takes.",
-    inputSchema: schemas.run,
-    annotations: {
-      readOnlyHint: false,
-      destructiveHint: true,
-      idempotentHint: false,
-      openWorldHint: true,
-    },
-    execute: ({ runHarness }, args, signal) =>
-      runHarness(args.id as string, args.prompt as string, {
-        cwd: args.cwd as string | undefined,
-        model: args.model as string | undefined,
-        effort: args.effort as string | undefined,
-        extensions: args.extensions as boolean | undefined,
-        timeoutSeconds: args.timeoutSeconds as number | undefined,
-        signal,
-        structured: args.structured as boolean | undefined,
-        tools: args.tools as boolean | undefined,
-        readOnly: args.readOnly as boolean | undefined,
-      }),
-  },
-  {
-    name: "harnesses_mcp_list",
-    title: "Harnesses MCP List",
-    description:
-      "List the MCP servers configured in each harness's config files, normalized across dialects. Omit id to scan every harness. Pass name to find one server without reading every listing.",
-    inputSchema: schemas.mcpList,
-    annotations: READ_ONLY,
-    execute: ({ mcpList }, args) =>
-      mcpList(args.id as string | undefined, args.name as string | undefined),
-  },
-  {
-    name: "harnesses_mcp_add",
-    title: "Harnesses MCP Add",
-    description:
-      "Add or replace one MCP server in a harness config. JSON configs are rewritten; TOML configs get a surgical, comment-preserving edit.",
-    inputSchema: schemas.mcpAdd,
-    annotations: CONFIG_WRITE,
-    execute: ({ mcpAdd }, args) =>
-      mcpAdd(
-        args.id as string,
-        args as unknown as McpServerParams,
-        (args.scope as "user" | "project") ?? "user",
-      ),
-  },
-  {
-    name: "harnesses_mcp_sync",
-    title: "Harnesses MCP Sync",
-    description:
-      "Reset every harness's user-scope MCP config to exactly the master list from ~/.config/agntn/mcp.jsonc: servers are added, replaced, and extras removed unless the list's keep names them for that harness. Excluded harnesses keep their own servers. A server's own excludes replaces the global one, and master names a harness is excluded from are withdrawn from it. Pass check to only report.",
-    inputSchema: schemas.mcpSync,
-    annotations: CONFIG_WRITE,
-    execute: ({ mcpSync }, args) => mcpSync(args.id as string | undefined, args.check === true),
-  },
-  {
-    name: "harnesses_agents_sync",
-    title: "Harnesses Agents Sync",
-    description:
-      "Link every harness's global instructions file and declared companions to the master bundle, so edits made through any harness land in one place. Diverged copies are backed up and relinked. Pass check to only report.",
-    inputSchema: schemas.agentsSync,
-    annotations: CONFIG_WRITE,
-    execute: ({ agentsSync }, args) =>
-      agentsSync(args.id as string | undefined, args.check === true),
-  },
-  {
-    name: "harnesses_prompts_sync",
-    title: "Harnesses Prompts Sync",
-    description:
-      "Sync canonical Markdown prompt templates from the agntn XDG data directory into every supported harness. Each Markdown target directory becomes one link to the canonical directory; Gemini's directory holds only generated TOML. Anything else there is backed up first. Pass check to only report.",
-    inputSchema: schemas.promptsSync,
-    annotations: CONFIG_WRITE,
-    execute: ({ promptsSync }, args) =>
-      promptsSync(args.id as string | undefined, args.check === true),
-  },
-  {
-    name: "harnesses_skills_sync",
-    title: "Harnesses Skills Sync",
-    description:
-      "Link every harness's user-scope skills directory to the canonical skills directory in the agntn XDG data directory, so a skill added or edited through any harness lands in one place. Links to single skills in the source are replaced; anything else there is backed up first. Pass check to only report.",
-    inputSchema: schemas.skillsSync,
-    annotations: CONFIG_WRITE,
-    execute: ({ skillsSync }, args) =>
-      skillsSync(args.id as string | undefined, args.check === true),
-  },
-  {
-    name: "harnesses_mcp_remove",
-    title: "Harnesses MCP Remove",
-    description:
-      "Remove one MCP server from a harness config. JSON configs are rewritten; TOML configs get a surgical, comment-preserving edit.",
-    inputSchema: schemas.mcpRemove,
-    annotations: CONFIG_WRITE,
-    execute: ({ mcpRemove }, args) =>
-      mcpRemove(
-        args.id as string,
-        args.name as string,
-        (args.scope as "user" | "project") ?? "user",
-      ),
-  },
-];
-
-const toolsByName = new Map(tools.map((tool) => [tool.name, tool]));
-
-/**
- * Formats the first TypeBox validation failure for an MCP client. A stray key is
- * named from the schema itself, since TypeBox reports it as `schema is false`.
- *
- * @param schema - Schema that rejected the value.
- * @param value - Rejected input value.
- * @returns {string} A client-facing validation message.
- */
-function validationError(schema: TSchema, value: object): string {
-  const declared = IsObject(schema) ? schema.properties : {};
-  const unknown = Object.keys(value).filter((key) => !Object.hasOwn(declared, key));
-  if (unknown.length > 0) return `Invalid arguments at /: unknown property ${unknown.join(", ")}`;
-  const first = Value.Errors(schema, value)[0];
-  if (!first) return "Invalid arguments";
-  return `Invalid arguments at ${first.instancePath || "/"}: ${first.message}`;
-}
-
-/**
- * Wraps error text for the MCP client, replacing control bytes with spaces.
- *
- * Every error branch goes through here because parts of these messages echo
- * client-controlled values (a tool name, an argument) or downstream error
- * messages: one raw newline or escape byte would forge extra lines that read
- * as the server's own answer.
- *
- * @param text - Untrusted error text.
- * @returns {CallToolResult} A sanitized MCP error result.
- */
-function errorResult(text: string): CallToolResult {
-  return {
-    content: [{ type: "text", text: text.replaceAll(/\p{Cc}/gu, " ") }],
-    isError: true,
-  };
-}
-
-/**
- * Converts a shared tool result to the MCP text-result contract.
- *
- * `details` is dropped and `structuredContent` is never set: clients that see
- * structured output prefer it over `content` and would hide the readable answer.
- *
- * @param result - Shared tool result to adapt.
- * @returns {CallToolResult} The MCP text-result envelope.
- */
-function toCallToolResult(result: ToolResult<unknown>): CallToolResult {
-  return {
-    content: result.content,
-    ...(result.isError === undefined ? {} : { isError: result.isError }),
-  };
-}
-
-/**
- * Validates one call and runs its executor.
- *
- * @param name - Requested tool name.
- * @param args - Unvalidated arguments.
- * @param signal - Client cancellation.
- * @returns {Promise<CallToolResult>} The answer or a sanitized error.
- */
-async function callTool(
-  name: string,
-  args: Readonly<Record<string, unknown>>,
-  signal: AbortSignal,
-): Promise<CallToolResult> {
-  const tool = toolsByName.get(name);
-  if (!tool) return errorResult(`Unknown harnesses tool: ${JSON.stringify(name)}`);
-  if (!Value.Check(tool.inputSchema, args)) {
-    return errorResult(validationError(tool.inputSchema, args));
-  }
-
-  try {
-    operationsPromise ??= import("./tool-operations.ts");
-    const operations = await operationsPromise;
-    signal.throwIfAborted();
-    return toCallToolResult(await tool.execute(operations, args, signal));
-  } catch (error) {
-    return errorResult(
-      `${tool.name} failed: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-}
-
 /**
  * Creates an unconnected MCP server exposing the harness registry tools.
- *
- * Built on the low-level `Server` even though the SDK marks it `@deprecated`,
- * because `McpServer.registerTool` accepts Standard Schema (Zod) only. TypeBox 1.x
- * does not implement Standard Schema, and this package's tool schemas are TypeBox,
- * shared with the Pi and OMP extensions. The high-level API would force a second
- * definition of every parameter.
+ * From `src/`, a call refuses once that tree changes.
  *
  * @returns {Server} An unconnected MCP server.
  */
 export function createMcpServer(): Server {
-  const server = new Server({ name: "harnesses", version }, { capabilities: { tools: {} } });
+  const server = createToolServer(serverInfo, harnessesTools);
+  const changed = sourceChanged;
+  if (!changed) return server;
 
-  server.setRequestHandler(ListToolsRequestSchema, () => ({
-    tools: tools.map((tool): Tool => ({
-      name: tool.name,
-      title: tool.title,
-      description: tool.description,
-      inputSchema: tool.inputSchema as Tool["inputSchema"],
-      annotations: tool.annotations,
-    })),
-  }));
-
-  server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
-    if (sourceChanged?.()) return errorResult(RESTART);
-    const { name, arguments: args = {} } = request.params;
-    const result = await callTool(name, args, extra.signal);
-    return sourceChanged?.() ? errorResult(RAN) : result;
+  server.setRequestHandler("tools/call", async (request, ctx) => {
+    if (changed()) return errorResult(RESTART);
+    const { name, arguments: args } = request.params;
+    const result = await callTool(serverInfo, harnessesTools, name, args, {
+      signal: ctx.mcpReq.signal,
+    });
+    return changed() ? errorResult(RAN) : result;
   });
-
   return server;
 }
