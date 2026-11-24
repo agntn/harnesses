@@ -291,7 +291,7 @@ describe("harnesses MCP server", () => {
 
     expect(response.isError).toBe(true);
     expect(onlyTextContent(response.content)).toBe(
-      'Invalid arguments: unknown property "read_only"; takes id, prompt, cwd, model, effort, extensions, timeoutSeconds, structured, tools, readOnly',
+      'Invalid arguments: unknown property "read_only"; takes id, prompt, cwd, model, effort, extensions, resume, sessionId, timeoutSeconds, structured, tools, readOnly',
     );
   });
 });

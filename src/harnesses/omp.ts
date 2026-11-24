@@ -202,6 +202,7 @@ export default class Omp extends Harness {
     modelArgs: ["--model={model}"],
     effortArgs: ["--thinking={effort}"],
     noExtensionsArgs: ["--no-extensions"],
+    resumeArgs: ["--resume={session}"],
     level: "official",
     note: "Add --mode json for structured event output. --no-tools disables only OMP's bundled tools, so it cannot provide an advisor mode without tools.",
   };

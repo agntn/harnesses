@@ -61,6 +61,19 @@ function extensionsOptional(harness: Harness): boolean {
 }
 
 /**
+ * Which session options a run takes, as `--resume` and `--session-id` ask.
+ *
+ * @param harness - The harness to ask.
+ * @returns {Record<"resume" | "sessionId", boolean>} One switch per option.
+ */
+function sessionSwitches(harness: Harness): Record<"resume" | "sessionId", boolean> {
+  return {
+    resume: harness.invocation?.resumeArgs !== undefined,
+    sessionId: harness.invocation?.sessionIdArgs !== undefined,
+  };
+}
+
+/**
  * @param harness - The harness to describe.
  * @returns {object} Everything `info --json` prints.
  */
@@ -79,6 +92,8 @@ function metadata(harness: Harness) {
     modelSelection: models.features.selection,
     effortSelection: models.features.effort,
     extensionsOptional: extensionsOptional(harness),
+    sessionResume: sessionSwitches(harness).resume,
+    sessionIdSelection: sessionSwitches(harness).sessionId,
     config: harness.config,
     sessions: harness.sessions,
     instructions: harness.instructions,
@@ -141,6 +156,7 @@ function printModes(harness: Harness): void {
   if (extensionsOptional(harness)) {
     print(entry(s.white("extensions: optional, --no-extensions skips them")));
   }
+  print(entry(`${s.dim("session:")} ${switchLine(sessionSwitches(harness))}`));
   const models = modelSummary(harness);
   print(section("Models"));
   print(entry(switchLine(models.features)));

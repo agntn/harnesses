@@ -175,8 +175,9 @@ export default class Codex extends Harness {
     ],
     modelArgs: ["--model", "{model}"],
     effortArgs: ["-c", "model_reasoning_effort={effort}"],
+    resumeArgs: ["resume", "{session}"],
     level: "official",
-    note: "Non-interactive exec subcommand; add --json for structured output.",
+    note: "Non-interactive exec subcommand; add --json for structured output. A resume goes after the exec flags, so --sandbox read-only still holds: a shell write in a resumed read-only run hit a read-only file system on 0.167.0 and 0.171.0.",
   };
   override readonly modelListing: Harness["modelListing"] = {
     args: ["debug", "models"],

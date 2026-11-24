@@ -90,6 +90,10 @@ export interface HarnessMetadata {
   effortSelection: boolean;
   /** Whether `extensions: false` works here, starting the run without extension discovery. */
   extensionsOptional: boolean;
+  /** Whether `resume` continues a session here. */
+  sessionResume: boolean;
+  /** Whether `sessionId` names a new session here. */
+  sessionIdSelection: boolean;
   config: PathCandidate[];
   sessions: PathCandidate[];
   instructions: PathCandidate[];
@@ -161,6 +165,8 @@ type RunInvocationOptions = Readonly<{
   model?: string;
   effort?: string;
   extensions?: boolean;
+  resume?: string;
+  sessionId?: string;
   structured: boolean;
   tools: boolean;
   readOnly: boolean;
@@ -251,20 +257,23 @@ function runText(
 }
 
 /**
- * The model, effort and extension skip a run asked for, each only when set.
+ * The model, effort, extension skip and session a run asked for, each only when set.
  *
  * @param options - The run's invocation options.
- * @returns {Pick<RunOutcome, "model" | "effort" | "extensions">} The selections to echo.
+ * @returns {RunSelections} The selections to echo.
  */
-function runSelections(
-  options: RunInvocationOptions,
-): Pick<RunOutcome, "model" | "effort" | "extensions"> {
+function runSelections(options: RunInvocationOptions): RunSelections {
   return {
     ...(options.model === undefined ? {} : { model: options.model }),
     ...(options.effort === undefined ? {} : { effort: options.effort }),
     ...(options.extensions === false ? { extensions: false } : {}),
+    ...(options.resume === undefined ? {} : { resume: options.resume }),
+    ...(options.sessionId === undefined ? {} : { sessionId: options.sessionId }),
   };
 }
+
+/** What a run picked besides its mode, echoed back in its status. */
+type RunSelections = Pick<RunOutcome, "model" | "effort" | "extensions" | "resume" | "sessionId">;
 
 function completedRun(
   harness: Harness,
@@ -372,6 +381,8 @@ function harnessInfoResult(id: string): HarnessInfoResult {
     modelSelection: harness.invocation?.modelArgs !== undefined,
     effortSelection: harness.invocation?.effortArgs !== undefined,
     extensionsOptional: harness.invocation?.noExtensionsArgs !== undefined,
+    sessionResume: harness.invocation?.resumeArgs !== undefined,
+    sessionIdSelection: harness.invocation?.sessionIdArgs !== undefined,
     config: harness.config,
     sessions: harness.sessions,
     instructions: harness.instructions,
@@ -433,6 +444,8 @@ function harnessInfoText(result: HarnessInfoResult): HarnessInfoText {
     modelSelection,
     effortSelection,
     extensionsOptional,
+    sessionResume,
+    sessionIdSelection,
     envOverrides,
     persistence,
     detection,
@@ -451,6 +464,8 @@ function harnessInfoText(result: HarnessInfoResult): HarnessInfoText {
     modelSelection,
     effortSelection,
     extensionsOptional,
+    sessionResume,
+    sessionIdSelection,
     envOverrides: getHarness(id).resolveCandidates(envOverrides),
     persistence,
     detection,
@@ -586,6 +601,10 @@ export interface RunOptions {
   effort?: string;
   /** Load extensions, the default; `false` skips discovery and is rejected where `noExtensionsArgs` is missing. */
   extensions?: boolean;
+  /** Session id to continue; rejected where `resumeArgs` is missing. */
+  resume?: string;
+  /** Id for a new session; rejected where `sessionIdArgs` is missing. */
+  sessionId?: string;
   /** Wall-clock budget in seconds; defaults to {@link RUN_DEFAULT_TIMEOUT_SECONDS}. */
   timeoutSeconds?: number;
   /** Cancel the owned command through the host request signal. */
@@ -608,6 +627,10 @@ export interface RunOutcome {
   effort?: string;
   /** Present when the run skipped extension discovery. */
   extensions?: false;
+  /** Present when the run continued a session. */
+  resume?: string;
+  /** Present when the run started a session under this id. */
+  sessionId?: string;
   structured: boolean;
   tools: boolean;
   readOnly: boolean;
@@ -670,6 +693,8 @@ export async function runHarness(
     model: options.model,
     effort: options.effort,
     extensions: options.extensions,
+    resume: options.resume,
+    sessionId: options.sessionId,
     structured,
     tools,
     readOnly,
@@ -688,6 +713,8 @@ export async function runHarness(
       model: options.model,
       effort: options.effort,
       extensions: options.extensions,
+      resume: options.resume,
+      sessionId: options.sessionId,
       timeoutMs: timeoutSeconds * 1000,
       signal: options.signal,
       structured,
