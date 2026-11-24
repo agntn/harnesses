@@ -790,7 +790,7 @@ function redactUrlParams(tail: string): string {
 function redactUrl(value: string): string {
   const cut = value.search(/[#?]/);
   const head = (cut < 0 ? value : value.slice(0, cut))
-    .replace(/^((?:[a-z][\d+.a-z-]*:(?=\/))?\/*)[^/@]*@/i, `$1${MCP_REDACTED_VALUE}@`)
+    .replace(/^((?:[a-z][\d+.a-z-]*:(?=\/))?\/*)[^/]*@/i, `$1${MCP_REDACTED_VALUE}@`)
     .split("/")
     .map((segment) => (MCP_PATH_TOKEN.test(segment) ? MCP_REDACTED_VALUE : segment))
     .join("/");

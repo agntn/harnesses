@@ -442,7 +442,7 @@ describe("mcpList", () => {
             remote: {
               url: "https://user:URL_PASS@example.test/mcp?token=URL_SECRET&region=eu#top",
             },
-            bare: { url: "bare:BARE_PASS@example.test/mcp?token=BARE_SECRET" },
+            bare: { url: "bare:BARE_PASS@BARE_TAIL@example.test/mcp?token=BARE_SECRET" },
             path: { url: "https://mcp.example.test/api/PATH0SECRET0abcdef123456/mcp" },
             local: {
               command: "npx",
@@ -450,6 +450,7 @@ describe("mcpList", () => {
                 "-y",
                 "mcp-remote",
                 "https://example.test/sse?key=ARG_URL_SECRET",
+                "https://u:ARG_PASS@ARG_TAIL@example.test/sse",
                 "--header",
                 "Authorization: Bearer HEADER_SECRET",
                 "--api-key",
@@ -477,6 +478,7 @@ describe("mcpList", () => {
           "-y",
           "mcp-remote",
           "https://example.test/sse?key=<redacted>",
+          "https://<redacted>@example.test/sse",
           "--header",
           "Authorization: <redacted>",
           "--api-key",
@@ -489,7 +491,7 @@ describe("mcpList", () => {
           "Cookie: <redacted>",
         ],
       ]);
-      expect(result.content[0]?.text).not.toMatch(/SECRET|URL_PASS|BARE_|bare:/);
+      expect(result.content[0]?.text).not.toMatch(/SECRET|_PASS|_TAIL|BARE_|bare:/);
     });
   });
 
