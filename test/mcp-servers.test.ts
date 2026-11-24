@@ -461,6 +461,12 @@ describe("mcpList", () => {
                 "3000",
                 "--verbose",
                 "Cookie: session=COOKIE_SECRET",
+                "X-Api-Key:NOSPACE_SECRET",
+                "--token",
+                "--DASH_SECRET",
+                "u:SCHEMELESS_PASS@example.test",
+                "example.test/mcp?token=first?Q_SECRET=tail",
+                "@scope/server@1.2.0",
               ],
             },
           },
@@ -489,9 +495,15 @@ describe("mcpList", () => {
           "3000",
           "--verbose",
           "Cookie: <redacted>",
+          "<redacted>",
+          "--token",
+          "<redacted>",
+          "<redacted>@example.test",
+          "example.test/mcp?token=<redacted>",
+          "@scope/server@1.2.0",
         ],
       ]);
-      expect(result.content[0]?.text).not.toMatch(/SECRET|_PASS|_TAIL|BARE_|bare:/);
+      expect(result.content[0]?.text).not.toMatch(/SECRET|_PASS|_TAIL|BARE_|bare:|tail/);
     });
   });
 

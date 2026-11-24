@@ -744,10 +744,14 @@ function redactMcpValues(values: Readonly<Record<string, string>>): Record<strin
 
 /** Flag and variable names that smell like a credential. Overmasking beats a leak. */
 const MCP_SECRET_NAME = /key|token|secret|pass|auth|credential|cookie|header|session|signature/i;
-const MCP_URL_SCHEME = /^[a-z][\d+.a-z-]*:\/\//i;
+/** A URL by scheme, by `user:pass@` or by a query, so package specs like `pkg@1.2` stay. */
+const MCP_URL_LIKE = /^[a-z][\d+.a-z-]*:\/\/|^[^\s/:@]+:[^\s/]*@|\?/i;
 const MCP_FLAG_ASSIGNMENT = /^(-{1,2}[^=]+)=(.*)$/s;
 const MCP_ENV_ASSIGNMENT = /^([a-z_]\w*)=(.*)$/is;
-const MCP_HEADER_LINE = /^([\w-]+):\s/;
+const MCP_HEADER_NAME = /^([\w-]+):/;
+/** Only an `Authorization: Bearer …` line keeps its name; `sk-abc:def` shows nothing. */
+const MCP_HEADER_LINE = /^([a-z][\w-]*):\s/i;
+const MCP_PARAM_NAME = /^[\w%.[\]-]+$/;
 /** A path segment that reads like a key: long, no dots, letters and digits mixed. */
 const MCP_PATH_TOKEN = /^(?=.*\d)(?=.*[a-z])[\w-]{20,}$/i;
 
@@ -763,26 +767,37 @@ function redactSecret(value: string): string {
 }
 
 /**
- * Masks every query and fragment value, keeping parameter names.
+ * Masks every value of an `&` list, keeping names that are plain words.
+ *
+ * @param params - Query or fragment text without its leading `?` or `#`.
+ * @returns {string} The masked list.
+ */
+function redactParams(params: string): string {
+  return params
+    .split("&")
+    .map((param) => {
+      const name = param.slice(0, Math.max(param.indexOf("="), 0));
+      if (MCP_PARAM_NAME.test(name)) return `${name}=${MCP_REDACTED_VALUE}`;
+      return param === "" ? "" : MCP_REDACTED_VALUE;
+    })
+    .join("&");
+}
+
+/**
+ * Masks the query and the fragment, where only the first `?` and `#` split anything.
  *
  * @param tail - URL part from the first `?` or `#` on.
  * @returns {string} The masked tail.
  */
 function redactUrlParams(tail: string): string {
-  return tail
-    .split(/(?=[#&?])/)
-    .map((part) => {
-      const separator = part.slice(0, 1);
-      const body = part.slice(1);
-      const equals = body.indexOf("=");
-      if (equals >= 0) return `${separator}${body.slice(0, equals)}=${MCP_REDACTED_VALUE}`;
-      return body === "" ? separator : separator + MCP_REDACTED_VALUE;
-    })
-    .join("");
+  const hash = tail.indexOf("#");
+  const query = hash < 0 ? tail : tail.slice(0, hash);
+  const fragment = hash < 0 ? "" : `#${redactParams(tail.slice(hash + 1))}`;
+  return (query === "" ? "" : `?${redactParams(query.slice(1))}`) + fragment;
 }
 
 /**
- * Masks user info and parameter values of a URL.
+ * Masks user info, key-like path segments and parameter values of a URL.
  *
  * @param value - The URL.
  * @returns {string} The masked URL.
@@ -798,23 +813,23 @@ function redactUrl(value: string): string {
 }
 
 /**
- * Masks an argument only when it is a URL, so paths and globs keep their `?`.
+ * Masks an argument only when it looks like a URL, so plain paths stay readable.
  *
  * @param value - The argument or its assigned value.
  * @returns {string} The masked URL, or the untouched value.
  */
 function redactArgUrl(value: string): string {
-  return MCP_URL_SCHEME.test(value) ? redactUrl(value) : value;
+  return MCP_URL_LIKE.test(value) ? redactUrl(value) : value;
 }
 
 /**
  * Tells whether an argument is a credential flag waiting for its value.
  *
- * @param arg - The previous argument.
+ * @param arg - The argument.
  * @returns {boolean} True for `--api-key` and friends.
  */
-function isSecretFlag(arg: string | undefined): boolean {
-  return arg?.startsWith("-") === true && !arg.includes("=") && MCP_SECRET_NAME.test(arg);
+function isSecretFlag(arg: string): boolean {
+  return arg.startsWith("-") && !arg.includes("=") && MCP_SECRET_NAME.test(arg);
 }
 
 /**
@@ -829,18 +844,6 @@ function redactAssignment(name: string, value: string): string {
 }
 
 /**
- * Tells whether an argument is a secret as a whole: a flag value or a credential header.
- *
- * @param arg - The argument.
- * @param afterSecretFlag - Whether a credential flag came right before it.
- * @returns {boolean} True when nothing of it may show.
- */
-function isWholeSecret(arg: string, afterSecretFlag: boolean): boolean {
-  if (afterSecretFlag && !arg.startsWith("--")) return true;
-  return MCP_SECRET_NAME.test(MCP_HEADER_LINE.exec(arg)?.[1] ?? "");
-}
-
-/**
  * Masks one command argument by its own shape and the flag before it.
  *
  * @param arg - The argument.
@@ -848,7 +851,8 @@ function isWholeSecret(arg: string, afterSecretFlag: boolean): boolean {
  * @returns {string} The masked argument.
  */
 function redactArg(arg: string, afterSecretFlag: boolean): string {
-  if (isWholeSecret(arg, afterSecretFlag)) return redactSecret(arg);
+  const header = MCP_HEADER_NAME.exec(arg)?.[1] ?? "";
+  if (afterSecretFlag || MCP_SECRET_NAME.test(header)) return redactSecret(arg);
   const [, name, value] = MCP_FLAG_ASSIGNMENT.exec(arg) ?? MCP_ENV_ASSIGNMENT.exec(arg) ?? [];
   if (name === undefined || value === undefined) return redactArgUrl(arg);
   return redactAssignment(name, value);
@@ -861,7 +865,12 @@ function redactArg(arg: string, afterSecretFlag: boolean): string {
  * @returns {string[]} The masked arguments.
  */
 function redactMcpArgs(args: readonly string[]): string[] {
-  return args.map((arg, index) => redactArg(arg, isSecretFlag(args[index - 1])));
+  let afterSecretFlag = false;
+  return args.map((arg) => {
+    const masked = redactArg(arg, afterSecretFlag);
+    afterSecretFlag = !afterSecretFlag && isSecretFlag(arg);
+    return masked;
+  });
 }
 
 /**
