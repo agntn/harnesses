@@ -116,9 +116,9 @@ const toolWord = countWord(TOOLS.length);
     </LandingFeature>
 
     <LandingFeature
-      :title="`${toolWord} tools, three hosts`"
+      :title="`${toolWord} tools, four hosts`"
       to="/guide/agents"
-      link="MCP, Pi and OMP"
+      link="MCP, Pi, OMP and the AI SDK"
       :checks="[
         'harnesses_detect, harnesses_info, harnesses_models, harnesses_run, and seven for MCP configuration, AGENTS.md, prompts and skills',
         'harnesses_run makes the model choose tools explicitly; unsupported modes never widen access',
@@ -126,9 +126,11 @@ const toolWord = countWord(TOOLS.length);
       ]"
     >
       <code class="harnesses-code">harnesses mcp</code> serves the tools over stdio, the Pi and OMP
-      extensions render the same executors in the terminal. So Claude can ask Codex for a second
-      opinion on a patch, read-only, and get the answer back as one tool result. That's what the
-      tools are for; the table of paths alone wouldn't need a server.
+      extensions render the same executors in the terminal, and
+      <code class="harnesses-code">@agntn/harnesses/ai</code> hands them to your own AI SDK loop.
+      So Claude can ask Codex for a second opinion on a patch, read-only, and get the answer back
+      as one tool result. That's what the tools are for; the table of paths alone wouldn't need a
+      server.
       <template #visual>
         <div
           @mouseenter="paused = true"

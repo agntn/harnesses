@@ -87,7 +87,7 @@ const detection = computed(() => {
     </div>
 
     <footer class="console-footer console-footer-plain">
-      <span aria-label="Supported hosts: MCP, Pi and OMP">MCP · Pi · OMP</span>
+      <span aria-label="Supported hosts: MCP, Pi, OMP and the AI SDK">MCP · Pi · OMP · AI SDK</span>
       <span class="console-meta">{{ allPaths(sample).length }} paths resolved</span>
     </footer>
   </section>

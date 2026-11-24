@@ -42,27 +42,47 @@ async function loadOperations(signal?: AbortSignal): Promise<ToolOperations> {
   return operations;
 }
 
+/** Each tool's params interface from `tool-schemas.ts`, by wire name. */
+interface HarnessToolParams {
+  harnesses_detect: Record<string, never>;
+  harnesses_info: InfoParams;
+  harnesses_models: ModelsParams;
+  harnesses_run: RunParams;
+  harnesses_mcp_list: McpListParams;
+  harnesses_mcp_add: McpAddParams;
+  harnesses_mcp_sync: McpSyncParams;
+  harnesses_agents_sync: AgentsSyncParams;
+  harnesses_prompts_sync: PromptsSyncParams;
+  harnesses_skills_sync: SkillsSyncParams;
+  harnesses_mcp_remove: McpRemoveParams;
+}
+
 /** A tool typed by its params interface, since the schema factory erases the static type. */
-interface HarnessTool<Params> extends Omit<ToolDefinition, "execute"> {
-  execute(input: Params, context: ToolCallContext): Promise<ToolResult>;
+interface HarnessTool<Name extends keyof HarnessToolParams> extends Omit<
+  ToolDefinition<TObject, unknown, Name>,
+  "execute"
+> {
+  execute(input: HarnessToolParams[Name], context: ToolCallContext): Promise<ToolResult>;
 }
 
 /**
- * Defines a tool over its parameter interface from `tool-schemas.ts`.
+ * Defines a tool typed by its name, kept literal for `toAiTools`.
  *
  * @param tool - Definition with a typed executor.
- * @returns {ToolDefinition} The checked definition.
+ * @returns {ToolDefinition<TObject, unknown, Name>} The checked definition.
  */
-function harnessTool<Params>(tool: HarnessTool<Params>): ToolDefinition {
+function harnessTool<const Name extends keyof HarnessToolParams>(
+  tool: HarnessTool<Name>,
+): ToolDefinition<TObject, unknown, Name> {
   return defineTool({
     ...tool,
-    execute: (input, context) => tool.execute(input as unknown as Params, context),
+    execute: (input, context) => tool.execute(input as unknown as HarnessToolParams[Name], context),
   });
 }
 
 /** The eleven harnesses tools, in `tools/list` order. */
-export const harnessesTools: readonly ToolDefinition[] = [
-  harnessTool<Record<string, never>>({
+export const harnessesTools = [
+  harnessTool({
     name: "harnesses_detect",
     title: "Harnesses Detect",
     description:
@@ -76,7 +96,7 @@ export const harnessesTools: readonly ToolDefinition[] = [
     input: schemas.detect,
     execute: async (_input, { signal }) => (await loadOperations(signal)).detectHarnesses(),
   }),
-  harnessTool<InfoParams>({
+  harnessTool({
     name: "harnesses_info",
     title: "Harnesses Info",
     description:
@@ -90,7 +110,7 @@ export const harnessesTools: readonly ToolDefinition[] = [
     input: schemas.info,
     execute: async (input, { signal }) => (await loadOperations(signal)).harnessInfo(input.id),
   }),
-  harnessTool<ModelsParams>({
+  harnessTool({
     name: "harnesses_models",
     title: "Harnesses Models",
     description:
@@ -104,7 +124,7 @@ export const harnessesTools: readonly ToolDefinition[] = [
       return (await loadOperations(signal)).listHarnessModels(id, { ...options, signal });
     },
   }),
-  harnessTool<RunParams>({
+  harnessTool({
     name: "harnesses_run",
     title: "Harnesses Run",
     description:
@@ -123,7 +143,7 @@ export const harnessesTools: readonly ToolDefinition[] = [
       return (await loadOperations(signal)).runHarness(id, prompt, { ...options, signal });
     },
   }),
-  harnessTool<McpListParams>({
+  harnessTool({
     name: "harnesses_mcp_list",
     title: "Harnesses MCP List",
     description:
@@ -142,7 +162,7 @@ export const harnessesTools: readonly ToolDefinition[] = [
       return (await loadOperations(signal)).mcpList(id, name);
     },
   }),
-  harnessTool<McpAddParams>({
+  harnessTool({
     name: "harnesses_mcp_add",
     title: "Harnesses MCP Add",
     description:
@@ -156,7 +176,7 @@ export const harnessesTools: readonly ToolDefinition[] = [
       return (await loadOperations(signal)).mcpAdd(id, server as McpServerParams, scope);
     },
   }),
-  harnessTool<McpSyncParams>({
+  harnessTool({
     name: "harnesses_mcp_sync",
     title: "Harnesses MCP Sync",
     description:
@@ -175,7 +195,7 @@ export const harnessesTools: readonly ToolDefinition[] = [
       return (await loadOperations(signal)).mcpSync(id, check === true);
     },
   }),
-  harnessTool<AgentsSyncParams>({
+  harnessTool({
     name: "harnesses_agents_sync",
     title: "Harnesses Agents Sync",
     description:
@@ -194,7 +214,7 @@ export const harnessesTools: readonly ToolDefinition[] = [
       return (await loadOperations(signal)).agentsSync(id, check === true);
     },
   }),
-  harnessTool<PromptsSyncParams>({
+  harnessTool({
     name: "harnesses_prompts_sync",
     title: "Harnesses Prompts Sync",
     description:
@@ -213,7 +233,7 @@ export const harnessesTools: readonly ToolDefinition[] = [
       return (await loadOperations(signal)).promptsSync(id, check === true);
     },
   }),
-  harnessTool<SkillsSyncParams>({
+  harnessTool({
     name: "harnesses_skills_sync",
     title: "Harnesses Skills Sync",
     description:
@@ -232,7 +252,7 @@ export const harnessesTools: readonly ToolDefinition[] = [
       return (await loadOperations(signal)).skillsSync(id, check === true);
     },
   }),
-  harnessTool<McpRemoveParams>({
+  harnessTool({
     name: "harnesses_mcp_remove",
     title: "Harnesses MCP Remove",
     description:
@@ -251,4 +271,4 @@ export const harnessesTools: readonly ToolDefinition[] = [
       return (await loadOperations(signal)).mcpRemove(id, name, scope);
     },
   }),
-];
+] as const satisfies readonly ToolDefinition[];

@@ -37,7 +37,7 @@ Forget step 4 or 6 and `test/docs.test.ts` tells you which one.
 
 ## Agent tools and extensions
 
-- Each tool is one `defineTool` in `src/tools.ts`. MCP, Pi and OMP register that same list through the `@agntn/tools` adapters, so a description fixed there reads the same everywhere. The extensions only add status lines, and Pi its note about the active model.
+- Each tool is one `defineTool` in `src/tools.ts`. MCP, Pi, OMP and the AI SDK map in `src/ai.ts` get that same list through the `@agntn/tools` adapters, so a description fixed there reads the same everywhere. The extensions only add status lines, and Pi its note about the active model.
 - `extensions/shared/tui.ts` returns plain strings and keeps collapsed status lines short. Every outside value gets sanitized before a terminal sees it.
 
 ## Tests

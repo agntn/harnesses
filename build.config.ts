@@ -9,6 +9,7 @@ export default defineBuildConfig({
         "./src/index.ts",
         "./src/cli.ts",
         "./src/mcp.ts",
+        "./src/ai.ts",
         "./src/tool-operations.ts",
         "./src/tools.ts",
       ],
