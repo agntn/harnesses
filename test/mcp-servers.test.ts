@@ -433,6 +433,80 @@ describe("mcpList", () => {
     });
   });
 
+  it("masks secrets in URLs and args, keeping their shape", () => {
+    withMcpListFixture(() => {
+      writeFileSync(
+        mcpListFixturePath,
+        JSON.stringify({
+          mcpServers: {
+            remote: {
+              url: "https://user:URL_PASS@example.test/mcp?token=URL_SECRET&region=eu#top",
+            },
+            bare: { url: "bare:BARE_PASS@BARE_TAIL@example.test/mcp?token=BARE_SECRET" },
+            path: { url: "https://mcp.example.test/api/PATH0SECRET0abcdef123456/mcp" },
+            local: {
+              command: "npx",
+              args: [
+                "-y",
+                "mcp-remote",
+                "https://example.test/sse?key=ARG_URL_SECRET",
+                "https://u:ARG_PASS@ARG_TAIL@example.test/sse",
+                "--header",
+                "Authorization: Bearer HEADER_SECRET",
+                "--api-key",
+                "-ARG_SECRET",
+                "--auth-token=EQ_SECRET",
+                "GITHUB_TOKEN=ENV_SECRET",
+                "--port",
+                "3000",
+                "--verbose",
+                "Cookie: session=COOKIE_SECRET",
+                "X-Api-Key:NOSPACE_SECRET",
+                "--token",
+                "--DASH_SECRET",
+                "u:SCHEMELESS_PASS@example.test",
+                "example.test/mcp?token=first?Q_SECRET=tail",
+                "@scope/server@1.2.0",
+              ],
+            },
+          },
+        }),
+      );
+
+      const result = mcpList("cursor");
+      if (!("harnesses" in result.details)) throw new Error("Expected an MCP listing");
+      const servers = result.details.harnesses[0]?.configs[0]?.servers;
+      expect(servers?.map((server) => server.url ?? server.args)).toEqual([
+        "https://<redacted>@example.test/mcp?token=<redacted>&region=<redacted>#<redacted>",
+        "<redacted>@example.test/mcp?token=<redacted>",
+        "https://mcp.example.test/api/<redacted>/mcp",
+        [
+          "-y",
+          "mcp-remote",
+          "https://example.test/sse?key=<redacted>",
+          "https://<redacted>@example.test/sse",
+          "--header",
+          "Authorization: <redacted>",
+          "--api-key",
+          "<redacted>",
+          "--auth-token=<redacted>",
+          "GITHUB_TOKEN=<redacted>",
+          "--port",
+          "3000",
+          "--verbose",
+          "Cookie: <redacted>",
+          "<redacted>",
+          "--token",
+          "<redacted>",
+          "<redacted>@example.test",
+          "example.test/mcp?token=<redacted>",
+          "@scope/server@1.2.0",
+        ],
+      ]);
+      expect(result.content[0]?.text).not.toMatch(/SECRET|_PASS|_TAIL|BARE_|bare:|tail/);
+    });
+  });
+
   it("does not echo malformed config contents", () => {
     withMcpListFixture(() => {
       const secret = "LEAKME";
