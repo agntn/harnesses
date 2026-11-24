@@ -26,7 +26,7 @@ The rest of it sits on [harnesses.agntn.dev](https://harnesses.agntn.dev).
 - 🔗 **One AGENTS.md behind the global files.** Symlinks, so an edit through Claude or Gemini is the same bytes.
 - 🗂️ **One prompt folder, supported harnesses.** Markdown lives under XDG data; Gemini TOML is generated from it.
 - 📜 **Session types when the format is stable.** JSONL, SQLite, JSON. Unstable shapes stay `unknown`.
-- 🤖 **Eleven tools, three doors.** MCP, Pi and OMP call the same executors.
+- 🤖 **Eleven tools, four doors.** MCP, Pi, OMP and the AI SDK call the same executors.
 
 ## 📦 Install
 
@@ -252,7 +252,30 @@ omp install @agntn/harnesses
 }
 ```
 
-Eleven tools, the same eleven on MCP, Pi and OMP. `harnesses_detect`, `harnesses_info` and `harnesses_mcp_list` only read. `harnesses_run` is the one that can spend tokens. `tools` is required, so the model has to pick advisor or agent. What each call returns is on the [Agents page](https://harnesses.agntn.dev/guide/agents).
+Eleven tools, the same eleven on MCP, Pi, OMP and the AI SDK. `harnesses_detect`, `harnesses_info` and `harnesses_mcp_list` only read. `harnesses_run` is the one that can spend tokens. `tools` is required, so the model has to pick advisor or agent. What each call returns is on the [Agents page](https://harnesses.agntn.dev/guide/agents).
+
+### AI SDK
+
+Your AI SDK app gets all eleven harness tools with one import.
+
+```bash
+pnpm add @agntn/harnesses ai @ai-sdk/anthropic
+```
+
+```ts
+import { anthropic } from "@ai-sdk/anthropic";
+import { harnessesAiTools } from "@agntn/harnesses/ai";
+import { generateText, isStepCount } from "ai";
+
+const { text } = await generateText({
+  model: anthropic("claude-sonnet-5-5"),
+  tools: harnessesAiTools,
+  stopWhen: isStepCount(5),
+  prompt: "Which coding agents are installed here?",
+});
+```
+
+`harnesses_detect`, `harnesses_info` and `harnesses_mcp_list` run without approval. The other eight wait for one, since nobody's sitting at a bare `generateText` loop to click yes. That's the right default when a run can spend someone else's tokens. Your `toolApproval` overrides it.
 
 ## 🚫 What this does not do
 
