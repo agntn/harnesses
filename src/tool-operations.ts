@@ -742,6 +742,128 @@ function redactMcpValues(values: Readonly<Record<string, string>>): Record<strin
   return Object.fromEntries(Object.keys(values).map((key) => [key, MCP_REDACTED_VALUE]));
 }
 
+/** Flag and variable names that smell like a credential. Overmasking beats a leak. */
+const MCP_SECRET_NAME = /key|token|secret|pass|auth|credential|cookie|header|session|signature/i;
+const MCP_URL_SCHEME = /^[a-z][\d+.a-z-]*:\/\//i;
+const MCP_FLAG_ASSIGNMENT = /^(-{1,2}[^=]+)=(.*)$/s;
+const MCP_ENV_ASSIGNMENT = /^([a-z_]\w*)=(.*)$/is;
+const MCP_HEADER_LINE = /^([\w-]+):\s/;
+/** A path segment that reads like a key: long, no dots, letters and digits mixed. */
+const MCP_PATH_TOKEN = /^(?=.*\d)(?=.*[a-z])[\w-]{20,}$/i;
+
+/**
+ * Hides a secret value, keeping the header name of an `Authorization: Bearer …` line.
+ *
+ * @param value - The secret value.
+ * @returns {string} The masked value.
+ */
+function redactSecret(value: string): string {
+  const header = MCP_HEADER_LINE.exec(value)?.[1];
+  return header === undefined ? MCP_REDACTED_VALUE : `${header}: ${MCP_REDACTED_VALUE}`;
+}
+
+/**
+ * Masks every query and fragment value, keeping parameter names.
+ *
+ * @param tail - URL part from the first `?` or `#` on.
+ * @returns {string} The masked tail.
+ */
+function redactUrlParams(tail: string): string {
+  return tail
+    .split(/(?=[#&?])/)
+    .map((part) => {
+      const separator = part.slice(0, 1);
+      const body = part.slice(1);
+      const equals = body.indexOf("=");
+      if (equals >= 0) return `${separator}${body.slice(0, equals)}=${MCP_REDACTED_VALUE}`;
+      return body === "" ? separator : separator + MCP_REDACTED_VALUE;
+    })
+    .join("");
+}
+
+/**
+ * Masks user info and parameter values of a URL.
+ *
+ * @param value - The URL.
+ * @returns {string} The masked URL.
+ */
+function redactUrl(value: string): string {
+  const cut = value.search(/[#?]/);
+  const head = (cut < 0 ? value : value.slice(0, cut))
+    .replace(/^((?:[a-z][\d+.a-z-]*:(?=\/))?\/*)[^/@]*@/i, `$1${MCP_REDACTED_VALUE}@`)
+    .split("/")
+    .map((segment) => (MCP_PATH_TOKEN.test(segment) ? MCP_REDACTED_VALUE : segment))
+    .join("/");
+  return cut < 0 ? head : head + redactUrlParams(value.slice(cut));
+}
+
+/**
+ * Masks an argument only when it is a URL, so paths and globs keep their `?`.
+ *
+ * @param value - The argument or its assigned value.
+ * @returns {string} The masked URL, or the untouched value.
+ */
+function redactArgUrl(value: string): string {
+  return MCP_URL_SCHEME.test(value) ? redactUrl(value) : value;
+}
+
+/**
+ * Tells whether an argument is a credential flag waiting for its value.
+ *
+ * @param arg - The previous argument.
+ * @returns {boolean} True for `--api-key` and friends.
+ */
+function isSecretFlag(arg: string | undefined): boolean {
+  return arg?.startsWith("-") === true && !arg.includes("=") && MCP_SECRET_NAME.test(arg);
+}
+
+/**
+ * Masks a `NAME=value` or `--flag=value` pair, judging the value by its name.
+ *
+ * @param name - Variable or flag name.
+ * @param value - The assigned value.
+ * @returns {string} The masked pair.
+ */
+function redactAssignment(name: string, value: string): string {
+  return `${name}=${MCP_SECRET_NAME.test(name) ? redactSecret(value) : redactArgUrl(value)}`;
+}
+
+/**
+ * Tells whether an argument is a secret as a whole: a flag value or a credential header.
+ *
+ * @param arg - The argument.
+ * @param afterSecretFlag - Whether a credential flag came right before it.
+ * @returns {boolean} True when nothing of it may show.
+ */
+function isWholeSecret(arg: string, afterSecretFlag: boolean): boolean {
+  if (afterSecretFlag && !arg.startsWith("--")) return true;
+  return MCP_SECRET_NAME.test(MCP_HEADER_LINE.exec(arg)?.[1] ?? "");
+}
+
+/**
+ * Masks one command argument by its own shape and the flag before it.
+ *
+ * @param arg - The argument.
+ * @param afterSecretFlag - Whether a credential flag came right before it.
+ * @returns {string} The masked argument.
+ */
+function redactArg(arg: string, afterSecretFlag: boolean): string {
+  if (isWholeSecret(arg, afterSecretFlag)) return redactSecret(arg);
+  const [, name, value] = MCP_FLAG_ASSIGNMENT.exec(arg) ?? MCP_ENV_ASSIGNMENT.exec(arg) ?? [];
+  if (name === undefined || value === undefined) return redactArgUrl(arg);
+  return redactAssignment(name, value);
+}
+
+/**
+ * Masks credentials in stdio args: flag values, `NAME=value` pairs and URLs.
+ *
+ * @param args - The server's command arguments.
+ * @returns {string[]} The masked arguments.
+ */
+function redactMcpArgs(args: readonly string[]): string[] {
+  return args.map((arg, index) => redactArg(arg, isSecretFlag(args[index - 1])));
+}
+
 /**
  * Tells whether the name filter keeps a config: it holds the server, or failed to parse and might.
  *
@@ -812,6 +934,8 @@ export function mcpList(id?: string, name?: string): ToolResult<McpListing | Unk
               .filter((server) => name === undefined || server.name === name)
               .map((server) => ({
                 ...server,
+                ...(server.args === undefined ? {} : { args: redactMcpArgs(server.args) }),
+                ...(server.url === undefined ? {} : { url: redactUrl(server.url) }),
                 ...(server.env === undefined ? {} : { env: redactMcpValues(server.env) }),
                 ...(server.headers === undefined
                   ? {}
