@@ -266,6 +266,8 @@ export interface RunParams {
   model?: string;
   effort?: string;
   extensions?: boolean;
+  resume?: string;
+  sessionId?: string;
   timeoutSeconds?: number;
   structured?: boolean;
   tools: boolean;
