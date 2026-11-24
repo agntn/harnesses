@@ -119,6 +119,7 @@ await getHarness("codex").invoke("Review this patch", { readOnly: true, effort: 
 getHarness("grok").readOnlyNetwork(); // false on Linux, so no web for its MCP servers under readOnly
 getHarness("pi").readOnlyTools(); // ["read", "grep", "find", "ls"], no extension or MCP tools
 await getHarness("pi").invoke("Review this patch", { extensions: false }); // a broken extension can't stop this one
+await getHarness("claude").invoke("And the tests?", { resume: sessionId }); // same conversation, no transcript to drag along
 getHarness("claude").invocation?.modelHint; // what model takes, since Claude can't list them
 
 const agy = getHarness("antigravity");

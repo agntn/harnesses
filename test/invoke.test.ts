@@ -536,6 +536,70 @@ describe("normalized invocation", () => {
     });
   });
 
+  it("puts the session right before the prompt, where Codex wants its resume subcommand", () => {
+    const id = "01a20ce2-66f1-7a23-844f-441a1228f4db";
+    const codex = getHarness("codex");
+
+    expect(codex.buildInvocation("next", { readOnly: true, structured: true, resume: id })).toEqual(
+      {
+        command: "codex",
+        args: [
+          "exec",
+          "--skip-git-repo-check",
+          "--sandbox",
+          "read-only",
+          "--json",
+          "resume",
+          id,
+          "next",
+        ],
+      },
+    );
+    expect(codex.buildInvocation("next", { tools: true, resume: id, effort: "low" })?.args).toEqual(
+      ["exec", "--skip-git-repo-check", "resume", id, "next", "-c", "model_reasoning_effort=low"],
+    );
+    expect(
+      getHarness("claude").buildInvocation("next", { readOnly: true, resume: id })?.args,
+    ).toEqual(["-p", "--resume", id, "next", "--strict-mcp-config", "--tools", "Read,Glob,Grep"]);
+    expect(getHarness("omp").buildInvocation("next", { tools: true, resume: id })?.args).toEqual([
+      "-p",
+      `--resume=${id}`,
+      "next",
+    ]);
+  });
+
+  it("starts a Claude session under the id the caller picked", () => {
+    const id = "7d0c2a51-3b7e-4f4e-9a52-6c1d2b0e9f11";
+
+    expect(
+      getHarness("claude").buildInvocation("first", { sessionId: id })?.args.slice(0, 4),
+    ).toEqual(["-p", "--session-id", id, "first"]);
+    expect(getHarness("codex").invocationError({ tools: true, sessionId: id })).toBe(
+      "Harness codex cannot start a session under a chosen id",
+    );
+  });
+
+  it("rejects a session the harness can't continue or the caller can't name", () => {
+    const id = "01a20ce2-66f1-7a23-844f-441a1228f4db";
+    const claude = getHarness("claude");
+
+    for (const harness of ["pi", "gemini", "kilo", "opencode"] as const) {
+      expect(getHarness(harness).buildInvocation("x", { tools: true, resume: id })).toBeNull();
+      expect(getHarness(harness).invocationError({ tools: true, resume: id })).toBe(
+        `Harness ${harness} cannot resume a session`,
+      );
+    }
+    expect(claude.invocationError({ resume: id, sessionId: id })).toBe(
+      "Pick resume or sessionId, not both: one continues a session, the other starts one",
+    );
+    for (const session of ["", "--dangerously-skip-permissions", "01a2", "plum", `${id}\nok`]) {
+      expect(claude.buildInvocation("x", { resume: session })).toBeNull();
+      expect(claude.invocationError({ resume: session })).toBe(
+        "Session id must be a full UUID, the way the harness printed it",
+      );
+    }
+  });
+
   it("rejects read-only access when a harness cannot enforce it", () => {
     expect(getHarness("gemini").invocationError({ readOnly: true })).toContain(
       "no read-only full agent invocation",
@@ -1187,6 +1251,18 @@ describe("harness metadata for agents", () => {
     expect(harnessInfo("cursor").details).toMatchObject({ effortSelection: false });
     expect(harnessInfo("grok").content[0]?.text).toContain('"effortSelection":true');
   });
+
+  it("tells which harnesses continue or name a session", () => {
+    expect(harnessInfo("claude").details).toMatchObject({
+      sessionResume: true,
+      sessionIdSelection: true,
+    });
+    expect(harnessInfo("codex").details).toMatchObject({
+      sessionResume: true,
+      sessionIdSelection: false,
+    });
+    expect(harnessInfo("pi").content[0]?.text).toContain('"sessionResume":false');
+  });
 });
 
 describe("runHarness tool operation", () => {
@@ -1406,6 +1482,32 @@ describe("runHarness tool operation", () => {
     expect(result.details).toEqual({
       error: "Harness github-copilot does not support reasoning effort",
     });
+  });
+
+  it("hands the session to the child and echoes it in the status", async () => {
+    const id = "01a20ce2-66f1-7a23-844f-441a1228f4db";
+    registerHarness(
+      class extends FakeCursor {
+        override readonly invocation: Harness["invocation"] = {
+          args: ["-e", "console.log(process.argv.slice(1).join(' '))", "{prompt}"],
+          resumeArgs: ["resume", "{session}"],
+          level: "inferred",
+        };
+      },
+    );
+
+    try {
+      const result = await runHarness("cursor", "next", { tools: true, resume: id });
+
+      expect(result.isError).toBeUndefined();
+      expect(result.details).toMatchObject({ resume: id, stdout: `resume ${id} next\n` });
+      expect(result.content[0]?.text).toContain(`"resume":"${id}"`);
+      expect((await runHarness("cursor", "x", { tools: true, sessionId: id })).details).toEqual({
+        error: "Harness cursor cannot start a session under a chosen id",
+      });
+    } finally {
+      registerHarness(Cursor);
+    }
   });
 
   it("keeps an effort with a line break out of the run text", async () => {

@@ -69,6 +69,8 @@ type InvocationOptions = Readonly<{
   structured?: boolean;
   tools?: boolean;
   readOnly?: boolean;
+  resume?: string;
+  sessionId?: string;
 }>;
 
 type InvocationMode = keyof HarnessInvocationModes;
@@ -107,6 +109,56 @@ function requestedInvocationMode(options: InvocationOptions): InvocationMode {
 /** One lowercase word, so an effort can never turn into a flag of its own. */
 const EFFORT_PATTERN = /^[a-z]+$/u;
 
+/** A full UUID: to Codex a name is a new session, to OMP a prefix matches anything. */
+const SESSION_PATTERN = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/iu;
+
+/**
+ * Rejects a session option the harness can't take, or an id that isn't a UUID.
+ *
+ * @param id - Harness id for the message.
+ * @param invocation - Templates that decide which session options exist.
+ * @param options - Requested resume and session id.
+ * @returns {string | null} The rejection, or null when both are accepted.
+ */
+function sessionError(
+  id: string,
+  invocation: HarnessInvocation,
+  options: InvocationOptions,
+): string | null {
+  const unsupported = sessionSupportError(id, invocation, options);
+  if (unsupported !== null) return unsupported;
+  const session = options.resume ?? options.sessionId;
+  return session === undefined || SESSION_PATTERN.test(session)
+    ? null
+    : "Session id must be a full UUID, the way the harness printed it";
+}
+
+/**
+ * Rejects both session options together, or one the recipe lacks.
+ *
+ * @param id - Harness id for the message.
+ * @param invocation - Templates that decide which session options exist.
+ * @param options - Requested resume and session id.
+ * @returns {string | null} The rejection, or null when the recipe takes them.
+ */
+function sessionSupportError(
+  id: string,
+  invocation: HarnessInvocation,
+  options: InvocationOptions,
+): string | null {
+  const { resume, sessionId } = options;
+  if (resume !== undefined && sessionId !== undefined) {
+    return "Pick resume or sessionId, not both: one continues a session, the other starts one";
+  }
+  if (resume !== undefined && !invocation.resumeArgs) {
+    return `Harness ${id} cannot resume a session`;
+  }
+  if (sessionId !== undefined && !invocation.sessionIdArgs) {
+    return `Harness ${id} cannot start a session under a chosen id`;
+  }
+  return null;
+}
+
 /**
  * Rejects a model, effort or extension skip the harness can't take. No mode switch fixes that, so no retry.
  *
@@ -126,6 +178,8 @@ export function selectionError(
   if (options.extensions === false && !invocation.noExtensionsArgs) {
     return `Harness ${id} cannot start without extensions`;
   }
+  const session = sessionError(id, invocation, options);
+  if (session !== null) return session;
   if (options.effort === undefined) return null;
   if (!invocation.effortArgs) return `Harness ${id} does not support reasoning effort`;
   return EFFORT_PATTERN.test(options.effort)
@@ -268,6 +322,27 @@ function fillArgs(
   return args.map((arg) => arg.replaceAll(placeholder, () => value));
 }
 
+/**
+ * Puts the session arguments just before the prompt, where Codex wants `resume`.
+ *
+ * @param template - Mode template.
+ * @param invocation - Recipe with the session templates.
+ * @param options - Requested resume or session id.
+ * @returns {string[]} The template with the session arguments in.
+ */
+function withSession(
+  template: readonly string[],
+  invocation: HarnessInvocation,
+  options: InvocationOptions,
+): string[] {
+  const session = [
+    ...fillArgs(invocation.resumeArgs, "{session}", options.resume),
+    ...fillArgs(invocation.sessionIdArgs, "{session}", options.sessionId),
+  ];
+  const slot = template.findIndex((arg) => arg.includes("{prompt}"));
+  return template.toSpliced(slot === -1 ? template.length : slot, 0, ...session);
+}
+
 function buildInvocationArgs(
   template: readonly string[],
   prompt: string,
@@ -275,7 +350,7 @@ function buildInvocationArgs(
   options: InvocationOptions,
 ): string[] {
   return [
-    ...fillArgs(template, "{prompt}", prompt),
+    ...fillArgs(withSession(template, invocation, options), "{prompt}", prompt),
     ...fillArgs(invocation.modelArgs, "{model}", options.model),
     ...fillArgs(invocation.effortArgs, "{effort}", options.effort),
     ...(options.extensions === false ? (invocation.noExtensionsArgs ?? []) : []),
@@ -756,6 +831,8 @@ export abstract class Harness {
       structured: options.structured,
       tools: options.tools,
       readOnly: options.readOnly,
+      resume: options.resume,
+      sessionId: options.sessionId,
     };
     const built = this.buildInvocation(prompt, invocationOptions);
     if (!built) {

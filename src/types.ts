@@ -112,6 +112,10 @@ export interface HarnessInvocation {
   effortArgs?: string[];
   /** Arguments appended when a run skips extension discovery; absent when the CLI can't. */
   noExtensionsArgs?: string[];
+  /** Arguments put right before the prompt to continue a session; every "{session}" is replaced. */
+  resumeArgs?: string[];
+  /** Arguments put right before the prompt to start a session under a chosen id. */
+  sessionIdArgs?: string[];
   /**
    * Arguments appended to a plain text run so a CLI that holds its answer until
    * the end reports it as events instead; `invoke` folds them back into that text,
@@ -190,6 +194,10 @@ export interface InvokeOptions {
   signal?: AbortSignal;
   /** Use the harness's structured (JSON) output mode instead of plain text. */
   structured?: boolean;
+  /** Session id to continue. Rejected where `resumeArgs` is missing. */
+  resume?: string;
+  /** Id for a new session. Rejected where `sessionIdArgs` is missing. */
+  sessionId?: string;
 }
 
 export interface InvokeResult {

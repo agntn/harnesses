@@ -169,6 +169,13 @@ describe("harnesses usage paths", () => {
     expect(JSON.parse(result.stdout)).toMatchObject(modes);
   });
 
+  it("harnesses run refuses a resume that isn't a session UUID before spawning", () => {
+    const result = runCli(["run", "codex", "--read-only", "--resume", "plum", "next"]);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Session id must be a full UUID");
+  });
+
   it("harnesses run rejects --read-only beside --no-tools", () => {
     const result = runCli(["run", "claude", "--no-tools", "--read-only", "review"]);
 

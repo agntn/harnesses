@@ -68,6 +68,15 @@ export default defineTool({
           description: "Load Pi or OMP extensions; --no-extensions skips a broken one",
         }),
       ),
+      resume: Type.Optional(
+        Type.String({
+          description: "Session id to continue, as the harness printed it",
+          minLength: 1,
+        }),
+      ),
+      sessionId: Type.Optional(
+        Type.String({ description: "UUID for a new session you can resume later", minLength: 1 }),
+      ),
     },
     { additionalProperties: false },
   ),
@@ -83,6 +92,8 @@ export default defineTool({
       structured: input.structured === true,
       tools: input.tools ?? readOnly,
       readOnly,
+      resume: input.resume,
+      sessionId: input.sessionId,
     };
     if (!harness.buildInvocation("", options)) {
       return refusal(harness.invocationError(options) ?? "Invalid invocation");

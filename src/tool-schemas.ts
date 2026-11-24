@@ -16,6 +16,10 @@ export interface McpSchemaBuilder<I, S> {
 export const HARNESS_INFO_MAX_ITEMS = 20;
 export const RUN_TIMEOUT_DEFAULT_SECONDS = 600;
 
+/** Same UUID rule as `invoke`, so a session name or prefix never gets this far. */
+const SESSION_UUID =
+  "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
+
 /**
  * Builds the parameter schemas for all harness tools with the host's TypeBox.
  *
@@ -120,6 +124,24 @@ export function harnessToolSchemas<I, S>(Type: McpSchemaBuilder<I, S>) {
         Type.Boolean({
           description:
             "Set false to start Pi or OMP without extension discovery, so a broken extension can't stop the run. Harnesses without extensionsOptional in harnesses_info reject it. A run that died on an extension says retry with extensions: false.",
+        }),
+      ),
+      resume: Type.Optional(
+        Type.String({
+          description:
+            "Full session UUID to continue, as the harness printed it: Claude session_id, Codex thread_id, OMP session id. Harnesses without sessionResume in harnesses_info reject it.",
+          minLength: 36,
+          maxLength: 36,
+          pattern: SESSION_UUID,
+        }),
+      ),
+      sessionId: Type.Optional(
+        Type.String({
+          description:
+            "UUID for a new session that a later run resumes. Harnesses without sessionIdSelection in harnesses_info reject it.",
+          minLength: 36,
+          maxLength: 36,
+          pattern: SESSION_UUID,
         }),
       ),
       timeoutSeconds: Type.Optional(
