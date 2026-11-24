@@ -4,9 +4,11 @@
 
 `pnpm install`, and you're in. CI runs `pnpm lint`, `pnpm typecheck`, `pnpm build` and `pnpm test:run` in that order, so run the same four before you push.
 
-`lint` and `typecheck` build first, because the Pi and OMP extensions import their schemas and types from `dist/`. That means `build`, `lint`, `typecheck` and packing all rewrite `dist/`.
+`lint` and `typecheck` build first, because the Pi and OMP extensions take their tool list types from `dist/`. That means `build`, `lint`, `typecheck` and packing all rewrite `dist/`.
 
-Point an MCP client at `node <checkout>/dist/cli.mjs mcp` and it serves `src/`. The rebuild and reconnect dance is over: edit, restart, done. Only `src/cli.ts` still wants `pnpm build`. Skip the restart and every tool call refuses, asking for one. `HARNESSES_DIST=1` and the Pi and OMP extensions still read `dist/`, so build in a separate worktree while they run.
+Point an MCP client at `node <checkout>/dist/cli.mjs mcp` and it serves `src/`. The rebuild and reconnect dance is over: edit, restart, done. Only `src/cli.ts` still wants `pnpm build`. Skip the restart and every tool call refuses, asking for one.
+
+Pi and OMP read `src/` as well, so a new session picks up the edit. Only `HARNESSES_DIST=1` still reads `dist/`, so build in a separate worktree while it runs.
 
 The docs site rides along for free. `docs/` is a workspace member, so the same install and the one lockfile cover it. `pnpm run docs` starts it. The `run` isn't optional: bare `pnpm docs` is pnpm 12's own command, and it just asks which package you meant.
 
@@ -35,7 +37,7 @@ Forget step 4 or 6 and `test/docs.test.ts` tells you which one.
 
 ## Agent tools and extensions
 
-- Schemas live in `src/tool-schemas.ts`, executors in `src/tool-operations.ts`. The Pi and OMP adapters reuse both, load the executors lazily and register every tool, so a fix lands on all surfaces at once.
+- Each tool is one `defineTool` in `src/tools.ts`. MCP, Pi and OMP register that same list through the `@agntn/tools` adapters, so a description fixed there reads the same everywhere. The extensions only add status lines, and Pi its note about the active model.
 - `extensions/shared/tui.ts` returns plain strings and keeps collapsed status lines short. Every outside value gets sanitized before a terminal sees it.
 
 ## Tests

@@ -1,16 +1,6 @@
-/**
- * Tool parameter schemas shared by every surface (MCP server, Pi and OMP
- * extensions). Each surface owns a different TypeBox build (the extensions
- * must use their host's facade), so the schemas are a factory over a minimal
- * structural builder instead of importing typebox here.
- */
+/** Tool parameter schemas, built by `src/tools.ts` and the CLI's `mcp-servers add`. */
 
-/**
- * The subset of the TypeBox builder the tool schemas need. `I` is the schema
- * type the builder accepts as input, `S` the (possibly narrower) type it
- * returns; OMP's facade accepts its own `AnySchema` while producing schemas
- * that satisfy the host's stricter `TSchema`.
- */
+/** The part of `Type` from `@agntn/tools` the schemas use. */
 export interface McpSchemaBuilder<I, S> {
   Object(properties: Readonly<Record<string, I>>, options?: object): S;
   String(options?: object): I;

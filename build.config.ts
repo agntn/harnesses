@@ -10,7 +10,7 @@ export default defineBuildConfig({
         "./src/cli.ts",
         "./src/mcp.ts",
         "./src/tool-operations.ts",
-        "./src/tool-schemas.ts",
+        "./src/tools.ts",
       ],
       /** Declaration maps would point at a src/ the tarball doesn't carry. */
       dts: { sourcemap: false },

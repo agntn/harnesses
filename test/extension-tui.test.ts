@@ -1,6 +1,4 @@
-import { Type as OmpType } from "@oh-my-pi/omptype/typebox";
-import { IsSchema } from "typebox";
-import { Value } from "typebox/value";
+import { validateInput } from "@agntn/tools";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 vi.mock("@oh-my-pi/pi-coding-agent", () => ({
@@ -19,8 +17,9 @@ vi.mock("@oh-my-pi/pi-coding-agent", () => ({
 
 import ompExtension from "../extensions/omp/harnesses.ts";
 import piExtension from "../extensions/pi/harnesses.ts";
-import { HARNESS_TOOL_LABELS } from "../extensions/shared/tui.ts";
+import { HARNESS_TOOL_APPROVALS, HARNESS_TOOL_LABELS } from "../extensions/shared/tui.ts";
 import { registerHarness } from "../src/index.ts";
+import { harnessesTools } from "../src/tools.ts";
 import { Harness } from "../src/harness.ts";
 import Cursor from "../src/harnesses/cursor.ts";
 
@@ -33,19 +32,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function registeredTools(
+async function registeredTools(
   extension: typeof piExtension | typeof ompExtension,
   omp = false,
-): unknown[] {
+): Promise<unknown[]> {
   const tools: unknown[] = [];
   const api = {
     on() {},
     registerTool(tool: unknown) {
       tools.push(tool);
     },
-    ...(omp ? { setLabel() {}, typebox: { Type: OmpType } } : {}),
+    /* `Unsafe` hands the schema over as is, so the test sees what OMP's validator gets. */
+    ...(omp ? { setLabel() {}, typebox: { Type: { Unsafe: (schema: unknown) => schema } } } : {}),
   };
-  Reflect.apply(extension, undefined, [api]);
+  await Reflect.apply(extension, undefined, [api]);
   return tools;
 }
 
@@ -98,10 +98,10 @@ function renderResult(definition: Readonly<Record<string, unknown>>, omp: boolea
   return render(Reflect.apply(definition.renderResult, definition, rendererArgs));
 }
 
-describe("Pi and OMP extension renderers", () => {
-  const piTools = registeredTools(piExtension);
-  const ompTools = registeredTools(ompExtension, true);
+const piTools = await registeredTools(piExtension);
+const ompTools = await registeredTools(ompExtension, true);
 
+describe("Pi and OMP extension renderers", () => {
   it("registers custom renderers for every tool in both hosts", () => {
     const expected = Object.keys(HARNESS_TOOL_LABELS).sort();
     const names = (tools: readonly unknown[]) =>
@@ -139,21 +139,23 @@ describe("Pi and OMP extension renderers", () => {
   });
 
   it("forwards cancellation from both hosts to runs and model listings", async () => {
+    const hang = { args: ["-e", "setTimeout(() => {}, 30_000)"], level: "inferred" } as const;
     registerHarness(
       class extends Cursor {
-        override readonly binaries = ["agntn-missing-harness-binary"];
-        override readonly invocation: Harness["invocation"] = { args: [], level: "inferred" };
-        override readonly modelListing: Harness["modelListing"] = { args: [], level: "inferred" };
+        override readonly binaries = ["node"];
+        override readonly invocation: Harness["invocation"] = hang;
+        override readonly modelListing: Harness["modelListing"] = hang;
       },
     );
     try {
       for (const definitions of [piTools, ompTools]) {
-        for (const name of ["harnesses_run", "harnesses_models"]) {
-          await expectFailure(
-            tool(definitions, name),
-            [{ id: "cursor", prompt: "x", tools: true }, AbortSignal.abort()],
-            "aborted",
-          );
+        for (const [name, args] of [
+          ["harnesses_run", { id: "cursor", prompt: "x", tools: true }],
+          ["harnesses_models", { id: "cursor" }],
+        ] as const) {
+          const controller = new AbortController();
+          setTimeout(() => controller.abort(), 200);
+          await expectFailure(tool(definitions, name), [args, controller.signal], "aborted");
         }
       }
     } finally {
@@ -205,13 +207,15 @@ describe("Pi and OMP extension renderers", () => {
     if (typeof definition.prepareArguments !== "function") {
       throw new TypeError("Missing argument preparation");
     }
-    if (!IsSchema(definition.parameters)) throw new TypeError("Missing parameter schema");
+    const info = harnessesTools.find((candidate) => candidate.name === "harnesses_info");
+    if (!info) throw new TypeError("Missing harnesses_info");
+    const accepts = (args: unknown) => validateInput(info, args).ok;
 
     const raw = { id: '["pi","omp"]' };
-    expect(Value.Check(definition.parameters, raw)).toBe(false);
+    expect(accepts(raw)).toBe(false);
     const prepared: unknown = Reflect.apply(definition.prepareArguments, definition, [raw]);
     expect(prepared).toEqual({ id: ["pi", "omp"] });
-    expect(Value.Check(definition.parameters, prepared)).toBe(true);
+    expect(accepts(prepared)).toBe(true);
 
     for (const [input, valid] of [
       [{ id: "pi" }, true],
@@ -221,7 +225,7 @@ describe("Pi and OMP extension renderers", () => {
     ] as const) {
       const unchanged: unknown = Reflect.apply(definition.prepareArguments, definition, [input]);
       expect(unchanged).toEqual(input);
-      expect(Value.Check(definition.parameters, unchanged)).toBe(valid);
+      expect(accepts(unchanged)).toBe(valid);
     }
 
     for (const input of [
@@ -230,30 +234,44 @@ describe("Pi and OMP extension renderers", () => {
       { id: '["Nope!"]' },
     ]) {
       const invalid: unknown = Reflect.apply(definition.prepareArguments, definition, [input]);
-      expect(Value.Check(definition.parameters, invalid)).toBe(false);
+      expect(accepts(invalid)).toBe(false);
     }
   });
 
-  it("rejects arguments the schema does not declare in both hosts", () => {
+  it("rejects arguments the schema does not declare in both hosts", async () => {
     const stray = { id: "claude", prompt: "inspect", tools: true, read_only: true };
-    const piRun = tool(piTools, "harnesses_run").parameters;
-    const ompRun = tool(ompTools, "harnesses_run").parameters;
-    if (!IsSchema(piRun)) throw new TypeError("Missing parameter schema");
-    if (typeof ompRun !== "function" || !("allows" in ompRun)) {
-      throw new TypeError("Missing OMP parameter schema");
+    for (const definitions of [piTools, ompTools]) {
+      const run = tool(definitions, "harnesses_run");
+      if (typeof run.execute !== "function") throw new Error("Missing execute");
+      await expect(Reflect.apply(run.execute, run, ["call", stray])).rejects.toThrow(
+        'unknown property "read_only"',
+      );
     }
-    const { allows } = ompRun;
-    if (typeof allows !== "function") throw new TypeError("Missing OMP validator");
+    const detect = harnessesTools.find((candidate) => candidate.name === "harnesses_detect");
+    if (!detect) throw new TypeError("Missing harnesses_detect");
+    expect(validateInput(detect, { _: "" }).ok).toBe(true);
+  });
 
-    expect(Value.Check(piRun, stray)).toBe(false);
-    expect(Reflect.apply(allows, ompRun, [stray])).toBe(false);
-    const { read_only: _, ...declared } = stray;
-    expect(Value.Check(piRun, declared)).toBe(true);
-    expect(Reflect.apply(allows, ompRun, [declared])).toBe(true);
+  it("registers the MCP definitions unchanged in both hosts", () => {
+    for (const definition of harnessesTools) {
+      const fromPi = tool(piTools, definition.name);
+      const fromOmp = tool(ompTools, definition.name);
+      for (const registered of [fromPi, fromOmp]) {
+        expect(registered.description).toBe(definition.description);
+        expect(registered.label).toBe(definition.title);
+        expect(registered.parameters).toEqual(definition.input);
+      }
+      expect(fromPi.promptSnippet).toBe(definition.snippet);
+      expect(fromPi.promptGuidelines).toEqual(definition.guidelines);
+    }
+  });
 
-    const detect = tool(piTools, "harnesses_detect").parameters;
-    if (!IsSchema(detect)) throw new TypeError("Missing parameter schema");
-    expect(Value.Check(detect, { _: "" })).toBe(true);
+  it("keeps OMP approvals and the main tool list", () => {
+    for (const [name, approval] of Object.entries(HARNESS_TOOL_APPROVALS)) {
+      const registered = tool(ompTools, name);
+      expect(registered.approval).toBe(approval);
+      expect(registered.loadMode).toBe("essential");
+    }
   });
 
   it("renders bounded terminal-safe call rows in both hosts", () => {

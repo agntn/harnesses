@@ -16,6 +16,9 @@ export const HARNESS_TOOL_LABELS = {
 
 export type HarnessToolName = keyof typeof HARNESS_TOOL_LABELS;
 
+/** Every tool the extensions draw a status line for, in label order. */
+export const harnessToolNames = Object.keys(HARNESS_TOOL_LABELS) as readonly HarnessToolName[];
+
 /** Spawning a harness is `exec` even for a read-only run, since the child can do anything. */
 export const HARNESS_TOOL_APPROVALS: Record<HarnessToolName, "read" | "exec" | "write"> = {
   harnesses_detect: "read",

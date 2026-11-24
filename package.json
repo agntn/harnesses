@@ -59,21 +59,17 @@
     "@earendil-works/pi-coding-agent": "catalog:dev",
     "@earendil-works/pi-tui": "catalog:dev",
     "@modelcontextprotocol/client": "catalog:dev",
-    "@oh-my-pi/omptype": "catalog:dev",
-    "@oh-my-pi/pi-ai": "catalog:dev",
     "@oh-my-pi/pi-coding-agent": "catalog:dev",
     "@types/node": "latest",
     "@typescript/native-preview": "latest",
     "obuild": "catalog:dev",
-    "typebox": "catalog:dev",
     "typescript": "catalog:dev",
     "vite-plus": "catalog:"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": ">=0.99.0 <2",
     "@earendil-works/pi-tui": ">=0.84.2 <2",
-    "@oh-my-pi/pi-coding-agent": ">=18.0.0 <19",
-    "typebox": "*"
+    "@oh-my-pi/pi-coding-agent": ">=18.0.0 <19"
   },
   "peerDependenciesMeta": {
     "@earendil-works/pi-coding-agent": {
@@ -83,9 +79,6 @@
       "optional": true
     },
     "@oh-my-pi/pi-coding-agent": {
-      "optional": true
-    },
-    "typebox": {
       "optional": true
     }
   },

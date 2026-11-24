@@ -67,6 +67,11 @@ export const harnessesTools: readonly ToolDefinition[] = [
     title: "Harnesses Detect",
     description:
       "List every known AI coding harness with its install state, version and the harnesses_run modes it takes: advisor (tools=false), readOnly (tools=true with readOnly=true) and agent (tools=true).",
+    snippet:
+      "Use harnesses_detect to see which AI coding harnesses are installed and how each one runs.",
+    guidelines: [
+      "The scan checks binaries on PATH. Versions come from native metadata or the CLI.",
+    ],
     effect: "read",
     input: schemas.detect,
     execute: async (_input, { signal }) => (await loadOperations(signal)).detectHarnesses(),
@@ -76,6 +81,11 @@ export const harnessesTools: readonly ToolDefinition[] = [
     title: "Harnesses Info",
     description:
       "Full metadata for one or more AI coding harnesses, including supported invocation and model operations, whether a read-only run keeps its network and which tools, configuration, sessions, instructions, skills, commands, prompt templates, hooks, temp directories, the env variables that move them, and resolved paths.",
+    snippet: "Use harnesses_info to look up where coding harnesses store their data.",
+    guidelines: [
+      "Pass one harness id from harnesses_detect, or batch several ids in one call.",
+      "Resolved paths are absolute for the current platform and home directory.",
+    ],
     effect: "read",
     input: schemas.info,
     execute: async (input, { signal }) => (await loadOperations(signal)).harnessInfo(input.id),
@@ -85,6 +95,7 @@ export const harnessesTools: readonly ToolDefinition[] = [
     title: "Harnesses Models",
     description:
       "List the models currently available to one AI coding harness through its native CLI, normalized across providers. An optional search filter is passed to harnesses that support it. The command may load project configuration and extensions.",
+    snippet: "Use harnesses_models to inspect models available to an installed coding harness.",
     effect: "exec",
     openWorld: true,
     input: schemas.models,
@@ -98,6 +109,12 @@ export const harnessesTools: readonly ToolDefinition[] = [
     title: "Harnesses Run",
     description:
       "Run one prompt through an AI coding harness's normalized non-interactive invocation and return its output. Pass tools=true whenever the task needs harness tools, including Grok native X search. Add readOnly=true to require native read-only tool enforcement. Pass tools=false only for an advisor without tools. Unsupported modes never widen access; harnesses_detect shows which modes each harness takes.",
+    snippet: "Use harnesses_run to delegate one prompt to another installed coding harness.",
+    guidelines: [
+      "A run that needs the web checks readOnlyNetwork in harnesses_info first: false means its MCP servers get no network under readOnly.",
+      "A run that needs extension or MCP tools checks readOnlyTools in harnesses_info first: a list there is every tool the run keeps under readOnly.",
+      "Output is capped for context; long runs stop at the timeout.",
+    ],
     effect: "exec",
     openWorld: true,
     input: schemas.run,
@@ -111,6 +128,7 @@ export const harnessesTools: readonly ToolDefinition[] = [
     title: "Harnesses MCP List",
     description:
       "List the MCP servers configured in each harness's config files, normalized across dialects. Omit id to scan every harness. Pass name to find one server without reading every listing.",
+    snippet: "Use harnesses_mcp_list to see which MCP servers each coding harness has configured.",
     effect: "read",
     input: schemas.mcpList,
     cli: {
