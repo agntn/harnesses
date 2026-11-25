@@ -28,6 +28,7 @@ import type {
   Platform,
 } from "./types.ts";
 import { resolvePathTemplate } from "./resolve.ts";
+import { locateBinary, type BinaryLocation } from "./executables.ts";
 
 /**
  * Swaps the default root at the start of a resolved path for the value the
@@ -564,6 +565,14 @@ export interface HarnessProbe {
   version: string | null;
 }
 
+/** What {@link Harness.locate} found on `PATH`. */
+export interface HarnessLocation {
+  /** The binary `probe()` asks; null when the harness names none. */
+  probe: BinaryLocation | null;
+  /** The binary a headless run starts; null without a headless mode. */
+  invocation: BinaryLocation | null;
+}
+
 /** Cap on one `--version` probe. */
 const VERSION_TIMEOUT_MS = 5000;
 
@@ -719,6 +728,18 @@ export abstract class Harness {
     if (!installed) return { installed, version: null };
     const version = replaces(this, "version") ? this.version : await askVersion(this.binaries);
     return { installed, version };
+  }
+
+  /**
+   * Which files a probe and a run would start, read off `PATH` without spawning either.
+   *
+   * @returns {HarnessLocation} Probe and run binary, each with the copies it hides.
+   */
+  locate(): HarnessLocation {
+    const located = this.binaries.map((binary) => locateBinary(binary));
+    const probe = located.find(({ path }) => path !== null) ?? located[0] ?? null;
+    const run = this.invocation === null ? undefined : (this.invocation.binary ?? this.binaries[0]);
+    return { probe, invocation: run === undefined ? null : locateBinary(run) };
   }
 
   /**

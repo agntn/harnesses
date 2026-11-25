@@ -27,7 +27,7 @@ export type { SkillsSyncReport } from "./skills-sync.ts";
 import { syncSkills } from "./skills-sync.ts";
 import type { SkillsSyncReport } from "./skills-sync.ts";
 import { modelListingError, readOnlyVersionError, selectionError } from "./harness.ts";
-import type { Harness } from "./harness.ts";
+import type { Harness, HarnessLocation } from "./harness.ts";
 import type {
   AvailableModel,
   EnvOverride,
@@ -65,6 +65,33 @@ export interface HarnessStatus {
   readOnly: boolean;
   /** Takes `tools: true`, the full agent. */
   agent: boolean;
+  /** The probe binary, first on `PATH`; null when nothing there answers to it. */
+  path: string | null;
+  /** Later copies on `PATH` that `path` hides; absent when there are none. */
+  shadowed?: string[];
+  /** File `harnesses run` starts, only when it's another binary; null if missing. */
+  runPath?: string | null;
+  /** Later copies of the run binary; absent when there are none. */
+  runShadowed?: string[];
+}
+
+/** The {@link HarnessStatus} fields that say which files run. */
+type BinaryPaths = Pick<HarnessStatus, "path" | "shadowed" | "runPath" | "runShadowed">;
+
+/**
+ * Status fields of one location, without repeats or empty lists.
+ *
+ * @param location - What {@link Harness.locate} found.
+ * @returns {BinaryPaths} The path fields for one status row.
+ */
+function binaryPaths(location: HarnessLocation): BinaryPaths {
+  const { probe, invocation } = location;
+  const paths: BinaryPaths = { path: probe?.path ?? null };
+  if (probe !== null && probe.shadowed.length > 0) paths.shadowed = probe.shadowed;
+  if (invocation === null || invocation.binary === probe?.binary) return paths;
+  paths.runPath = invocation.path;
+  if (invocation.shadowed.length > 0) paths.runShadowed = invocation.shadowed;
+  return paths;
 }
 
 /** Every registered harness with its install state, as scanned by {@link detectHarnesses}. */
@@ -335,7 +362,7 @@ function unsupportedInvocation(
 }
 
 /**
- * Scans every registered harness for its binaries and version, next to the modes it runs in.
+ * Scans every registered harness for its binaries, paths and version, next to its run modes.
  * Probes run side by side, so the slowest CLI sets the pace.
  *
  * @returns {Promise<ToolResult<HarnessListing>>} The complete installation listing.
@@ -357,6 +384,7 @@ export async function detectHarnesses(): Promise<ToolResult<HarnessListing>> {
         advisor,
         readOnly: readOnly && !belowFloor,
         agent,
+        ...binaryPaths(harness.locate()),
       };
     }),
   };

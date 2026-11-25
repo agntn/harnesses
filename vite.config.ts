@@ -25,6 +25,8 @@ export default defineConfig({
                 "Harness",
                 "HarnessInfoResult",
                 "HarnessInvocation",
+                "HarnessLocation",
+                "HarnessStatus",
                 "InvokeOptions",
                 "InvokeResult",
                 "ListModelsOptions",

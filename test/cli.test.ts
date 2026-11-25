@@ -7,10 +7,11 @@ import {
   readFileSync,
   readlinkSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { delimiter, join, resolve } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 import { describe, expect, it } from "vite-plus/test";
 import { getHarness, listHarnesses } from "../src/index.ts";
@@ -168,6 +169,33 @@ describe("harnesses usage paths", () => {
     });
     expect(JSON.parse(result.stdout)).toMatchObject(modes);
   });
+
+  it.skipIf(process.platform === "win32")(
+    "harnesses detect shows the file that runs and the copy it shadows",
+    () => {
+      const dir = mkdtempSync(join(tmpdir(), "harnesses-detect-cli-"));
+      try {
+        const [first, second] = [join(dir, "first"), join(dir, "second")];
+        for (const bin of [first, second]) {
+          mkdirSync(bin);
+          writeFileSync(join(bin, "claude"), "#!/bin/sh\necho 2.1.0\n", { mode: 0o755 });
+        }
+        const which = spawnSync("sh", ["-c", "command -v which"], { encoding: "utf8" });
+        symlinkSync(which.stdout.trim(), join(first, "which"));
+
+        const result = runCli(["detect"], "", { PATH: [first, second].join(delimiter) });
+
+        expect(result.status).toBe(0);
+        const lines = result.stdout.split("\n");
+        const row = lines.findIndex((line) => line.includes("● claude"));
+        expect(lines[row]).toContain("v2.1.0");
+        expect(lines[row]?.trimEnd().endsWith(join(first, "claude"))).toBe(true);
+        expect(lines[row + 1]?.trim()).toBe(`shadows ${join(second, "claude")}`);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+  );
 
   it("harnesses run refuses a resume that isn't a session UUID before spawning", () => {
     const result = runCli(["run", "codex", "--read-only", "--resume", "plum", "next"]);

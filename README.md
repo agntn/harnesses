@@ -45,26 +45,29 @@ npx @agntn/harnesses detect
 ```
   System Scan
 
-    ● antigravity     Google Antigravity CLI  v1.2.14   agent
-    ● claude          Anthropic Claude Code   v2.1.289  advisor · readOnly · agent
-    ● codex           OpenAI Codex CLI        v0.160.0  readOnly · agent
+    ● antigravity     Google Antigravity CLI  v1.5.11   agent                       /usr/bin/agy
+    ● claude          Anthropic Claude Code   v2.1.332  advisor · readOnly · agent  /usr/bin/claude
+    ● codex           OpenAI Codex CLI        v0.171.0  readOnly · agent            /usr/bin/codex
     ○ cursor          Cursor
-    ● freebuff        Freebuff                v0.0.204  no headless mode
+    ● freebuff        Freebuff                v0.2.36   no headless mode            /home/oritwoen/.local/bin/freebuff
     ○ gemini          Google Gemini CLI
     ○ github-copilot  GitHub Copilot
-    ● grok            xAI Grok CLI            v1.0.41   readOnly · agent
-    ● kilo            Kilo Code CLI           v7.4.15   agent
-    ● mastracode      Mastra Code             v0.10.2   no headless mode
-    ● omp             OMP (oh-my-pi)          v18.6.1   agent
-    ● opencode        OpenCode CLI            v2.0.22   agent
-    ● prime-agent     Prime Agent             v0.9.5    advisor · agent
-    ● pi              Pi Coding Agent         v1.0.2    advisor · readOnly · agent
-    ● vibe            Mistral Vibe            v3.1.3    readOnly · agent
-    ● hermes          Hermes Agent            v0.23.3   agent
+    ● grok            xAI Grok CLI            v1.0.70   readOnly · agent            /home/oritwoen/.grok/bin/grok
+    ● kilo            Kilo Code CLI           v7.4.15   agent                       /home/oritwoen/.kilo/bin/kilo
+      shadows /home/oritwoen/.local/bin/kilo
+    ● mastracode      Mastra Code             v0.10.2   no headless mode            /usr/bin/mastracode
+    ● omp             OMP (oh-my-pi)          v19.1.1   agent                       /home/oritwoen/.local/share/tern/omp/bin/omp
+      shadows /home/oritwoen/.cache/.bun/bin/omp
+    ● opencode        OpenCode CLI            v2.3.2    agent                       /usr/bin/opencode
+    ● prime-agent     Prime Agent             v0.10.3   advisor · agent             /home/oritwoen/.local/bin/prime-agent
+    ● pi              Pi Coding Agent         v1.6.1    advisor · readOnly · agent  /home/oritwoen/.pi/agent/bin/pi
+      shadows /usr/bin/pi
+    ● vibe            Mistral Vibe            v3.1.3    readOnly · agent            /home/oritwoen/.local/bin/vibe
+    ● hermes          Hermes Agent            v0.23.3   agent                       /home/oritwoen/.local/bin/hermes
     ○ openbot         OpenBot
 ```
 
-No key, no config. No network either. `detect` looks at `PATH`. Filled dot is installed, hollow is not. The tail says how `run` can drive it: `advisor` without tools, `readOnly` behind the harness's own read-only lock, `agent` with everything. Codex has no advisor, and now you learn that here, not from a refused run. After `pnpm add`, the same command is `pnpm exec harnesses`, or install it once with `pnpm add -g @agntn/harnesses`.
+No key, no config. No network either. `detect` looks at `PATH`. Filled dot is installed, hollow is not. The tail says how `run` can drive it: `advisor` without tools, `readOnly` behind the harness's own read-only lock, `agent` with everything. Codex has no advisor, and now you learn that here, not from a refused run. The last column shows what runs, with `shadows` underneath for later copies. On my machine, Pi shadows `/usr/bin/pi`, a calculator that's more interested in digits than code. After `pnpm add`, the same command is `pnpm exec harnesses`, or install it once with `pnpm add -g @agntn/harnesses`.
 
 Same binary, more commands:
 
@@ -114,6 +117,7 @@ console.log(paths.temp, claude.envOverrides);
 const active = detectHarness();
 if (active) console.log(active.id);
 await claude.probe(); // { installed, version }, without blocking on `claude --version`
+claude.locate().probe?.path; // "/usr/bin/claude", read off PATH without spawning anything
 
 await getHarness("codex").invoke("Review this patch", { readOnly: true, effort: "low" });
 getHarness("grok").readOnlyNetwork(); // false on Linux, so no web for its MCP servers under readOnly

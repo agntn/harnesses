@@ -27,7 +27,7 @@ export const harnessesTools = [
     name: "harnesses_detect",
     title: "Harnesses Detect",
     description:
-      "List every known AI coding harness with its install state, version and the harnesses_run modes it takes: advisor (tools=false), readOnly (tools=true with readOnly=true) and agent (tools=true).",
+      "List every known AI coding harness with its install state, version, the file on PATH that runs (path, plus runPath when a run starts another binary, and shadowed copies behind them) and the harnesses_run modes it takes: advisor (tools=false), readOnly (tools=true with readOnly=true) and agent (tools=true).",
     snippet:
       "Use harnesses_detect to see which AI coding harnesses are installed and how each one runs.",
     guidelines: [

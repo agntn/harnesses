@@ -8,6 +8,7 @@ import { getHarness, registerHarness } from "../src/index.ts";
 import { Harness } from "../src/harness.ts";
 import Claude, { foldClaudeStream } from "../src/harnesses/claude.ts";
 import Cursor from "../src/harnesses/cursor.ts";
+import { findExecutables } from "../src/executables.ts";
 import {
   detectHarnesses,
   harnessInfo,
@@ -647,6 +648,9 @@ describe("normalized invocation", () => {
 
   it("runs the structured invocation and yields parseable JSON", async () => {
     const fake = registerHarness(FakeCursor);
+    onTestFinished(() => {
+      registerHarness(Cursor);
+    });
 
     const result = await fake.invoke("ping", { structured: true });
 
@@ -656,6 +660,9 @@ describe("normalized invocation", () => {
 
   it("runs a prompt through the invocation and captures the output", async () => {
     const fake = registerHarness(FakeCursor);
+    onTestFinished(() => {
+      registerHarness(Cursor);
+    });
 
     const result = await fake.invoke("hello world");
 
@@ -665,6 +672,9 @@ describe("normalized invocation", () => {
   });
 
   it("kills a run that exceeds the timeout", async () => {
+    onTestFinished(() => {
+      registerHarness(Cursor);
+    });
     registerHarness(
       class extends FakeCursor {
         override readonly invocation: Harness["invocation"] = {
@@ -1525,6 +1535,9 @@ describe("runHarness tool operation", () => {
   });
 
   it("returns the outcome of a successful run", async () => {
+    onTestFinished(() => {
+      registerHarness(Cursor);
+    });
     registerHarness(FakeCursor);
 
     const result = await runHarness("cursor", "ping");
@@ -1836,6 +1849,9 @@ describe("runHarness tool operation", () => {
   });
 
   it("marks a non-zero exit as an error and truncates long output", async () => {
+    onTestFinished(() => {
+      registerHarness(Cursor);
+    });
     registerHarness(
       class extends FakeCursor {
         override readonly invocation: Harness["invocation"] = {
@@ -1856,5 +1872,93 @@ describe("runHarness tool operation", () => {
     expect(outcome.stdout.length).toBeLessThan(RUN_MAX_OUTPUT_CHARS + 100);
     expect(outcome.stdout).toContain("[truncated");
     expect(result.content[0]?.text).toContain("failure-trace");
+  });
+});
+
+describe.skipIf(process.platform === "win32")("binary location", () => {
+  /* A temp root that goes away with the test, PATH stub included. */
+  async function scratch(): Promise<string> {
+    const root = await mkdtemp(join(tmpdir(), "harnesses-locate-"));
+    onTestFinished(() => rm(root, { recursive: true, force: true }));
+    onTestFinished(() => vi.unstubAllEnvs());
+    return root;
+  }
+
+  /* Writes an empty script with the given mode. */
+  async function script(file: string, mode = 0o755): Promise<void> {
+    await writeFile(file, "#!/bin/sh\n", { mode });
+  }
+
+  it("names the files a Cursor probe and run start, and the copies behind them", async () => {
+    const root = await scratch();
+    const first = join(root, "first");
+    const second = join(root, "second");
+    const linked = join(root, "linked");
+    await mkdir(first);
+    await mkdir(second);
+    await symlink(first, linked);
+    await script(join(first, "cursor"));
+    await script(join(first, "cursor-agent"));
+    await script(join(second, "cursor-agent"));
+    await script(join(second, "cursor"), 0o644);
+    vi.stubEnv("PATH", [first, linked, second].join(delimiter));
+
+    expect(new Cursor().locate()).toEqual({
+      probe: { binary: "cursor", path: join(first, "cursor"), shadowed: [] },
+      invocation: {
+        binary: "cursor-agent",
+        path: join(first, "cursor-agent"),
+        shadowed: [join(second, "cursor-agent")],
+      },
+    });
+    const row = (await detectHarnesses()).details.harnesses.find(({ id }) => id === "cursor");
+    expect(row).toMatchObject({
+      path: join(first, "cursor"),
+      runPath: join(first, "cursor-agent"),
+      runShadowed: [join(second, "cursor-agent")],
+    });
+    expect(row).not.toHaveProperty("shadowed");
+  });
+
+  it("reports a run binary missing from PATH as null, and a lone harness without run fields", async () => {
+    const root = await scratch();
+    const first = join(root, "first");
+    const second = join(root, "second");
+    await mkdir(first);
+    await mkdir(second);
+    await script(join(first, "cursor"));
+    await script(join(second, "cursor"));
+    vi.stubEnv("PATH", [first, second].join(delimiter));
+
+    const { harnesses } = (await detectHarnesses()).details;
+    expect(harnesses.find(({ id }) => id === "cursor")).toMatchObject({
+      path: join(first, "cursor"),
+      shadowed: [join(second, "cursor")],
+      runPath: null,
+    });
+    const claude = harnesses.find(({ id }) => id === "claude");
+    expect(claude).toMatchObject({ path: null });
+    expect(Object.keys(claude ?? {})).not.toContain("runPath");
+  });
+
+  it("searches the way spawn does on each platform", async () => {
+    const root = await scratch();
+    await script(join(root, "tool"));
+    await script(join(root, "tool.com"), 0o644);
+    await script(join(root, "tool.exe"), 0o644);
+
+    expect(findExecutables("tool", { path: "", cwd: root, platform: "linux" })).toEqual([
+      join(root, "tool"),
+    ]);
+    expect(findExecutables("./tool", { path: "/nowhere", cwd: root, platform: "linux" })).toEqual([
+      join(root, "tool"),
+    ]);
+    expect(findExecutables("tool", { path: "/nowhere", cwd: root, platform: "linux" })).toEqual([]);
+    expect(
+      findExecutables("tool", { path: `"${root}";;`, cwd: "/nowhere", platform: "win32" }),
+    ).toEqual([join(root, "tool.com"), join(root, "tool.exe")]);
+    expect(findExecutables("tool.exe", { path: "", cwd: root, platform: "win32" })).toEqual([
+      join(root, "tool.exe"),
+    ]);
   });
 });
