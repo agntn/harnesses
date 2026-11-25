@@ -1,32 +1,11 @@
 /** The harnesses tools, declared once for every host. Executors load on the first call. */
 
-import {
-  defineTool,
-  Type,
-  type TObject,
-  type ToolCallContext,
-  type ToolDefinition,
-  type ToolResult,
-  type TSchema,
-} from "@agntn/tools";
-import type { McpServerParams } from "./tool-operations.ts";
-import {
-  harnessToolSchemas,
-  type AgentsSyncParams,
-  type InfoParams,
-  type McpAddParams,
-  type McpListParams,
-  type McpRemoveParams,
-  type McpSyncParams,
-  type ModelsParams,
-  type PromptsSyncParams,
-  type RunParams,
-  type SkillsSyncParams,
-} from "./tool-schemas.ts";
+import { defineTool, type ToolDefinition } from "@agntn/tools";
+import { harnessToolSchemas } from "./tool-schemas.ts";
 
 type ToolOperations = typeof import("./tool-operations.ts");
 
-const schemas = harnessToolSchemas<TSchema, TObject>(Type);
+const schemas = harnessToolSchemas();
 let operationsPromise: Promise<ToolOperations> | undefined;
 
 /**
@@ -42,47 +21,9 @@ async function loadOperations(signal?: AbortSignal): Promise<ToolOperations> {
   return operations;
 }
 
-/** Each tool's params interface from `tool-schemas.ts`, by wire name. */
-interface HarnessToolParams {
-  harnesses_detect: Record<string, never>;
-  harnesses_info: InfoParams;
-  harnesses_models: ModelsParams;
-  harnesses_run: RunParams;
-  harnesses_mcp_list: McpListParams;
-  harnesses_mcp_add: McpAddParams;
-  harnesses_mcp_sync: McpSyncParams;
-  harnesses_agents_sync: AgentsSyncParams;
-  harnesses_prompts_sync: PromptsSyncParams;
-  harnesses_skills_sync: SkillsSyncParams;
-  harnesses_mcp_remove: McpRemoveParams;
-}
-
-/** A tool typed by its params interface, since the schema factory erases the static type. */
-interface HarnessTool<Name extends keyof HarnessToolParams> extends Omit<
-  ToolDefinition<TObject, unknown, Name>,
-  "execute"
-> {
-  execute(input: HarnessToolParams[Name], context: ToolCallContext): Promise<ToolResult>;
-}
-
-/**
- * Defines a tool typed by its name, kept literal for `toAiTools`.
- *
- * @param tool - Definition with a typed executor.
- * @returns {ToolDefinition<TObject, unknown, Name>} The checked definition.
- */
-function harnessTool<const Name extends keyof HarnessToolParams>(
-  tool: HarnessTool<Name>,
-): ToolDefinition<TObject, unknown, Name> {
-  return defineTool({
-    ...tool,
-    execute: (input, context) => tool.execute(input as unknown as HarnessToolParams[Name], context),
-  });
-}
-
 /** The eleven harnesses tools, in `tools/list` order. */
 export const harnessesTools = [
-  harnessTool({
+  defineTool({
     name: "harnesses_detect",
     title: "Harnesses Detect",
     description:
@@ -96,7 +37,7 @@ export const harnessesTools = [
     input: schemas.detect,
     execute: async (_input, { signal }) => (await loadOperations(signal)).detectHarnesses(),
   }),
-  harnessTool({
+  defineTool({
     name: "harnesses_info",
     title: "Harnesses Info",
     description:
@@ -110,7 +51,7 @@ export const harnessesTools = [
     input: schemas.info,
     execute: async (input, { signal }) => (await loadOperations(signal)).harnessInfo(input.id),
   }),
-  harnessTool({
+  defineTool({
     name: "harnesses_models",
     title: "Harnesses Models",
     description:
@@ -124,7 +65,7 @@ export const harnessesTools = [
       return (await loadOperations(signal)).listHarnessModels(id, { ...options, signal });
     },
   }),
-  harnessTool({
+  defineTool({
     name: "harnesses_run",
     title: "Harnesses Run",
     description:
@@ -143,7 +84,7 @@ export const harnessesTools = [
       return (await loadOperations(signal)).runHarness(id, prompt, { ...options, signal });
     },
   }),
-  harnessTool({
+  defineTool({
     name: "harnesses_mcp_list",
     title: "Harnesses MCP List",
     description:
@@ -162,7 +103,7 @@ export const harnessesTools = [
       return (await loadOperations(signal)).mcpList(id, name);
     },
   }),
-  harnessTool({
+  defineTool({
     name: "harnesses_mcp_add",
     title: "Harnesses MCP Add",
     description:
@@ -173,10 +114,10 @@ export const harnessesTools = [
     cli: { command: "mcp-servers add" },
     async execute(input, { signal }) {
       const { id, scope, ...server } = input;
-      return (await loadOperations(signal)).mcpAdd(id, server as McpServerParams, scope);
+      return (await loadOperations(signal)).mcpAdd(id, server, scope);
     },
   }),
-  harnessTool({
+  defineTool({
     name: "harnesses_mcp_sync",
     title: "Harnesses MCP Sync",
     description:
@@ -195,7 +136,7 @@ export const harnessesTools = [
       return (await loadOperations(signal)).mcpSync(id, check === true);
     },
   }),
-  harnessTool({
+  defineTool({
     name: "harnesses_agents_sync",
     title: "Harnesses Agents Sync",
     description:
@@ -214,7 +155,7 @@ export const harnessesTools = [
       return (await loadOperations(signal)).agentsSync(id, check === true);
     },
   }),
-  harnessTool({
+  defineTool({
     name: "harnesses_prompts_sync",
     title: "Harnesses Prompts Sync",
     description:
@@ -233,7 +174,7 @@ export const harnessesTools = [
       return (await loadOperations(signal)).promptsSync(id, check === true);
     },
   }),
-  harnessTool({
+  defineTool({
     name: "harnesses_skills_sync",
     title: "Harnesses Skills Sync",
     description:
@@ -252,7 +193,7 @@ export const harnessesTools = [
       return (await loadOperations(signal)).skillsSync(id, check === true);
     },
   }),
-  harnessTool({
+  defineTool({
     name: "harnesses_mcp_remove",
     title: "Harnesses MCP Remove",
     description:

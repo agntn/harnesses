@@ -1,8 +1,8 @@
-import { defineTool, Type, type TObject, type TSchema } from "@agntn/tools";
+import { defineTool, Type } from "@agntn/tools";
 import type { McpServerParams } from "../tool-operations.ts";
-import { harnessToolSchemas, type McpAddParams } from "../tool-schemas.ts";
+import { harnessToolSchemas } from "../tool-schemas.ts";
 
-const { properties } = harnessToolSchemas<TSchema, TObject>(Type).mcpAdd;
+const { properties } = harnessToolSchemas().mcpAdd;
 
 /**
  * @param env - Comma-separated `K=V` pairs.
@@ -17,9 +17,6 @@ function parseEnv(env: string): Record<string, string> {
       .map((pair) => [pair[0] as string, pair[1] ?? ""]),
   );
 }
-
-/** The tool's parameters, with `args` and `env` as the words the command line took. */
-type CliAddParams = Omit<McpAddParams, "args" | "env"> & { args?: string; env?: string };
 
 /** The tool's schema, with `--args` and `--env` as words a shell can type. */
 export default defineTool({
@@ -40,7 +37,7 @@ export default defineTool({
   ),
   cli: { command: "mcp-servers add", positional: ["id", "name"], plain: ["id", "name"] },
   async execute(input) {
-    const { id, scope, args, env, ...server } = input as CliAddParams;
+    const { id, scope, args, env, ...server } = input;
     const { mcpAdd } = await import("../tool-operations.ts");
     return mcpAdd(
       id,
