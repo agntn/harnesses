@@ -68,6 +68,12 @@ catalogs:
     '@oh-my-pi/pi-coding-agent':
       specifier: 18.20.0
       version: 18.20.0
+    '@types/node':
+      specifier: 26.6.6
+      version: 26.6.6
+    '@typescript/native-preview':
+      specifier: 7.0.0-dev.20260707.2
+      version: 7.0.0-dev.20260707.2
     '@vueuse/core':
       specifier: 14.4.0
       version: 14.4.0
@@ -126,10 +132,10 @@ importers:
         specifier: catalog:dev
         version: 18.20.0
       '@types/node':
-        specifier: latest
+        specifier: catalog:dev
         version: 26.6.6
       '@typescript/native-preview':
-        specifier: latest
+        specifier: catalog:dev
         version: 7.0.0-dev.20260707.2
       ai:
         specifier: catalog:dev
