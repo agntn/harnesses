@@ -145,21 +145,8 @@ export default class Codex extends Harness {
     scope: "user",
     level: "official",
   };
-  readonly commands: Harness["commands"] = [
-    {
-      path: "~/.codex/prompts/",
-      scope: "user",
-      level: "official",
-      note: "Deprecated Markdown prompts invoked as /prompts:name. Top-level files only; use skills for shared prompts.",
-    },
-  ];
-  override readonly promptTemplates = this.commands;
-  override readonly promptTemplateSyncTarget: Harness["promptTemplateSyncTarget"] = {
-    path: "~/.codex/prompts/",
-    scope: "user",
-    level: "official",
-    format: "markdown",
-  };
+  /** Codex 0.117.0 stopped reading `~/.codex/prompts/`; skills took over its job. */
+  readonly commands: Harness["commands"] = [];
   readonly hooks: Harness["hooks"] = [];
   readonly invocation: Harness["invocation"] = {
     args: ["exec", "--skip-git-repo-check", "{prompt}"],
@@ -208,7 +195,7 @@ export default class Codex extends Harness {
       path: "~/.codex",
       scope: "user",
       level: "official",
-      relocates: ["config", "sessions", "instructions", "skills", "commands", "promptTemplates"],
+      relocates: ["config", "sessions", "instructions", "skills"],
     },
   ];
   override readonly agentsFile = "~/.codex/AGENTS.md";

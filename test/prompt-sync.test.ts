@@ -423,4 +423,24 @@ describe("syncPromptTemplates", () => {
       ]);
     });
   });
+  it("leaves Codex alone now that it no longer reads custom prompts", () => {
+    withoutXdgData(() => {
+      const { homeDir, sourceDir } = fixture();
+      writeFileSync(join(sourceDir, "review.md"), "Review this.\n");
+      const report = syncPromptTemplates([getHarness("codex")], false, {
+        homeDir,
+        platform: "linux",
+      });
+
+      expect(report.targets).toEqual([
+        {
+          id: "codex",
+          detail: "no stable user-scope prompt template destination",
+          templates: [],
+        },
+      ]);
+      expect(existsSync(join(homeDir, ".codex", "prompts"))).toBe(false);
+      expect(getHarness("codex").resolve({ homeDir }).promptTemplates).toEqual([]);
+    });
+  });
 });
