@@ -36,6 +36,18 @@ function candidateNames(binary: string, windows: boolean): string[] {
 }
 
 /**
+ * Joins without folding `..`, which POSIX walks through symlinks, not lexically.
+ *
+ * @param dir - Directory as `PATH` spells it.
+ * @param name - File name, or a path of its own.
+ * @returns {string} The path a spawn hands the kernel.
+ */
+function posixJoin(dir: string, name: string): string {
+  const joined = name.startsWith("/") ? name : `${dir}/${name}`;
+  return joined.replaceAll(/\/\.(?=\/|$)/gu, "").replaceAll(/\/{2,}/gu, "/");
+}
+
+/**
  * An empty POSIX entry is the current directory, as execvp reads it.
  *
  * @param binary - Name or path to look up.
@@ -46,7 +58,9 @@ function searchDirs(binary: string, options: Required<LookupOptions>): string[] 
   const windows = options.platform === "win32";
   const { cwd } = options;
   if (binary.includes("/") || (windows && binary.includes("\\"))) return [cwd];
-  if (!windows) return options.path.split(":").map((entry) => resolve(cwd, entry));
+  if (!windows) {
+    return options.path.split(":").map((entry) => (entry === "" ? cwd : posixJoin(cwd, entry)));
+  }
   const entries = options.path
     .split(";")
     .map((entry) => entry.replaceAll('"', ""))
@@ -110,7 +124,7 @@ export function findExecutables(binary: string, options: LookupOptions = {}): st
   const found: string[] = [];
   for (const dir of searchDirs(binary, lookup)) {
     for (const name of names) {
-      const file = resolve(dir, name);
+      const file = windows ? resolve(dir, name) : posixJoin(dir, name);
       if (!runnable(file, windows)) continue;
       const real = realOrSelf(file);
       if (seen.has(real)) continue;

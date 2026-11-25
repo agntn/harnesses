@@ -1941,6 +1941,20 @@ describe.skipIf(process.platform === "win32")("binary location", () => {
     expect(Object.keys(claude ?? {})).not.toContain("runPath");
   });
 
+  it("walks .. after a symlink the way the kernel does, not lexically", async () => {
+    const root = await scratch();
+    await mkdir(join(root, "actual", "child"), { recursive: true });
+    await mkdir(join(root, "actual", "bin"));
+    await mkdir(join(root, "bin"));
+    await symlink(join(root, "actual", "child"), join(root, "link"));
+    await script(join(root, "actual", "bin", "tool"));
+    await script(join(root, "bin", "tool"));
+
+    expect(findExecutables("tool", { path: `${root}/link/../bin`, platform: "linux" })).toEqual([
+      `${root}/link/../bin/tool`,
+    ]);
+  });
+
   it("searches the way spawn does on each platform", async () => {
     const root = await scratch();
     await script(join(root, "tool"));
