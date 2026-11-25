@@ -1,17 +1,6 @@
 /** Tool parameter schemas, built by `src/tools.ts` and the CLI's `mcp-servers add`. */
 
-/** The part of `Type` from `@agntn/tools` the schemas use. */
-export interface McpSchemaBuilder<I, S> {
-  Object(properties: Readonly<Record<string, I>>, options?: object): S;
-  String(options?: object): I;
-  Integer(options?: object): I;
-  Boolean(options?: object): I;
-  Array(item: I, options?: object): I;
-  Record(key: I, value: I, options?: object): I;
-  Union(schemas: readonly I[], options?: object): I;
-  Enum(values: readonly string[], options?: object): I;
-  Optional(schema: I): I;
-}
+import { Type, type TProperties } from "@agntn/tools";
 
 export const HARNESS_INFO_MAX_ITEMS = 20;
 export const RUN_TIMEOUT_DEFAULT_SECONDS = 600;
@@ -21,12 +10,11 @@ const SESSION_UUID =
   "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
 
 /**
- * Builds the parameter schemas for all harness tools with the host's TypeBox.
+ * Builds every harness tool's schema, the one place its input type comes from.
  *
- * @param Type - Host-provided TypeBox-compatible schema builder.
- * @returns {Record<string, S>} Schemas keyed by harness tool operation.
+ * @returns {Record<string, TObject>} Schemas keyed by harness tool operation.
  */
-export function harnessToolSchemas<I, S>(Type: McpSchemaBuilder<I, S>) {
+export function harnessToolSchemas() {
   const harnessId = (description: string) =>
     Type.String({ description, minLength: 1, maxLength: 50, pattern: "^[a-z][a-z0-9-]*$" });
 
@@ -39,9 +27,9 @@ export function harnessToolSchemas<I, S>(Type: McpSchemaBuilder<I, S>) {
    * A closed object rejects a stray `read_only` instead of quietly running with every tool.
    *
    * @param properties - Declared tool arguments.
-   * @returns {S} An object schema that refuses undeclared keys.
+   * @returns {TObject<P>} An object schema that refuses undeclared keys.
    */
-  const closed = (properties: Readonly<Record<string, I>>) =>
+  const closed = <const P extends TProperties>(properties: P) =>
     Type.Object(properties, { additionalProperties: false });
 
   const scope = Type.Optional(
@@ -241,78 +229,4 @@ export function harnessToolSchemas<I, S>(Type: McpSchemaBuilder<I, S>) {
       scope,
     }),
   };
-}
-
-/**
- * Parameter types matching the schemas above. The generic factory erases the
- * builders' literal types, so hosts annotate their execute callbacks with
- * these instead of TypeBox Static inference.
- */
-export interface InfoParams {
-  id: string | string[];
-}
-
-export interface ModelsParams {
-  id: string;
-  search?: string;
-  cwd?: string;
-  timeoutSeconds?: number;
-}
-
-export interface RunParams {
-  id: string;
-  prompt: string;
-  cwd?: string;
-  model?: string;
-  effort?: string;
-  extensions?: boolean;
-  resume?: string;
-  sessionId?: string;
-  timeoutSeconds?: number;
-  structured?: boolean;
-  tools: boolean;
-  readOnly?: boolean;
-}
-
-export interface McpListParams {
-  id?: string;
-  name?: string;
-}
-
-export interface McpSyncParams {
-  id?: string;
-  check?: boolean;
-}
-
-export interface AgentsSyncParams {
-  id?: string;
-  check?: boolean;
-}
-
-export interface PromptsSyncParams {
-  id?: string;
-  check?: boolean;
-}
-
-export interface SkillsSyncParams {
-  id?: string;
-  check?: boolean;
-}
-
-export interface McpAddParams {
-  id: string;
-  name: string;
-  command?: string;
-  args?: string[];
-  env?: Record<string, string>;
-  url?: string;
-  transport?: "stdio" | "http" | "sse";
-  headers?: Record<string, string>;
-  scope?: "user" | "project";
-}
-
-export interface McpRemoveParams {
-  id: string;
-  name: string;
-  scope?: "user" | "project";
 }
