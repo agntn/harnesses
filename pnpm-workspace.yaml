@@ -67,6 +67,8 @@ catalogs:
     "@nuxt/content": 3.16.2
     "@nuxt/ui": 4.12.0
     "@oh-my-pi/pi-coding-agent": 18.20.0
+    "@types/node": 26.6.6
+    "@typescript/native-preview": 7.0.0-dev.20260707.2
     "@vueuse/core": 14.4.0
     ai: 7.0.173
     obuild: 0.4.43
