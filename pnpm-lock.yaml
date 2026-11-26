@@ -11,8 +11,8 @@ catalogs:
       version: 1.0.0
   deps:
     '@agntn/tools':
-      specifier: 0.3.2
-      version: 0.3.2
+      specifier: 0.4.0
+      version: 0.4.0
     '@modelcontextprotocol/server':
       specifier: 2.4.0
       version: 2.4.0
@@ -102,7 +102,7 @@ importers:
     dependencies:
       '@agntn/tools':
         specifier: catalog:deps
-        version: 0.3.2(@earendil-works/pi-coding-agent@1.5.2(@aws-sdk/credential-provider-node@3.972.83)(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(@smithy/signature-v4@5.7.3)(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.7))(@modelcontextprotocol/server@2.4.0)(@oh-my-pi/pi-coding-agent@18.20.0)(ai@7.0.173(zod@4.6.7))(zod@4.6.7)
+        version: 0.4.0(@earendil-works/pi-coding-agent@1.5.2(@aws-sdk/credential-provider-node@3.972.83)(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(@smithy/signature-v4@5.7.3)(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.7))(@modelcontextprotocol/server@2.4.0)(@oh-my-pi/pi-coding-agent@18.20.0)(ai@7.0.173(zod@4.6.7))(zod@4.6.7)
       '@modelcontextprotocol/server':
         specifier: catalog:deps
         version: 2.4.0
@@ -200,13 +200,14 @@ packages:
       oxlint: '>=1.78.0'
       oxlint-tsgolint: '>=7.0.2001'
 
-  '@agntn/tools@0.3.2':
-    resolution: {integrity: sha512-I6Q6tS/k5AzrZauBfza2g9VeckYKyDgxZdNAr/TD/pnYl8R8Xxf1gK48mfF3EENKpH8iVyMqgF+y2i2oVzyc9g==}
+  '@agntn/tools@0.4.0':
+    resolution: {integrity: sha512-JfPGXIcgMvVSP9MhyOiNFepwmBy0GUH3ETd22SoDlXtTa9lIdAVLtUPuwHCahaOcYXTf00h4ASTJwFQqeiRXkQ==}
     engines: {node: '>=26'}
     peerDependencies:
       '@earendil-works/pi-coding-agent': '>=0.84.2 <2'
       '@modelcontextprotocol/server': '>=2.2.0 <3'
-      '@oh-my-pi/pi-coding-agent': '>=18.0.0 <19'
+      '@oh-my-pi/pi-coding-agent': '>=18.0.0 <20'
+      '@opencode/plugin': '>=2.3.0 <3'
       ai: '>=7.0.0 <8'
       h3-mcp: '>=0.2.0 <0.3'
       zod: '>=4.1.13 <5'
@@ -216,6 +217,8 @@ packages:
       '@modelcontextprotocol/server':
         optional: true
       '@oh-my-pi/pi-coding-agent':
+        optional: true
+      '@opencode/plugin':
         optional: true
       ai:
         optional: true
@@ -8928,7 +8931,7 @@ snapshots:
       oxlint: 1.85.0(oxlint-tsgolint@7.0.2003)(vite-plus@1.0.0(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(@vitest/browser-preview@5.0.1)(@vitest/ui@5.0.1)(@voidzero-dev/vite-plus-core@1.0.0(@types/node@26.6.6)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.51.2)(typescript@6.0.3)(yaml@2.9.1))(esbuild@0.28.1)(jiti@2.7.0)(terser@5.51.2)(typescript@6.0.3)(vitest@5.0.1)(yaml@2.9.1))
       oxlint-tsgolint: 7.0.2003
 
-  '@agntn/tools@0.3.2(@earendil-works/pi-coding-agent@1.5.2(@aws-sdk/credential-provider-node@3.972.83)(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(@smithy/signature-v4@5.7.3)(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.7))(@modelcontextprotocol/server@2.4.0)(@oh-my-pi/pi-coding-agent@18.20.0)(ai@7.0.173(zod@4.6.7))(zod@4.6.7)':
+  '@agntn/tools@0.4.0(@earendil-works/pi-coding-agent@1.5.2(@aws-sdk/credential-provider-node@3.972.83)(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(@smithy/signature-v4@5.7.3)(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.7))(@modelcontextprotocol/server@2.4.0)(@oh-my-pi/pi-coding-agent@18.20.0)(ai@7.0.173(zod@4.6.7))(zod@4.6.7)':
     optionalDependencies:
       '@earendil-works/pi-coding-agent': 1.5.2(@aws-sdk/credential-provider-node@3.972.83)(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(@smithy/signature-v4@5.7.3)(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.7)
       '@modelcontextprotocol/server': 2.4.0

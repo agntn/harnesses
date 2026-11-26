@@ -6,7 +6,7 @@
 export async function serveMcp(): Promise<void> {
   const [{ createMcpServer }, { serveStdio }] = await Promise.all([
     import("../mcp.ts"),
-    import("@modelcontextprotocol/server/stdio"),
+    import("@agntn/tools/stdio"),
   ]);
   serveStdio(() => createMcpServer());
 }
