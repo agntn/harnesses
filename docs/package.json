@@ -25,5 +25,5 @@
     "shiki": "catalog:dev",
     "wrangler": "catalog:dev"
   },
-  "packageManager": "pnpm@12.15.0"
+  "packageManager": "pnpm@12.23.0"
 }

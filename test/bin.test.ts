@@ -121,22 +121,31 @@ function writableCheckout() {
   return checkout;
 }
 
-const dropped = {
+const RESTART = "src/ changed under this server, restart it to load the new code";
+
+const refused = { isError: true, content: [{ type: "text", text: RESTART }] };
+
+/* A spawn a pull lands under: the answer goes, the warning stays. */
+const mayHaveRun = {
   isError: true,
   content: [
     {
       type: "text",
-      text: "src/ changed during this call, so its answer was dropped. It may have run: check before retrying, then restart the server",
+      text: `${RESTART}\nThe call's answer was dropped, and it may have run. Check before retrying.`,
     },
   ],
 };
 
-const refused = {
-  isError: true,
-  content: [
-    { type: "text", text: "src/ changed under this server, restart it to load the new code" },
-  ],
-};
+/* A writable checkout with `edit` run over `file`, which must change it. */
+function patchedCheckout(file: string, edit: (source: string) => string) {
+  const checkout = writableCheckout();
+  const path = join(checkout, file);
+  const source = readFileSync(path, "utf8");
+  const edited = edit(source);
+  expect(edited, `the anchor in ${file} moved`).not.toBe(source);
+  writeFileSync(path, edited);
+  return checkout;
+}
 
 describe.skipIf(!existsSync(join(root, "dist/cli.mjs")))("harnesses mcp from the built bin", () => {
   it("serves the live source inside a checkout", () => {
@@ -204,6 +213,36 @@ describe.skipIf(!existsSync(join(root, "dist/cli.mjs")))("harnesses mcp from the
     }
   });
 
+  it.each(builds)(
+    "keeps a 2026 client on 2026 past a bare notification, from the $from",
+    (build) => {
+      const meta = {
+        "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+        "io.modelcontextprotocol/clientInfo": { name: "raw", version: "0" },
+        "io.modelcontextprotocol/clientCapabilities": { elicitation: { form: {} } },
+      };
+      const input = [
+        { jsonrpc: "2.0", id: 1, method: "server/discover", params: { _meta: meta } },
+        { jsonrpc: "2.0", method: "notifications/roots/list_changed", params: {} },
+        { jsonrpc: "2.0", id: 2, method: "tools/list", params: { _meta: meta } },
+      ]
+        .map((message) => `${JSON.stringify(message)}\n`)
+        .join("");
+      const child = spawnSync(process.execPath, [join(root, "dist/cli.mjs"), "mcp"], {
+        encoding: "utf8",
+        env: { ...env, ...build.env },
+        input,
+        timeout: 20_000,
+      });
+      const list = child.stdout
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as { id?: number; result?: { resultType?: string } })
+        .find((message) => message.id === 2);
+      expect(list?.result?.resultType, child.stderr).toBe("complete");
+    },
+  );
+
   it("refuses a call after a pull before the executor starts", async () => {
     const checkout = writableCheckout();
     /* The executor marks a file outside `src/` whenever it runs. */
@@ -234,22 +273,65 @@ describe.skipIf(!existsSync(join(root, "dist/cli.mjs")))("harnesses mcp from the
     }
   });
 
-  it("drops the answer of a call a pull landed under, saying it may have run", async () => {
-    const checkout = writableCheckout();
-    const operations = join(checkout, "src/tool-operations.ts");
-    writeFileSync(
-      operations,
-      `import { writeFileSync } from "node:fs";\n${readFileSync(operations, "utf8").replace(
-        '  if (typeof input === "string") {',
-        `  writeFileSync(new URL("./pulled.ts", import.meta.url), "export {};\\n");
+  it("drops a read a pull landed under, with nothing to double check", async () => {
+    const checkout = patchedCheckout(
+      "src/tool-operations.ts",
+      (source) =>
+        `import { writeFileSync } from "node:fs";\n${source.replace(
+          '  if (typeof input === "string") {',
+          `  writeFileSync(new URL("./pulled.ts", import.meta.url), "export {};\\n");
   if (typeof input === "string") {`,
-      )}`,
+        )}`,
     );
     const client = await connect(checkout);
     try {
       expect(
         await client.callTool({ name: "harnesses_info", arguments: { id: "pi" } }),
-      ).toMatchObject(dropped);
+      ).toStrictEqual(refused);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it("drops a spawn a pull landed under, saying it may have run", async () => {
+    const checkout = patchedCheckout(
+      "src/tool-operations.ts",
+      (source) =>
+        `import { writeFileSync } from "node:fs";\n${source.replace(
+          "  const built = harness.buildModelListInvocation(options.search);",
+          `  writeFileSync(new URL("./pulled.ts", import.meta.url), "export {};\\n");
+  return { content: [{ type: "text", text: "listed" }] };`,
+        )}`,
+    );
+    const client = await connect(checkout);
+    try {
+      expect(
+        await client.callTool({ name: "harnesses_models", arguments: { id: "codex" } }),
+      ).toStrictEqual(mayHaveRun);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it("lets progress through while it watches src/", async () => {
+    const checkout = patchedCheckout("src/tools.ts", (source) =>
+      source.replace(
+        "execute: async (_input, { signal }) => (await loadOperations(signal)).detectHarnesses(),",
+        `execute: async (_input, { signal, progress }) => {
+      progress?.("scanning PATH");
+      return (await loadOperations(signal)).detectHarnesses();
+    },`,
+      ),
+    );
+    const client = await connect(checkout);
+    const messages: unknown[] = [];
+    try {
+      const answer = await client.callTool(
+        { name: "harnesses_detect", arguments: {} },
+        { onprogress: ({ message }) => messages.push(message) },
+      );
+      expect(answer.isError).not.toBe(true);
+      expect(messages).toEqual(["scanning PATH"]);
     } finally {
       await client.close();
     }

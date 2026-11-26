@@ -47,7 +47,7 @@ catalog:
 # One version per name for the library and docs/, so a bump moves both in one line.
 catalogs:
   deps:
-    "@agntn/tools": 0.3.2
+    "@agntn/tools": 0.4.0
     "@modelcontextprotocol/server": 2.4.0
     better-sqlite3: 12.11.1
     docus: 5.15.0
